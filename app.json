@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "DaloaMarket",
+    "slug": "daloamarket",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "daloamarket",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0F17"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.daloamarket.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0F17"
+      },
+      "package": "com.daloamarket.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "DaloaMarket utilise votre position pour calculer précisément les frais de livraison à Daloa."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DaloaMarket a besoin d'accéder à vos photos pour publier des annonces."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "daloamarket-app-id"
+      }
+    }
+  }
+}
