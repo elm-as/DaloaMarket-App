@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start --port 8081",
-    "android": "expo start --android --port 8081",
-    "ios": "expo start --ios --port 8081",
-    "web": "expo start --web --port 8081",
+    "start": "npx expo start --port 8081",
+    "android": "npx expo start --android --port 8081",
+    "ios": "npx expo start --ios --port 8081",
+    "web": "npx expo start --web --port 8081",
     "typecheck": "tsc --noEmit",
     "build:preview": "eas build --profile preview --platform android",
     "build:prod": "eas build --profile production --platform android"
@@ -20,7 +20,7 @@
     "@shopify/flash-list": "^1.7.3",
     "@supabase/supabase-js": "^2.49.1",
     "@tanstack/react-query": "^5.67.1",
-    "expo": "~54.0.0",
+    "expo": "~54.0.37",
     "expo-constants": "~18.0.0",
     "expo-font": "~14.0.0",
     "expo-haptics": "~15.0.0",
