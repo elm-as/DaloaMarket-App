@@ -1,17 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { colors, radii, spacing, typography } from '@daloa/ui';
-import { Haptics } from '@daloa/utils';
-import {
-  Shirt,
-  Smartphone,
-  Home,
-  Car,
-  UtensilsCrossed,
-  Dumbbell,
-  BookOpen,
-  Sparkles,
-} from 'lucide-react-native';
+import { StyleSheet } from 'react-native';
+import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles } from 'lucide-react-native';
 
 export interface CategoryPillProps {
   id: string;
@@ -21,29 +11,26 @@ export interface CategoryPillProps {
   iconName?: string;
 }
 
-export const CategoryPill: React.FC<CategoryPillProps> = ({
-  id,
-  name,
-  isSelected,
-  onPress,
-  iconName,
-}) => {
-  const getIcon = () => {
-    const iconProps = {
-      size: 15,
-      color: isSelected ? '#FFFFFF' : colors.dark.textMuted,
-    };
+export const CategoryPill: React.FC<CategoryPillProps> = ({ id, name, isSelected, onPress }) => {
+  const accent = useAccent();
 
+  const getIcon = () => {
+    const iconProps = { size: 15, color: isSelected ? colors.text.inverse : accent.DEFAULT };
     switch (id) {
       case 'fashion':
+      case 'mode':
         return <Shirt {...iconProps} />;
       case 'electronics':
+      case 'electronique':
         return <Smartphone {...iconProps} />;
       case 'home':
+      case 'maison':
         return <Home {...iconProps} />;
       case 'vehicles':
+      case 'vehicules':
         return <Car {...iconProps} />;
       case 'food':
+      case 'alimentation':
         return <UtensilsCrossed {...iconProps} />;
       case 'sports':
         return <Dumbbell {...iconProps} />;
@@ -55,17 +42,16 @@ export const CategoryPill: React.FC<CategoryPillProps> = ({
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.75}
-      onPress={() => {
-        Haptics.selection();
-        onPress();
-      }}
-      style={[styles.pill, isSelected && styles.pillSelected]}
+    <AppPressable
+      haptic="selection"
+      onPress={onPress}
+      style={[styles.pill, isSelected && { backgroundColor: accent.DEFAULT, borderColor: accent.DEFAULT }]}
     >
       {getIcon()}
-      <Text style={[styles.text, isSelected && styles.textSelected]}>{name}</Text>
-    </TouchableOpacity>
+      <AppText variant="caption" color={isSelected ? colors.text.inverse : colors.grey[700]}>
+        {name}
+      </AppText>
+    </AppPressable>
   );
 };
 
@@ -73,26 +59,14 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dark.surfaceRaised,
+    backgroundColor: colors.bg.subtle,
     borderRadius: radii.full,
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[3] + 2,
+    paddingVertical: 7,
+    paddingHorizontal: spacing[3],
     marginRight: spacing[2],
     borderWidth: 1,
-    borderColor: colors.dark.border,
+    borderColor: colors.border.DEFAULT,
     gap: 6,
-  },
-  pillSelected: {
-    backgroundColor: colors.market.primary,
-    borderColor: colors.market.primary,
-  },
-  text: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium,
-  },
-  textSelected: {
-    color: '#FFFFFF',
-    fontWeight: typography.weights.bold,
+    overflow: 'hidden',
   },
 });

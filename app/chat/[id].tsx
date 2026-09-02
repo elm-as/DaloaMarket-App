@@ -1,16 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useChatMessages, chatService } from '@daloa/api';
@@ -19,12 +11,14 @@ import {
   radii,
   spacing,
   typography,
-  Header,
   Avatar,
   CurrencyText,
+  AppText,
+  AppPressable,
+  useAccent,
 } from '@daloa/ui';
-import { Send, Image as ImageIcon } from 'lucide-react-native';
-import { formatDate, Haptics } from '@daloa/utils';
+import { Send, ArrowLeft } from 'lucide-react-native';
+import { formatDate } from '@daloa/utils';
 
 export default function ChatRoomScreen() {
   const {
@@ -46,6 +40,8 @@ export default function ChatRoomScreen() {
   }>();
 
   const router = useRouter();
+  const accent = useAccent();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const scrollViewRef = useRef<ScrollView>(null);
   const [inputText, setInputText] = useState('');
@@ -56,9 +52,7 @@ export default function ChatRoomScreen() {
 
   useEffect(() => {
     if (!user?.id) return;
-    const channel = chatService.subscribeToMessages(user.id, () => {
-      refetch();
-    });
+    const channel = chatService.subscribeToMessages(user.id, () => refetch());
     return () => {
       channel.unsubscribe();
     };
@@ -72,7 +66,6 @@ export default function ChatRoomScreen() {
     if (!inputText.trim() || !user?.id || !partnerId) return;
     const textToSend = inputText.trim();
     setInputText('');
-    Haptics.selection();
 
     try {
       setIsSending(true);
@@ -91,40 +84,70 @@ export default function ChatRoomScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <Header
-        title={partnerName || 'Discussion'}
-        onBack={() => router.back()}
-      />
-
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Compact gradient header */}
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.chatHeader}
       >
-        {/* Encart Produit épinglé si lié à une annonce */}
+        <AppPressable
+          onPress={() => router.back()}
+          rippleBorderless
+          style={styles.backBtn}
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={18} color={colors.text.inverse} />
+        </AppPressable>
+
+        <View style={styles.headerCenter}>
+          <Avatar uri={partnerAvatar} name={partnerName || '?'} size={36} />
+          <View style={styles.headerInfo}>
+            <AppText variant="bodyStrong" color={colors.text.inverse} numberOfLines={1}>
+              {partnerName || 'Discussion'}
+            </AppText>
+            {listingTitle && (
+              <AppText variant="caption" color={accent[100]} numberOfLines={1}>
+                Re : {listingTitle}
+              </AppText>
+            )}
+          </View>
+        </View>
+
+        {listingId && listingPrice && (
+          <AppPressable
+            onPress={() => router.push(`/listing/${listingId}` as any)}
+            style={styles.priceChip}
+            haptic="selection"
+            accessibilityLabel="Voir l'annonce"
+          >
+            <CurrencyText amount={parseFloat(listingPrice)} size="sm" weight="bold" color="rgba(255,255,255,0.95)" />
+          </AppPressable>
+        )}
+      </LinearGradient>
+
+      <KeyboardAvoidingView style={styles.flex1} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {/* Encart produit épinglé */}
         {listingTitle && (
-          <TouchableOpacity
-            onPress={() => listingId && router.push(`/listing/${listingId}`)}
-            style={styles.pinnedProduct}
+          <AppPressable
+            haptic="none"
+            onPress={() => listingId && router.push(`/listing/${listingId}` as any)}
+            style={[styles.pinnedProduct, { backgroundColor: accent[50], borderBottomColor: accent[100] }]}
+            accessibilityLabel="Voir l'annonce liée"
           >
             {listingPhoto ? (
-              <Image source={{ uri: listingPhoto }} style={styles.productThumb} />
+              <Image source={{ uri: listingPhoto }} style={styles.productThumb} contentFit="cover" transition={150} />
             ) : null}
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.productTitle} numberOfLines={1}>
+            <View style={styles.pinnedInfo}>
+              <AppText variant="caption" color={colors.text.DEFAULT} numberOfLines={1}>
                 {listingTitle}
-              </Text>
+              </AppText>
               {listingPrice && (
-                <CurrencyText
-                  amount={parseFloat(listingPrice)}
-                  size="xs"
-                  weight="bold"
-                  color={colors.market.primary}
-                />
+                <CurrencyText amount={parseFloat(listingPrice)} size="sm" weight="bold" color={accent.DEFAULT} />
               )}
             </View>
-          </TouchableOpacity>
+          </AppPressable>
         )}
 
         {/* Messages */}
@@ -137,64 +160,113 @@ export default function ChatRoomScreen() {
           {messageList.map((msg) => {
             const isMine = msg.isMine;
             return (
-              <View
-                key={msg.id}
-                style={[styles.messageRow, isMine ? styles.myRow : styles.partnerRow]}
-              >
+              <View key={msg.id} style={[styles.messageRow, isMine ? styles.myRow : styles.partnerRow]}>
                 <View
                   style={[
                     styles.bubble,
-                    isMine ? styles.myBubble : styles.partnerBubble,
+                    isMine
+                      ? { backgroundColor: accent.DEFAULT, borderBottomRightRadius: radii.sm }
+                      : styles.partnerBubble,
                   ]}
                 >
-                  <Text style={[styles.bubbleText, isMine && styles.myBubbleText]}>
+                  <AppText variant="body" color={isMine ? colors.text.inverse : colors.text.DEFAULT}>
                     {msg.content}
-                  </Text>
-                  <Text style={[styles.bubbleTime, isMine && styles.myBubbleTime]}>
+                  </AppText>
+                  <AppText
+                    variant="overline"
+                    color={isMine ? 'rgba(255,255,255,0.75)' : colors.text.subtle}
+                    style={styles.bubbleTime}
+                  >
                     {formatDate(msg.created_at, true).split(' à ')[1] || ''}
-                  </Text>
+                  </AppText>
                 </View>
               </View>
             );
           })}
         </ScrollView>
 
-        {/* Input Bar */}
+        {/* Barre d'envoi */}
         <View style={styles.inputBar}>
           <TextInput
             value={inputText}
             onChangeText={setInputText}
             placeholder="Écrire un message..."
-            placeholderTextColor={colors.dark.textDim}
+            placeholderTextColor={colors.text.subtle}
             style={styles.textInput}
             multiline
+            returnKeyType="send"
+            blurOnSubmit={false}
+            onSubmitEditing={handleSend}
           />
-          <TouchableOpacity
+          <AppPressable
+            haptic="selection"
             onPress={handleSend}
             disabled={!inputText.trim() || isSending}
-            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, { backgroundColor: accent.DEFAULT }, !inputText.trim() && styles.sendBtnDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel="Envoyer le message"
           >
-            <Send size={18} color="#FFFFFF" />
-          </TouchableOpacity>
+            <Send size={18} color={colors.text.inverse} />
+          </AppPressable>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
   },
+  flex1: {
+    flex: 1,
+  },
+  // ─── Header ───
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[3],
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    gap: spacing[2],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  headerInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  priceChip: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: spacing[2],
+    paddingVertical: 5,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  // ─── Pinned product ───
   pinnedProduct: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dark.surface,
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
     borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
     gap: spacing[3],
   },
   productThumb: {
@@ -202,11 +274,11 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: radii.md,
   },
-  productTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
+  pinnedInfo: {
+    flex: 1,
+    gap: 2,
   },
+  // ─── Messages ───
   messagesScroll: {
     padding: spacing[4],
     gap: spacing[2],
@@ -227,60 +299,45 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3] + 2,
   },
-  myBubble: {
-    backgroundColor: colors.market.primary,
-    borderBottomRightRadius: radii.xs,
-  },
   partnerBubble: {
-    backgroundColor: colors.dark.surfaceRaised,
+    backgroundColor: colors.bg.surface,
     borderWidth: 1,
-    borderColor: colors.dark.border,
-    borderBottomLeftRadius: radii.xs,
-  },
-  bubbleText: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    lineHeight: 20,
-  },
-  myBubbleText: {
-    color: '#FFFFFF',
+    borderColor: colors.border.DEFAULT,
+    borderBottomLeftRadius: radii.sm,
   },
   bubbleTime: {
-    color: colors.dark.textDim,
-    fontSize: 9,
     alignSelf: 'flex-end',
     marginTop: 3,
   },
-  myBubbleTime: {
-    color: 'rgba(255, 255, 255, 0.75)',
-  },
+  // ─── Input bar ───
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dark.surface,
+    backgroundColor: colors.bg.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
+    borderTopColor: colors.border.DEFAULT,
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
     gap: spacing[2],
   },
   textInput: {
     flex: 1,
-    color: colors.dark.text,
-    backgroundColor: colors.dark.surfaceRaised,
+    color: colors.text.DEFAULT,
+    backgroundColor: colors.bg.subtle,
     borderRadius: radii.xl,
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
     maxHeight: 100,
     fontSize: typography.sizes.sm,
+    fontFamily: typography.families.normal,
   },
   sendBtn: {
     width: 44,
     height: 44,
     borderRadius: radii.xl,
-    backgroundColor: colors.market.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   sendBtnDisabled: {
     opacity: 0.5,

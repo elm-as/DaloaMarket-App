@@ -1,70 +1,211 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useState } from 'react';
+import { View, ScrollView, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, typography, Header, StatCard, Card } from '@daloa/ui';
-import { Eye, TrendingUp, Users, ShoppingBag } from 'lucide-react-native';
+import { useAuth } from '../../src/context/AuthContext';
+import { supabase } from '@daloa/api';
+import { colors, radii, spacing, StatCard, Card, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { Eye, TrendingUp, ShoppingBag, LayoutGrid, ArrowLeft } from 'lucide-react-native';
+import { formatFCFA } from '@daloa/utils';
+
+interface SellerStats {
+  totalViews: number;
+  salesCount: number;
+  activeListings: number;
+  netEarnings: number;
+}
+
+async function fetchSellerStats(userId: string): Promise<SellerStats> {
+  const [listingsRes, deliveredRes, activeRes] = await Promise.all([
+    supabase
+      .from('listings')
+      .select('views_count')
+      .eq('seller_id', userId)
+      .neq('status', 'deleted'),
+    supabase
+      .from('orders')
+      .select('product_amount, seller_fee')
+      .eq('seller_id', userId)
+      .eq('status', 'delivered'),
+    supabase
+      .from('listings')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller_id', userId)
+      .eq('status', 'active'),
+  ]);
+
+  const totalViews = (listingsRes.data || []).reduce(
+    (s, l) => s + (l.views_count || 0),
+    0
+  );
+
+  const salesCount = (deliveredRes.data || []).length;
+  const netEarnings = (deliveredRes.data || []).reduce(
+    (s, o) => s + Math.max(0, (o.product_amount || 0) - (o.seller_fee || 0)),
+    0
+  );
+
+  const activeListings = activeRes.count ?? 0;
+
+  return { totalViews, salesCount, activeListings, netEarnings };
+}
 
 export default function StatsScreen() {
   const router = useRouter();
+  const accent = useAccent();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
+  const [stats, setStats] = useState<SellerStats | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchSellerStats(user.id)
+      .then(setStats)
+      .catch(() => setStats({ totalViews: 0, salesCount: 0, activeListings: 0, netEarnings: 0 }));
+  }, [user?.id]);
+
+  const conversionRate =
+    stats && stats.totalViews > 0
+      ? ((stats.salesCount / stats.totalViews) * 100).toFixed(1) + '%'
+      : '—';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title="Mes Statistiques" onBack={() => router.back()} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroRow}>
+          <AppPressable
+            onPress={() => router.back()}
+            rippleBorderless
+            style={styles.backBtn}
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={18} color={colors.text.inverse} />
+          </AppPressable>
+          <View style={styles.heroTitles}>
+            <AppText variant="overline" color={accent[100]}>
+              Performance boutique
+            </AppText>
+            <AppText variant="title" color={colors.text.inverse}>
+              Statistiques
+            </AppText>
+          </View>
+          <View style={styles.iconCircle}>
+            <TrendingUp size={18} color={accent[200]} />
+          </View>
+        </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* KPI Grid */}
         <View style={styles.kpiGrid}>
           <StatCard
             label="Vues des annonces"
-            value="1 420"
-            icon={<Eye size={16} color={colors.market.primary} />}
-            trend="+18% ce mois"
+            value={stats ? stats.totalViews.toLocaleString('fr-FR') : '…'}
+            icon={<Eye size={16} color={accent.DEFAULT} />}
           />
           <StatCard
             label="Articles vendus"
-            value="34"
-            icon={<ShoppingBag size={16} color="#10B981" />}
-            trend="+8 cette semaine"
+            value={stats ? String(stats.salesCount) : '…'}
+            icon={<ShoppingBag size={16} color={colors.status.successDark} />}
           />
         </View>
 
         <View style={styles.kpiGrid}>
           <StatCard
-            label="Contacts WhatsApp"
-            value="89"
-            icon={<Users size={16} color="#3B82F6" />}
+            label="Annonces actives"
+            value={stats ? String(stats.activeListings) : '…'}
+            icon={<LayoutGrid size={16} color={colors.secondary.DEFAULT} />}
           />
           <StatCard
             label="Taux de conversion"
-            value="4.2%"
-            icon={<TrendingUp size={16} color="#F59E0B" />}
+            value={stats ? conversionRate : '…'}
+            icon={<TrendingUp size={16} color={accent.DEFAULT} />}
           />
         </View>
 
-        <Text style={styles.sectionTitle}>Conseils pour vendre plus vite</Text>
+        {/* Revenus nets */}
+        <View style={[styles.earningsCard, { backgroundColor: colors.status.successLight, borderColor: colors.status.successBorder }]}>
+          <View style={styles.earningsRow}>
+            <AppText variant="body" color={colors.status.successDark}>
+              Revenus nets totaux
+            </AppText>
+            <AppText variant="h2" color={colors.status.successDark}>
+              {stats ? formatFCFA(stats.netEarnings) : '…'}
+            </AppText>
+          </View>
+          <AppText variant="caption" color={colors.status.successDark} style={{ opacity: 0.7 }}>
+            Cumul des ventes livrées, après commission DaloaMarket.
+          </AppText>
+        </View>
+
+        <AppText variant="subtitle">Conseils pour vendre plus vite</AppText>
         <Card style={styles.tipsCard}>
-          <Text style={styles.tipTitle}>📸 Photos nettes et lumineuses</Text>
-          <Text style={styles.tipDesc}>
+          <AppText variant="bodyStrong" style={styles.tipTitle}>
+            📸 Photos nettes et lumineuses
+          </AppText>
+          <AppText variant="caption" color={colors.text.muted}>
             Les annonces avec 3 photos ou plus et un fond dégagé reçoivent 3 fois plus de contacts.
-          </Text>
+          </AppText>
 
-          <View style={{ height: spacing[3] }} />
+          <View style={styles.tipGap} />
 
-          <Text style={styles.tipTitle}>📲 Partagez sur WhatsApp</Text>
-          <Text style={styles.tipDesc}>
+          <AppText variant="bodyStrong" style={styles.tipTitle}>
+            📲 Partagez sur WhatsApp
+          </AppText>
+          <AppText variant="caption" color={colors.text.muted}>
             Partagez le lien de votre vitrine dans votre statut le matin entre 8h30 et 10h pour capter les acheteurs.
-          </Text>
+          </AppText>
         </Card>
+
+        <View style={{ height: insets.bottom + spacing[6] }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
+  },
+  hero: {
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroTitles: {
+    flex: 1,
+    marginLeft: spacing[2],
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     padding: spacing[4],
@@ -74,23 +215,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing[3],
   },
-  sectionTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
+  earningsCard: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    padding: spacing[4],
+    gap: spacing[1],
+  },
+  earningsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   tipsCard: {
     padding: spacing[4],
   },
   tipTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
     marginBottom: 2,
   },
-  tipDesc: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    lineHeight: 16,
+  tipGap: {
+    height: spacing[3],
   },
 });

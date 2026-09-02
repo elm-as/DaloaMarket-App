@@ -1,11 +1,30 @@
-import React from 'react';
-import { Stack } from 'expo-router';
+import React, { useEffect } from 'react';
+import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../src/context/AuthContext';
 import { CartProvider } from '../src/context/CartContext';
-import { colors } from '@daloa/ui';
+import { FavoritesProvider } from '../src/context/FavoritesContext';
+import { usePushNotifications } from '../src/hooks/usePushNotifications';
+import { ThemeProvider, colors } from '@daloa/ui';
+
+/** Enregistre les push et gère les taps ; monté dans l'arbre Auth. */
+function PushRegistrar() {
+  usePushNotifications();
+  return null;
+}
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  Inter_900Black,
+  useFonts,
+} from '@expo-google-fonts/inter';
+
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,16 +36,36 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+    Inter_900Black,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <CartProvider>
-            <StatusBar style="light" backgroundColor={colors.dark.background} />
+      <ThemeProvider app="market">
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <FavoritesProvider>
+            <CartProvider>
+            <PushRegistrar />
+            <StatusBar style="dark" backgroundColor={colors.bg.surface} />
             <Stack
               screenOptions={{
                 headerShown: false,
-                contentStyle: { backgroundColor: colors.dark.background },
+                contentStyle: { backgroundColor: colors.bg.surface },
                 animation: 'slide_from_right',
               }}
             >
@@ -48,16 +87,22 @@ export default function RootLayout() {
               <Stack.Screen name="settings/index" options={{ headerShown: false }} />
               <Stack.Screen name="settings/shop" options={{ headerShown: false }} />
               <Stack.Screen name="settings/payout" options={{ headerShown: false }} />
+              <Stack.Screen name="settings/delete-account" options={{ headerShown: false }} />
               <Stack.Screen name="affiliations/index" options={{ headerShown: false }} />
+              <Stack.Screen name="favorites/index" options={{ headerShown: false }} />
               <Stack.Screen name="banned" options={{ headerShown: false }} />
               <Stack.Screen name="legal/how-it-works" options={{ headerShown: false }} />
+              <Stack.Screen name="legal/about" options={{ headerShown: false }} />
+              <Stack.Screen name="legal/faq" options={{ headerShown: false }} />
               <Stack.Screen name="legal/terms" options={{ headerShown: false }} />
               <Stack.Screen name="legal/privacy" options={{ headerShown: false }} />
               <Stack.Screen name="legal/help" options={{ headerShown: false }} />
             </Stack>
-          </CartProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+            </CartProvider>
+            </FavoritesProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

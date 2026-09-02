@@ -1,44 +1,30 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { PRICING_CONFIG } from '@daloa/config';
-import {
-  colors,
-  radii,
-  spacing,
-  typography,
-  Header,
-  Card,
-  Button,
-  Badge,
-  CurrencyText,
-} from '@daloa/ui';
-import { Layers, Zap, ArrowUpCircle, Check } from 'lucide-react-native';
-import { Haptics } from '@daloa/utils';
+import { colors, radii, spacing, Card, Button, Badge, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { Layers, Zap, ArrowUpCircle, ArrowLeft } from 'lucide-react-native';
+import { formatFCFA, Haptics } from '@daloa/utils';
 
 export default function PacksScreen() {
   const router = useRouter();
+  const accent = useAccent();
+  const insets = useSafeAreaInsets();
   const [selectedPack, setSelectedPack] = useState<string>('silver');
 
   const handleBuyPack = (packName: string, price: number) => {
     Haptics.success();
     Alert.alert(
       'Paiement Mobile Money',
-      `Confirmez l'achat du ${packName} pour ${price} FCFA via Wave / Orange / MTN.`,
+      `Confirmez l'achat du ${packName} pour ${formatFCFA(price)} via Wave / Orange / MTN.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Confirmer',
           onPress: () => {
-            Alert.alert('Succès !', 'Vos crédits d’annonces ont été ajoutés à votre solde.');
+            Alert.alert('Succès ! 🎉', "Vos crédits d'annonces ont été ajoutés.");
             router.back();
           },
         },
@@ -47,21 +33,39 @@ export default function PacksScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title="Packs d'Annonces & Boosts" onBack={() => router.back()} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroRow}>
+          <AppPressable
+            onPress={() => router.back()}
+            rippleBorderless
+            style={styles.backBtn}
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={18} color={colors.text.inverse} />
+          </AppPressable>
+          <View style={styles.heroTitles}>
+            <AppText variant="overline" color={accent[100]}>
+              Visibilité & crédits
+            </AppText>
+            <AppText variant="title" color={colors.text.inverse}>
+              Packs & boosts
+            </AppText>
+          </View>
+          <View style={styles.iconCircle}>
+            <Zap size={18} color={accent[200]} />
+          </View>
+        </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* En-tête */}
-        <View style={styles.introCard}>
-          <Layers size={24} color={colors.market.primary} />
-          <Text style={styles.introTitle}>Packs de publication & Visibilité</Text>
-          <Text style={styles.introSub}>
-            Publiez plus d'annonces et propulsez vos articles en tête des résultats de recherche à Daloa.
-          </Text>
-        </View>
-
-        {/* 1. Packs de Crédits Annonces */}
-        <Text style={styles.sectionTitle}>Packs de Crédits Annonces</Text>
+        {/* Packs crédits */}
+        <AppText variant="subtitle">Packs de crédits annonces</AppText>
         <View style={styles.packsGrid}>
           {PRICING_CONFIG.packs.map((pack) => {
             const isSelected = selectedPack === pack.id;
@@ -72,7 +76,7 @@ export default function PacksScreen() {
                   Haptics.selection();
                   setSelectedPack(pack.id);
                 }}
-                style={[styles.packCard, isSelected && styles.packCardActive]}
+                style={[styles.packCard, isSelected && { borderColor: accent.DEFAULT, backgroundColor: accent[50] }]}
               >
                 {pack.popular && (
                   <View style={styles.popularBadge}>
@@ -80,35 +84,43 @@ export default function PacksScreen() {
                   </View>
                 )}
 
-                <Text style={styles.packName}>{pack.name}</Text>
-                <Text style={styles.creditsCount}>{pack.credits} Annonces</Text>
-                <CurrencyText amount={pack.price} size="xl" weight="bold" color={colors.market.primary} />
+                <AppText variant="caption" color={colors.text.DEFAULT}>
+                  {pack.name}
+                </AppText>
+                <AppText variant="caption" color={colors.text.subtle}>
+                  {pack.credits} annonces
+                </AppText>
+                <AppText variant="bodyStrong" color={accent[600]}>
+                  {formatFCFA(pack.price)}
+                </AppText>
 
                 <Button
                   title="Acheter"
-                  variant={isSelected ? 'market' : 'secondary'}
+                  variant={isSelected ? 'market' : 'outline'}
                   size="sm"
                   onPress={() => handleBuyPack(pack.name, pack.price)}
-                  style={{ marginTop: spacing[2], width: '100%' }}
+                  style={styles.packBtn}
                 />
               </Card>
             );
           })}
         </View>
 
-        {/* 2. Options de Visibilité (Boost & Bump) */}
-        <Text style={styles.sectionTitle}>Options de Boost Immédiat</Text>
-        <Card style={styles.boostCard}>
+        {/* Boost */}
+        <AppText variant="subtitle">Options de boost immédiat</AppText>
+        <View style={styles.boostCard}>
           <View style={styles.boostRow}>
-            <View style={styles.boostIconBox}>
-              <Zap size={22} color="#F59E0B" />
+            <View style={[styles.boostIconBox, { backgroundColor: accent[50] }]}>
+              <Zap size={22} color={accent.DEFAULT} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.boostTitle}>Boost En Vedette (7 jours)</Text>
-              <Text style={styles.boostSub}>
-                Bandeau doré, icône TOP et affichage prioritaire sur la page d'accueil de Daloa.
-              </Text>
-              <CurrencyText amount={PRICING_CONFIG.boosts.boost7Days} size="sm" weight="bold" color="#F59E0B" />
+            <View style={styles.flex1}>
+              <AppText variant="bodyStrong">Boost en vedette ⚡ (7 jours)</AppText>
+              <AppText variant="caption" color={colors.text.muted} style={styles.boostSub}>
+                Bandeau doré, badge TOP et affichage prioritaire sur la page d'accueil de Daloa.
+              </AppText>
+              <AppText variant="bodyStrong" color={accent[600]}>
+                {formatFCFA(PRICING_CONFIG.boosts.boost7Days)}
+              </AppText>
             </View>
           </View>
           <Button
@@ -116,21 +128,25 @@ export default function PacksScreen() {
             variant="outline"
             size="sm"
             onPress={() => handleBuyPack('Boost 7 Jours', 500)}
-            style={{ marginTop: spacing[3] }}
+            fullWidth
+            style={styles.boostBtn}
           />
-        </Card>
+        </View>
 
-        <Card style={styles.boostCard}>
+        {/* Bump */}
+        <View style={styles.boostCard}>
           <View style={styles.boostRow}>
-            <View style={[styles.boostIconBox, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
-              <ArrowUpCircle size={22} color="#3B82F6" />
+            <View style={[styles.boostIconBox, { backgroundColor: colors.secondary[50] }]}>
+              <ArrowUpCircle size={22} color={colors.secondary.DEFAULT} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.boostTitle}>Remontée Immédiate (Bump)</Text>
-              <Text style={styles.boostSub}>
+            <View style={styles.flex1}>
+              <AppText variant="bodyStrong">Remontée immédiate (Bump)</AppText>
+              <AppText variant="caption" color={colors.text.muted} style={styles.boostSub}>
                 Replace votre annonce tout en haut du flux des nouveautés comme si elle venait d'être publiée.
-              </Text>
-              <CurrencyText amount={PRICING_CONFIG.boosts.bumpToListTop} size="sm" weight="bold" color="#3B82F6" />
+              </AppText>
+              <AppText variant="bodyStrong" color={colors.secondary.DEFAULT}>
+                {formatFCFA(PRICING_CONFIG.boosts.bumpToListTop)}
+              </AppText>
             </View>
           </View>
           <Button
@@ -138,47 +154,58 @@ export default function PacksScreen() {
             variant="outline"
             size="sm"
             onPress={() => handleBuyPack('Bump Immédiat', 200)}
-            style={{ marginTop: spacing[3] }}
+            fullWidth
+            style={styles.boostBtn}
           />
-        </Card>
+        </View>
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: insets.bottom + spacing[6] }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
+  },
+  hero: {
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroTitles: {
+    flex: 1,
+    marginLeft: spacing[2],
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     padding: spacing[4],
     gap: spacing[4],
-  },
-  introCard: {
-    backgroundColor: colors.dark.surface,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-    padding: spacing[4],
-    gap: spacing[1],
-  },
-  introTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
-  },
-  introSub: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    lineHeight: 16,
-  },
-  sectionTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
   },
   packsGrid: {
     flexDirection: 'row',
@@ -189,27 +216,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing[3],
     gap: 4,
-    position: 'relative',
-  },
-  packCardActive: {
-    borderColor: colors.market.primary,
-    backgroundColor: 'rgba(249, 115, 22, 0.08)',
   },
   popularBadge: {
     position: 'absolute',
     top: -10,
   },
-  packName: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
-  },
-  creditsCount: {
-    color: colors.dark.textDim,
-    fontSize: 10,
+  packBtn: {
+    marginTop: spacing[2],
+    width: '100%',
   },
   boostCard: {
     padding: spacing[4],
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
   },
   boostRow: {
     flexDirection: 'row',
@@ -220,19 +241,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radii.xl,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boostTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
+  flex1: {
+    flex: 1,
   },
   boostSub: {
-    color: colors.dark.textDim,
-    fontSize: 11,
-    lineHeight: 15,
     marginVertical: 3,
+  },
+  boostBtn: {
+    marginTop: spacing[2],
   },
 });

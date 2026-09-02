@@ -1,22 +1,28 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCart } from '../../src/context/CartContext';
-import { colors, radii, spacing, typography, Button, EmptyState, CurrencyText, Card } from '@daloa/ui';
-import { Plus, Minus, Trash2, ShieldCheck, ShoppingBag, Truck } from 'lucide-react-native';
+import {
+  colors,
+  radii,
+  spacing,
+  AppText,
+  AppPressable,
+  EmptyState,
+  useAccent,
+} from '@daloa/ui';
+import { ArrowLeft, ShoppingCart, ShoppingBag, Trash2 } from 'lucide-react-native';
 import { PRICING_CONFIG } from '@daloa/config';
-import { Haptics } from '@daloa/utils';
+import { formatFCFA, Haptics } from '@daloa/utils';
+import { CartItemCard } from '../../src/components/cart/CartItemCard';
+import { CartSummaryCard } from '../../src/components/cart/CartSummaryCard';
 
 export default function CartScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const accent = useAccent();
   const { items, totalAmount, updateQuantity, removeFromCart, clearCart } = useCart();
 
   const buyerServiceFee = Math.round(totalAmount * PRICING_CONFIG.marketplace.buyerServiceFeeRate);
@@ -25,11 +31,10 @@ export default function CartScreen() {
 
   const handleCheckout = () => {
     if (items.length === 0) return;
-    Haptics.lightImpact();
-    // Utiliser le premier article pour le tunnel de commande escrow
+    Haptics.success();
     const firstItem = items[0];
     router.push({
-      pathname: '/checkout',
+      pathname: '/checkout' as any,
       params: {
         listingId: firstItem.listing.id,
         variantId: firstItem.variant?.id || '',
@@ -39,308 +44,192 @@ export default function CartScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.title}>Mon Panier</Text>
-        {items.length > 0 && (
-          <TouchableOpacity onPress={clearCart} activeOpacity={0.7}>
-            <Text style={styles.clearText}>Vider</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+    <View style={styles.container}>
+      {/* 1. Hero dégradé */}
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.heroBanner, { paddingTop: insets.top + spacing[2] }]}
+      >
+        <View style={styles.heroRow}>
+          <AppPressable
+            onPress={() => router.back()}
+            rippleBorderless
+            style={styles.backBtn}
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={18} color={colors.text.inverse} />
+          </AppPressable>
 
-      {items.length === 0 ? (
-        <EmptyState
-          icon={<ShoppingBag size={32} color={colors.market.primary} />}
-          title="Votre panier est vide"
-          description="Découvrez des milliers d'articles neufs et d'occasion disponibles près de chez vous à Daloa."
-          actionTitle="Explorer les annonces"
-          onActionPress={() => router.push('/(tabs)/index')}
-        />
-      ) : (
-        <View style={styles.content}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollList}>
-            {/* Liste des articles */}
-            {items.map((item) => {
-              const unitPrice = item.variant?.price ?? item.listing.price;
-              const photoUrl = item.listing.photos?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80';
-
-              return (
-                <Card key={item.id} style={styles.itemCard}>
-                  <Image source={{ uri: photoUrl }} style={styles.itemImage} resizeMode="cover" />
-
-                  <View style={styles.itemDetails}>
-                    <View style={styles.itemTop}>
-                      <Text style={styles.itemTitle} numberOfLines={2}>
-                        {item.listing.title}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => removeFromCart(item.id)}
-                        style={styles.deleteBtn}
-                      >
-                        <Trash2 size={16} color={colors.status.error} />
-                      </TouchableOpacity>
-                    </View>
-
-                    {item.variant && (
-                      <Text style={styles.variantText}>
-                        Option : {item.variant.label}
-                      </Text>
-                    )}
-
-                    <View style={styles.itemBottom}>
-                      <CurrencyText
-                        amount={unitPrice}
-                        size="base"
-                        weight="bold"
-                        color={colors.market.primary}
-                      />
-
-                      {/* Sélecteur de Quantité */}
-                      <View style={styles.quantityContainer}>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item.id, item.quantity - 1)}
-                          style={styles.qtyBtn}
-                        >
-                          <Minus size={14} color={colors.dark.text} />
-                        </TouchableOpacity>
-                        <Text style={styles.qtyText}>{item.quantity}</Text>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item.id, item.quantity + 1)}
-                          style={styles.qtyBtn}
-                        >
-                          <Plus size={14} color={colors.dark.text} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                </Card>
-              );
-            })}
-
-            {/* Garantie Séquestre */}
-            <View style={styles.guaranteeBox}>
-              <ShieldCheck size={20} color="#10B981" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.guaranteeTitle}>Garantie Séquestre Escrow DaloaMarket</Text>
-                <Text style={styles.guaranteeSub}>
-                  Votre argent est conservé en lieu sûr. Le vendeur et le livreur ne sont payés qu'après votre confirmation de livraison par code OTP.
-                </Text>
-              </View>
+          <View style={styles.heroCenter}>
+            <View style={styles.heroIconCircle}>
+              <ShoppingCart size={20} color={colors.text.inverse} strokeWidth={1.8} />
             </View>
-
-            {/* Récapitulatif Financier */}
-            <Card style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Détail de la commande</Text>
-
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Sous-total articles</Text>
-                <CurrencyText amount={totalAmount} size="sm" weight="semibold" color={colors.dark.text} />
-              </View>
-
-              <View style={styles.summaryRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Truck size={14} color={colors.dark.textDim} />
-                  <Text style={styles.summaryLabel}>Frais de livraison estimé</Text>
-                </View>
-                <CurrencyText amount={estimatedDeliveryFee} size="sm" weight="semibold" color={colors.dark.text} />
-              </View>
-
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Frais de service Escrow (3%)</Text>
-                <CurrencyText amount={buyerServiceFee} size="sm" weight="semibold" color={colors.dark.text} />
-              </View>
-
-              <View style={[styles.summaryRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total à payer</Text>
-                <CurrencyText amount={grandTotal} size="xl" weight="bold" color={colors.market.primary} />
-              </View>
-            </Card>
-
-            <View style={{ height: 100 }} />
-          </ScrollView>
-
-          {/* Action Sticky Bottom */}
-          <View style={styles.bottomBar}>
             <View>
-              <Text style={styles.bottomTotalLabel}>Total TTC</Text>
-              <CurrencyText amount={grandTotal} size="lg" weight="bold" color={colors.market.primary} />
+              <AppText variant="overline" color={accent[100]}>VOTRE SÉLECTION</AppText>
+              <AppText variant="title" color={colors.text.inverse}>Mon panier</AppText>
             </View>
-            <Button
-              title="Passer commande"
-              variant="market"
-              size="lg"
-              onPress={handleCheckout}
-              style={styles.checkoutBtn}
-            />
           </View>
+
+          {items.length > 0 ? (
+            <View style={styles.countBadge}>
+              <AppText variant="caption" color={colors.text.inverse}>
+                {items.length} art.
+              </AppText>
+            </View>
+          ) : (
+            <View style={{ width: 48 }} />
+          )}
         </View>
+
+        {items.length > 0 && (
+          <View style={styles.heroTotal}>
+            <AppText variant="caption" color={accent[100]}>Total estimé</AppText>
+            <AppText variant="h2" color={colors.text.inverse} style={styles.heroTotalAmount}>
+              {formatFCFA(grandTotal)}
+            </AppText>
+          </View>
+        )}
+      </LinearGradient>
+
+      {/* 2. Contenu */}
+      {items.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            icon={<ShoppingBag size={34} color={accent.DEFAULT} />}
+            title="Votre panier est vide"
+            description="Découvrez des milliers d'articles neufs et d'occasion disponibles immédiatement à Daloa."
+            actionTitle="Explorer les annonces"
+            onActionPress={() => router.push('/(tabs)' as any)}
+            actionVariant="market"
+          />
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollList}>
+          {/* Actions globales */}
+          <View style={styles.topActionsRow}>
+            <AppText variant="bodyStrong" color={colors.text.body}>
+              Articles sélectionnés ({items.length})
+            </AppText>
+            <AppPressable
+              haptic="none"
+              onPress={() => {
+                Haptics.warning();
+                clearCart();
+              }}
+              style={styles.clearBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Vider le panier"
+            >
+              <Trash2 size={13} color={colors.text.subtle} />
+              <AppText variant="caption" color={colors.text.subtle}>
+                Vider tout
+              </AppText>
+            </AppPressable>
+          </View>
+
+          {items.map((item) => (
+            <CartItemCard
+              key={item.id}
+              item={item}
+              onUpdateQty={(newQty) => updateQuantity(item.id, newQty)}
+              onRemove={() => removeFromCart(item.id)}
+            />
+          ))}
+
+          <CartSummaryCard
+            subtotal={totalAmount}
+            deliveryFee={estimatedDeliveryFee}
+            serviceFee={buyerServiceFee}
+            grandTotal={grandTotal}
+            itemCount={items.length}
+            onCheckout={handleCheckout}
+          />
+        </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
   },
-  topBar: {
+  heroBanner: {
+    paddingHorizontal: spacing[3],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    gap: spacing[3],
+  },
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
   },
-  title: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
-  },
-  clearText: {
-    color: colors.status.error,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-  },
-  content: {
+  heroCenter: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginLeft: spacing[1],
+  },
+  heroIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroTotal: {
+    paddingHorizontal: spacing[2],
+  },
+  heroTotalAmount: {
+    fontVariant: ['tabular-nums'],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  countBadge: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    paddingHorizontal: spacing[2],
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    minWidth: 48,
+    alignItems: 'center',
   },
   scrollList: {
-    padding: spacing[4],
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[8],
   },
-  itemCard: {
-    flexDirection: 'row',
-    padding: spacing[3],
-    marginBottom: spacing[3],
-  },
-  itemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: radii.xl,
-    backgroundColor: colors.dark.surfaceRaised,
-  },
-  itemDetails: {
-    flex: 1,
-    marginLeft: spacing[3],
-    justifyContent: 'space-between',
-  },
-  itemTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  itemTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    flex: 1,
-    marginRight: spacing[2],
-  },
-  deleteBtn: {
-    padding: 4,
-  },
-  variantText: {
-    color: colors.dark.textDim,
-    fontSize: typography.sizes.xs,
-    marginTop: 2,
-  },
-  itemBottom: {
+  topActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing[2],
+    marginBottom: spacing[2],
+    paddingHorizontal: 2,
   },
-  quantityContainer: {
+  clearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dark.surfaceRaised,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-  },
-  qtyBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  qtyText: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
+    gap: 4,
+    paddingVertical: 2,
     paddingHorizontal: 6,
   },
-  guaranteeBox: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-    borderRadius: radii.xl,
-    padding: spacing[3],
-    gap: spacing[3],
-    marginVertical: spacing[3],
-  },
-  guaranteeTitle: {
-    color: '#10B981',
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
-    marginBottom: 2,
-  },
-  guaranteeSub: {
-    color: colors.dark.textMuted,
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  summaryCard: {
-    padding: spacing[4],
-    gap: spacing[3],
-  },
-  summaryTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
-    marginBottom: 2,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  summaryLabel: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.sm,
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
-    paddingTop: spacing[3],
-    marginTop: spacing[1],
-  },
-  totalLabel: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.dark.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-  },
-  bottomTotalLabel: {
-    color: colors.dark.textDim,
-    fontSize: typography.sizes.xs,
-  },
-  checkoutBtn: {
-    minWidth: 180,
+  emptyWrap: {
+    flex: 1,
+    justifyContent: 'center',
   },
 });

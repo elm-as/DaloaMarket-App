@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { colors, radii, spacing, typography, Header, Input, Button, Card } from '@daloa/ui';
-import { ShieldAlert, Send } from 'lucide-react-native';
+import { View, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable } from '@daloa/ui';
+import { ShieldAlert, Send, LogOut, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../src/context/AuthContext';
 import { supabase } from '@daloa/api';
 
 export default function BannedScreen() {
-  const router = useRouter();
   const { user, profile, logout } = useAuth();
+  const insets = useSafeAreaInsets();
   const [appealReason, setAppealReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -18,7 +18,6 @@ export default function BannedScreen() {
       Alert.alert('Erreur', 'Veuillez expliquer les raisons de votre contestation.');
       return;
     }
-
     try {
       setIsSubmitting(true);
       await supabase.from('ban_appeals').insert({
@@ -28,74 +27,156 @@ export default function BannedScreen() {
         reason: appealReason.trim(),
         status: 'pending',
       });
-
       Alert.alert('Demande transmise', 'Votre recours a été envoyé aux administrateurs de DaloaMarket.');
       setAppealReason('');
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || 'Impossible d’envoyer le recours');
+      Alert.alert('Erreur', err.message || "Impossible d'envoyer le recours");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title="Compte Suspendu" onBack={() => logout()} />
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.iconBox}>
-          <ShieldAlert size={48} color={colors.status.error} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Hero danger */}
+      <LinearGradient
+        colors={['#7F1D1D', '#991B1B', '#B91C1C']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroTop}>
+          <AppPressable
+            onPress={() => logout()}
+            rippleBorderless
+            style={styles.logoutBtn}
+            accessibilityLabel="Se déconnecter"
+          >
+            <LogOut size={18} color="rgba(255,255,255,0.9)" />
+          </AppPressable>
+          <View style={styles.heroTitles}>
+            <AppText variant="overline" style={styles.overlineText}>
+              Accès restreint
+            </AppText>
+            <AppText variant="title" style={styles.titleText}>
+              Compte suspendu
+            </AppText>
+          </View>
+          <View style={styles.iconCircle}>
+            <ShieldAlert size={18} color="rgba(255,200,200,0.9)" />
+          </View>
         </View>
+      </LinearGradient>
 
-        <Text style={styles.title}>Accès temporairement restreint</Text>
-        <Text style={styles.sub}>
-          Votre compte a été suspendu pour non-respect des règles de sécurité de la communauté DaloaMarket.
-        </Text>
+      <KeyboardAvoidingView style={styles.flex1} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.iconBox}>
+            <ShieldAlert size={36} color={colors.status.error} />
+          </View>
 
-        {profile?.ban_reason && (
-          <Card style={styles.reasonCard}>
-            <Text style={styles.reasonLabel}>Motif de la suspension :</Text>
-            <Text style={styles.reasonText}>{profile.ban_reason}</Text>
-          </Card>
-        )}
+          <AppText variant="h2" center>
+            Accès temporairement restreint
+          </AppText>
+          <AppText variant="body" color={colors.text.muted} center style={styles.sub}>
+            Votre compte a été suspendu pour non-respect des règles de sécurité de la communauté DaloaMarket.
+          </AppText>
 
-        <Text style={styles.appealTitle}>Contester cette décision</Text>
-        <Input
-          label="Votre message à la modération *"
-          placeholder="Expliquez la situation aux modérateurs..."
-          value={appealReason}
-          onChangeText={setAppealReason}
-          multiline
-          numberOfLines={4}
-          inputStyle={{ minHeight: 90, textAlignVertical: 'top' }}
-        />
+          {profile?.ban_reason && (
+            <View style={styles.reasonCard}>
+              <View style={styles.reasonHeader}>
+                <AlertCircle size={14} color={colors.status.errorDark} />
+                <AppText variant="caption" color={colors.status.errorDark} style={styles.reasonLabel}>
+                  Motif de la suspension
+                </AppText>
+              </View>
+              <AppText variant="body" color={colors.status.errorDark}>
+                {profile.ban_reason}
+              </AppText>
+            </View>
+          )}
 
-        <Button
-          title="Envoyer mon recours"
-          variant="danger"
-          size="lg"
-          loading={isSubmitting}
-          onPress={handleAppeal}
-          leftIcon={<Send size={16} color="#FFFFFF" />}
-          style={{ marginTop: spacing[2] }}
-        />
+          <AppText variant="subtitle" style={styles.appealTitle}>
+            Contester cette décision
+          </AppText>
+          <Input
+            label="Votre message à la modération *"
+            placeholder="Expliquez la situation aux modérateurs..."
+            value={appealReason}
+            onChangeText={setAppealReason}
+            multiline
+            numberOfLines={4}
+            inputStyle={styles.textArea}
+          />
 
-        <Button
-          title="Se déconnecter"
-          variant="secondary"
-          size="md"
-          onPress={() => logout()}
-          style={{ marginTop: spacing[4] }}
-        />
-      </ScrollView>
-    </SafeAreaView>
+          <View style={styles.actions}>
+            <Button
+              title="Envoyer mon recours"
+              variant="market"
+              size="lg"
+              loading={isSubmitting}
+              onPress={handleAppeal}
+              leftIcon={<Send size={16} color={colors.text.inverse} />}
+              fullWidth
+            />
+            <Button title="Se déconnecter" variant="outline" size="md" onPress={() => logout()} fullWidth />
+          </View>
+
+          <View style={{ height: insets.bottom + spacing[6] }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
+  },
+  flex1: {
+    flex: 1,
+  },
+  hero: {
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logoutBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroTitles: {
+    flex: 1,
+    marginLeft: spacing[2],
+  },
+  overlineText: {
+    color: 'rgba(255,180,180,0.9)',
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  titleText: {
+    color: '#FFFFFF',
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     padding: spacing[4],
@@ -105,47 +186,48 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    backgroundColor: colors.status.errorLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: spacing[4],
-  },
-  title: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
-    marginBottom: spacing[2],
+    borderWidth: 1,
+    borderColor: colors.status.errorBorder,
   },
   sub: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.sm,
-    textAlign: 'center',
-    lineHeight: 18,
+    marginTop: spacing[2],
     marginBottom: spacing[4],
   },
   reasonCard: {
     width: '100%',
     padding: spacing[4],
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    backgroundColor: colors.status.errorLight,
+    borderColor: colors.status.errorBorder,
+    borderWidth: 1,
+    borderRadius: radii.xl,
     marginBottom: spacing[4],
+    gap: spacing[2],
+  },
+  reasonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   reasonLabel: {
-    color: colors.status.error,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
-    marginBottom: 4,
-  },
-  reasonText: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   appealTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
     alignSelf: 'flex-start',
     marginBottom: spacing[2],
+  },
+  textArea: {
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  actions: {
+    width: '100%',
+    marginTop: spacing[3],
+    gap: spacing[2],
   },
 });

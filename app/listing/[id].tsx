@@ -1,558 +1,559 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Linking,
-  Share,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useListingDetail, useSimilarListings, useReviews } from '@daloa/api';
 import { useCart } from '../../src/context/CartContext';
+import { useFavorites } from '../../src/context/FavoritesContext';
+import { useAuth } from '../../src/context/AuthContext';
 import { ListingVariant } from '@daloa/types';
 import {
   colors,
   radii,
   spacing,
-  typography,
-  Button,
-  Avatar,
-  RatingStars,
-  CurrencyText,
-  Badge,
   Skeleton,
-  Header,
-  Card,
+  ListingCard,
+  AppText,
+  AppPressable,
+  useAccent,
+  useResponsive,
 } from '@daloa/ui';
-import {
-  ShieldCheck,
-  Truck,
-  MapPin,
-  Share2,
-  Heart,
-  MessageCircle,
-  ShoppingBag,
-  Store,
-  ChevronRight,
-  Check,
-} from 'lucide-react-native';
-import { formatWhatsAppPhone, formatDate, Haptics } from '@daloa/utils';
-import { ListingCard } from '../../src/components/ListingCard';
+import { Tag } from 'lucide-react-native';
+import { formatFCFA, Haptics } from '@daloa/utils';
+import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
+import { ListingSellerBox } from '../../src/components/listing-detail/ListingSellerBox';
+import { ListingStickyFooter } from '../../src/components/listing-detail/ListingStickyFooter';
+import { ListingTrustBadges } from '../../src/components/listing-detail/ListingTrustBadges';
+import { ListingReviewsSection } from '../../src/components/listing-detail/ListingReviewsSection';
+import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+const CONDITION_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  new:      { label: 'Neuf',         color: colors.status.successDark, bg: colors.status.successLight },
+  like_new: { label: 'Très bon état', color: colors.status.infoDark,   bg: colors.status.infoLight   },
+  good:     { label: 'Bon état',      color: '#92400E',                  bg: '#FEF3C7'                 },
+  used:     { label: 'Usagé',         color: colors.grey[600],           bg: colors.bg.subtle          },
+};
+
+function getCondition(raw: string | null | undefined) {
+  return raw ? (CONDITION_LABELS[raw] ?? { label: raw, color: colors.grey[600], bg: colors.bg.subtle }) : null;
+}
+
+const FALLBACK_PHOTO =
+  'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=600';
+
+const DESC_LIMIT = 220;
+
+// ─── screen ─────────────────────────────────────────────────────────────────
 
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { addToCart } = useCart();
+  const accent = useAccent();
+  const { addToCart, updateQuantity, removeFromCart, items } = useCart();
+  const { isFavorited, toggleFavorite } = useFavorites();
+  const { user, isAuthenticated } = useAuth();
+  const { width: screenWidth } = useResponsive();
 
-  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<ListingVariant | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [showVariantPicker, setShowVariantPicker] = useState(false);
 
-  const { data: listing, isLoading, error } = useListingDetail(id);
+  const isFavorite = id ? isFavorited(id) : false;
+
+  const { data: listing, isLoading } = useListingDetail(id);
   const { data: similarItems } = useSimilarListings(listing?.category, id);
-  const { data: reviews } = useReviews('listing', id);
+  const { data: reviews = [] } = useReviews('seller', listing?.seller?.id);
 
+  const avgRating =
+    reviews.length > 0
+      ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
+      : 0;
+
+  // ── loading skeleton ──────────────────────────────────────────────────────
   if (isLoading || !listing) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <Header title="Détail de l'annonce" onBack={() => router.back()} />
-        <ScrollView style={{ padding: spacing[4] }}>
-          <Skeleton height={300} borderRadius={radii['2xl']} />
-          <View style={{ height: spacing[4] }} />
-          <Skeleton height={30} width="70%" />
-          <View style={{ height: spacing[2] }} />
-          <Skeleton height={24} width="40%" />
-          <View style={{ height: spacing[4] }} />
-          <Skeleton height={80} borderRadius={radii.xl} />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.skeletonHeader}>
+          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.iconBtn}>
+            <AppText variant="body">←</AppText>
+          </AppPressable>
+          <Skeleton width={160} height={18} borderRadius={6} />
+          <View style={styles.iconBtn} />
+        </View>
+        <ScrollView contentContainerStyle={styles.skeletonScroll}>
+          <Skeleton width="100%" height={320} borderRadius={0} />
+          <View style={{ padding: spacing[4], gap: spacing[3] }}>
+            <Skeleton width="40%" height={28} borderRadius={6} />
+            <Skeleton width="75%" height={22} borderRadius={6} />
+            <Skeleton width="60%" height={16} borderRadius={6} />
+          </View>
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  const photos = listing.photos && listing.photos.length > 0 ? listing.photos : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80'];
+  const photos = listing.photos && listing.photos.length > 0 ? listing.photos : [FALLBACK_PHOTO];
   const seller = listing.seller;
   const isPro = Boolean(seller?.pro_until && new Date(seller.pro_until) > new Date());
   const activePrice = selectedVariant?.price ?? listing.price;
   const variants = listing.variants || [];
+  const cartItemId = `${listing.id}_${selectedVariant?.id || 'base'}`;
+  const cartItem = items.find((i) => i.id === cartItemId);
+  const cartQty = cartItem?.quantity || 0;
+  const isOwner = isAuthenticated && user?.id === seller?.id;
+
+  const conditionInfo = getCondition(listing.condition);
+  const hasDiscount = listing.original_price != null && listing.original_price > activePrice;
+  const discountPct = hasDiscount && listing.original_price
+    ? Math.round(((listing.original_price - activePrice) / listing.original_price) * 100)
+    : 0;
+  const descLong = (listing.description || '').length > DESC_LIMIT;
+
+  // ── handlers ──────────────────────────────────────────────────────────────
 
   const handleShare = async () => {
     Haptics.lightImpact();
-    const shareUrl = `https://daloamarket.com/l/${listing.id.slice(0, 8)}`;
     await Share.share({
       title: listing.title,
-      message: `🛍️ ${listing.title} à ${activePrice} FCFA sur DaloaMarket !\n👉 ${shareUrl}`,
+      message: `🛍️ ${listing.title} à ${formatFCFA(activePrice)} sur DaloaMarket !\n👉 https://daloamarket.com/l/${listing.id.slice(0, 8)}`,
     });
   };
 
-  const handleWhatsApp = () => {
-    Haptics.success();
-    const phone = formatWhatsAppPhone(seller?.phone);
-    if (!phone) return;
-    const text = encodeURIComponent(
-      `Bonjour ${seller?.shop_name || seller?.full_name || 'Vendeur'}, je suis intéressé(e) par votre article "${listing.title}" à ${activePrice} FCFA sur DaloaMarket.`
+  const handleReport = () => {
+    Alert.alert(
+      'Signaler l\'annonce',
+      'Pensez-vous que cette annonce est problématique ou frauduleuse ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Signaler', style: 'destructive', onPress: () => Haptics.warning() },
+      ]
     );
-    Linking.openURL(`https://wa.me/${phone}?text=${text}`);
   };
 
   const handleAddToCart = () => {
-    addToCart(listing, selectedVariant, 1);
+    if (variants.length > 0) {
+      // Ouvrir le picker de variantes
+      setShowVariantPicker(true);
+      return;
+    }
+    Haptics.lightImpact();
+    addToCart(listing, null, 1);
   };
 
+  const handleVariantConfirm = (variant: ListingVariant) => {
+    setSelectedVariant(variant);
+    setShowVariantPicker(false);
+    Haptics.success();
+    addToCart(listing, variant, 1);
+  };
   const handleBuyNow = () => {
     Haptics.success();
-    router.push({
-      pathname: '/checkout',
-      params: {
-        listingId: listing.id,
-        variantId: selectedVariant?.id || '',
-        quantity: '1',
-      },
-    });
+    router.push({ pathname: '/checkout' as any, params: { listingId: listing.id, variantId: selectedVariant?.id || '', quantity: '1' } });
   };
 
+  const handleMarkSold = () => {
+    Alert.alert('Marquer comme vendu', 'Cette annonce sera retirée du catalogue.', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Marquer vendu', style: 'destructive', onPress: () => Haptics.success() },
+    ]);
+  };
+
+  // ── render ────────────────────────────────────────────────────────────────
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header Bar */}
-      <Header
-        title={listing.title}
-        onBack={() => router.back()}
-        rightAction={
-          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-            <TouchableOpacity onPress={handleShare} style={styles.headerIconBtn}>
-              <Share2 size={18} color={colors.dark.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.lightImpact();
-                setIsFavorite(!isFavorite);
-              }}
-              style={styles.headerIconBtn}
-            >
-              <Heart
-                size={18}
-                color={isFavorite ? colors.status.error : colors.dark.text}
-                fill={isFavorite ? colors.status.error : 'transparent'}
-              />
-            </TouchableOpacity>
-          </View>
-        }
-      />
-
+    <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Carrousel Photos */}
-        <View style={styles.galleryContainer}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={(e) => {
-              const slide = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-              setActivePhotoIndex(slide);
-            }}
-            scrollEventThrottle={16}
-          >
-            {photos.map((photo, index) => (
-              <Image
-                key={index}
-                source={{ uri: photo }}
-                style={styles.galleryImage}
-                resizeMode="cover"
-              />
-            ))}
-          </ScrollView>
 
-          {/* Indicateur de pagination */}
-          {photos.length > 1 && (
-            <View style={styles.paginationBadge}>
-              <Text style={styles.paginationText}>
-                {activePhotoIndex + 1} / {photos.length}
-              </Text>
-            </View>
-          )}
-        </View>
+        {/* ① Galerie avec nav flottante intégrée */}
+        <ListingPhotosGallery
+          photos={photos}
+          screenWidth={screenWidth}
+          isFavorite={isFavorite}
+          onBack={() => router.back()}
+          onShare={handleShare}
+          onToggleFavorite={() => id && toggleFavorite(id)}
+          onReport={handleReport}
+        />
 
-        {/* Détails Principaux */}
+        {/* ② Bloc info principal */}
         <View style={styles.detailsContainer}>
-          {/* Prix & Titre */}
+
+          {/* Prix + badge réduction */}
           <View style={styles.priceRow}>
-            <CurrencyText
-              amount={activePrice}
-              size="3xl"
-              weight="extrabold"
-              color={colors.market.primary}
-            />
-            {listing.original_price && listing.original_price > listing.price && (
-              <Text style={styles.originalPrice}>
-                {listing.original_price} FCFA
-              </Text>
+            <AppText variant="h1" color={accent[600]} style={styles.priceText}>
+              {formatFCFA(activePrice)}
+            </AppText>
+            {hasDiscount && listing.original_price && (
+              <AppText variant="body" color={colors.text.subtle} style={styles.originalPrice}>
+                {formatFCFA(listing.original_price)}
+              </AppText>
             )}
-          </View>
-
-          <Text style={styles.listingTitle}>{listing.title}</Text>
-
-          <View style={styles.tagsRow}>
-            <View style={styles.tag}>
-              <MapPin size={12} color={colors.market.primary} />
-              <Text style={styles.tagText}>{listing.district || 'Daloa'}</Text>
-            </View>
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>État : {listing.condition}</Text>
-            </View>
-            {listing.accepts_delivery && (
-              <View style={[styles.tag, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                <Truck size={12} color="#10B981" />
-                <Text style={[styles.tagText, { color: '#10B981' }]}>Livraison Daloa</Text>
+            {hasDiscount && discountPct > 0 && (
+              <View style={styles.discountBadge}>
+                <Tag size={10} color={colors.text.inverse} />
+                <AppText variant="overline" color={colors.text.inverse}>
+                  -{discountPct}%
+                </AppText>
               </View>
             )}
           </View>
 
-          {/* Variantes (Couleurs, Tailles) si existantes */}
+          {/* Titre */}
+          <AppText variant="title" style={styles.listingTitle}>
+            {listing.title}
+          </AppText>
+
+          {/* Chips : condition + quartier + livraison */}
+          <View style={styles.tagsRow}>
+            {conditionInfo && (
+              <View style={[styles.tag, { backgroundColor: conditionInfo.bg }]}>
+                <AppText variant="caption" color={conditionInfo.color} style={styles.tagText}>
+                  {conditionInfo.label}
+                </AppText>
+              </View>
+            )}
+            {listing.district && (
+              <View style={styles.tag}>
+                <AppText variant="caption" color={colors.grey[600]}>
+                  📍 {listing.district}
+                </AppText>
+              </View>
+            )}
+            <View style={[styles.tag, styles.deliveryTag]}>
+              <AppText variant="caption" color={colors.status.successDark}>
+                🚚 Livraison Daloa
+              </AppText>
+            </View>
+          </View>
+
+          {/* Variantes — signal visuel si options dispo */}
           {variants.length > 0 && (
-            <View style={styles.variantsSection}>
-              <Text style={styles.sectionSubtitle}>Choisir une option :</Text>
-              <View style={styles.variantsGrid}>
-                {variants.map((v) => {
-                  const isSelected = selectedVariant?.id === v.id;
-                  return (
-                    <TouchableOpacity
-                      key={v.id}
-                      onPress={() => {
-                        Haptics.selection();
-                        setSelectedVariant(isSelected ? null : v);
-                      }}
-                      style={[styles.variantChip, isSelected && styles.variantChipActive]}
-                    >
-                      <Text style={[styles.variantText, isSelected && styles.variantTextActive]}>
-                        {v.label}
-                      </Text>
-                      {v.price != null && (
-                        <Text style={[styles.variantPrice, isSelected && styles.variantPriceActive]}>
-                          ({v.price} F)
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
+            <AppPressable
+              haptic="selection"
+              onPress={() => setShowVariantPicker(true)}
+              style={[styles.variantBanner, { borderColor: accent[200], backgroundColor: accent[50] }]}
+              accessibilityLabel="Choisir une option"
+            >
+              <View style={styles.variantBannerLeft}>
+                <AppText variant="label" color={accent[700]}>
+                  {selectedVariant ? `Option : ${selectedVariant.label}` : 'Choisir une option'}
+                </AppText>
+                {selectedVariant?.price != null && (
+                  <AppText variant="caption" color={accent[600]}>
+                    {formatFCFA(selectedVariant.price)}
+                  </AppText>
+                )}
+                {!selectedVariant && (
+                  <AppText variant="caption" color={accent[500] ?? accent[600]}>
+                    {variants.length} option{variants.length > 1 ? 's' : ''} disponible{variants.length > 1 ? 's' : ''}
+                  </AppText>
+                )}
+              </View>
+              <View style={[styles.variantBannerBadge, { backgroundColor: accent.DEFAULT }]}>
+                <AppText variant="overline" color={colors.text.inverse}>
+                  {selectedVariant ? 'Modifier' : 'Choisir'}
+                </AppText>
+              </View>
+            </AppPressable>
+          )}
+
+          {/* Description avec collapse */}
+          {listing.description ? (
+            <View style={styles.sectionCard}>
+              <AppText variant="overline" color={colors.text.muted} style={styles.overline}>
+                Description de l'article
+              </AppText>
+              <AppText variant="body" color={colors.grey[600]}>
+                {descExpanded || !descLong
+                  ? listing.description
+                  : `${listing.description.slice(0, DESC_LIMIT)}...`}
+              </AppText>
+              {descLong && (
+                <AppPressable
+                  haptic="selection"
+                  onPress={() => setDescExpanded((p) => !p)}
+                  style={styles.readMoreBtn}
+                >
+                  <AppText variant="label" color={accent[600]}>
+                    {descExpanded ? 'Voir moins ↑' : 'Lire toute la description ↓'}
+                  </AppText>
+                </AppPressable>
+              )}
+            </View>
+          ) : null}
+
+          {/* ③ Trust badges */}
+          <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
+            Garanties & livraison
+          </AppText>
+          <ListingTrustBadges />
+
+          {/* ④ Seller card */}
+          <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
+            Le vendeur
+          </AppText>
+          <ListingSellerBox seller={seller} isPro={isPro} />
+
+          {/* ⑤ Contrôles propriétaire */}
+          {isOwner && (
+            <View style={styles.ownerCard}>
+              <AppText variant="label" color={colors.text.body} style={styles.sectionSubtitle}>
+                Gestion de votre annonce
+              </AppText>
+              <View style={styles.ownerButtons}>
+                <AppPressable
+                  onPress={handleMarkSold}
+                  style={[styles.ownerBtn, { backgroundColor: accent.DEFAULT }]}
+                >
+                  <AppText variant="label" color={colors.text.inverse}>
+                    Marquer vendu
+                  </AppText>
+                </AppPressable>
+                <AppPressable
+                  onPress={() => router.push(`/listing/create?id=${listing.id}` as any)}
+                  style={[styles.ownerBtn, styles.ownerBtnOutline, { borderColor: accent[300] }]}
+                >
+                  <AppText variant="label" color={accent[700]}>
+                    Modifier
+                  </AppText>
+                </AppPressable>
               </View>
             </View>
           )}
 
-          {/* Description */}
-          <View style={styles.descriptionSection}>
-            <Text style={styles.sectionSubtitle}>Description</Text>
-            <Text style={styles.descriptionText}>{listing.description}</Text>
-          </View>
+          {/* ⑥ Avis acheteurs */}
+          <ListingReviewsSection reviews={reviews} avgRating={avgRating} />
 
-          {/* Vendeur Profil Card */}
-          <Card
-            onPress={() => seller?.id && router.push(`/seller/${seller.id}`)}
-            style={styles.sellerCard}
-          >
-            <View style={styles.sellerRow}>
-              <Avatar
-                uri={seller?.shop_logo_url || seller?.avatar_url}
-                name={seller?.shop_name || seller?.full_name || 'Vendeur'}
-                size={48}
-                isPro={isPro}
-              />
-              <View style={styles.sellerInfo}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.sellerName} numberOfLines={1}>
-                    {seller?.shop_name || seller?.full_name || 'Boutique Daloa'}
-                  </Text>
-                  {isPro && <Badge label="PRO" variant="pro" />}
-                </View>
-                <RatingStars rating={seller?.rating || 5.0} totalReviews={seller?.review_count || 1} size={12} />
-                <Text style={styles.sellerDistrict}>📍 {seller?.district || 'Daloa'}</Text>
-              </View>
-              <ChevronRight size={20} color={colors.dark.textDim} />
-            </View>
-          </Card>
-
-          {/* Badge Garantie Séquestre */}
-          <View style={styles.escrowGuaranteeCard}>
-            <ShieldCheck size={24} color="#10B981" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.escrowTitle}>Paiement par Séquestre Garanti</Text>
-              <Text style={styles.escrowDesc}>
-                Votre argent ne sera versé au vendeur qu’après la livraison et validation de votre code OTP.
-              </Text>
-            </View>
-          </View>
-
-          {/* Articles Similaires */}
+          {/* ⑦ Annonces similaires — grille 2 colonnes */}
           {similarItems && similarItems.length > 0 && (
-            <View style={styles.similarSection}>
-              <Text style={styles.sectionSubtitle}>Articles similaires à Daloa</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {similarItems.map((simItem) => (
-                  <View key={simItem.id} style={{ width: 160, marginRight: spacing[3] }}>
+            <View>
+              <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
+                Dans la même catégorie
+              </AppText>
+              <View style={styles.similarGrid}>
+                {similarItems.map((simItem: any) => (
+                  <View key={simItem.id} style={styles.similarCell}>
                     <ListingCard
-                      listing={simItem}
-                      onPress={() => router.push(`/listing/${simItem.id}`)}
+                      listing={{
+                        id: simItem.id,
+                        title: simItem.title,
+                        price: simItem.price,
+                        photos: simItem.photos,
+                        district: simItem.district,
+                        createdAt: simItem.created_at,
+                      }}
+                      onPress={() => router.push(`/listing/${simItem.id}` as any)}
                     />
                   </View>
                 ))}
-              </ScrollView>
+              </View>
             </View>
           )}
 
-          <View style={{ height: 100 }} />
+          <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
 
-      {/* Sticky Bottom Actions */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handleWhatsApp}
-          style={styles.whatsappBtn}
-        >
-          <MessageCircle size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handleAddToCart}
-          style={styles.cartBtn}
-        >
-          <ShoppingBag size={20} color={colors.dark.text} />
-        </TouchableOpacity>
-
-        <Button
-          title="Acheter avec Séquestre"
-          variant="market"
-          size="lg"
-          onPress={handleBuyNow}
-          style={styles.buyBtn}
+      {/* Picker variantes */}
+      {variants.length > 0 && (
+        <VariantPickerSheet
+          visible={showVariantPicker}
+          onClose={() => setShowVariantPicker(false)}
+          onConfirm={handleVariantConfirm}
+          variants={variants}
+          listingTitle={listing.title}
+          listingPhoto={photos[0]}
+          basePrice={listing.price}
         />
-      </View>
+      )}
+
+      {/* Sticky footer */}
+      <ListingStickyFooter
+        cartQty={cartQty}
+        cartItemId={cartItemId}
+        onAddToCart={handleAddToCart}
+        onUpdateQty={updateQuantity}
+        onRemoveFromCart={removeFromCart}
+        onBuyNow={handleBuyNow}
+        isOwner={isOwner}
+      />
     </SafeAreaView>
   );
 }
 
+// ─── styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.surface,
   },
-  headerIconBtn: {
+  skeletonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  iconBtn: {
     width: 36,
     height: 36,
     borderRadius: radii.md,
-    backgroundColor: colors.dark.surfaceRaised,
+    backgroundColor: colors.bg.subtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  skeletonScroll: {
+    paddingBottom: spacing[8],
+  },
   scrollContent: {
-    paddingBottom: 40,
-  },
-  galleryContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH * 0.85,
-    backgroundColor: colors.dark.surfaceRaised,
-    position: 'relative',
-  },
-  galleryImage: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH * 0.85,
-  },
-  paginationBadge: {
-    position: 'absolute',
-    bottom: 12,
-    right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radii.full,
-  },
-  paginationText: {
-    color: '#FFFFFF',
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
+    backgroundColor: colors.bg.DEFAULT,
   },
   detailsContainer: {
+    backgroundColor: colors.bg.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -20,
     padding: spacing[4],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
   },
   priceRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: spacing[2],
-    marginBottom: spacing[1],
+    flexWrap: 'wrap',
+  },
+  priceText: {
+    fontVariant: ['tabular-nums'],
   },
   originalPrice: {
-    color: colors.dark.textDim,
-    fontSize: typography.sizes.base,
     textDecorationLine: 'line-through',
+    fontVariant: ['tabular-nums'],
+  },
+  discountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.status.error,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: radii.full,
   },
   listingTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
-    lineHeight: 26,
-    marginBottom: spacing[3],
+    marginTop: spacing[1],
   },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing[2],
-    marginBottom: spacing[4],
+    gap: 6,
+    marginTop: spacing[2],
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dark.surfaceRaised,
-    borderRadius: radii.full,
-    paddingHorizontal: spacing[3],
+    backgroundColor: colors.bg.subtle,
+    paddingHorizontal: spacing[2],
     paddingVertical: 4,
+    borderRadius: radii.md,
     gap: 4,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
   },
   tagText: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.medium,
+    fontWeight: '600',
   },
-  sectionSubtitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing[2],
+  deliveryTag: {
+    backgroundColor: colors.status.successLight,
+    borderWidth: 1,
+    borderColor: colors.status.successBorder,
   },
-  variantsSection: {
-    marginBottom: spacing[4],
-  },
-  variantsGrid: {
+  variantBanner: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing[3],
+    borderRadius: radii.xl,
+    borderWidth: 1.5,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3],
     gap: spacing[2],
   },
-  variantChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.dark.surfaceRaised,
-    borderRadius: radii.xl,
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[3],
-    borderWidth: 1.5,
-    borderColor: colors.dark.border,
-    gap: 4,
-  },
-  variantChipActive: {
-    borderColor: colors.market.primary,
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-  },
-  variantText: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium,
-  },
-  variantTextActive: {
-    color: colors.market.primary,
-    fontWeight: typography.weights.bold,
-  },
-  variantPrice: {
-    color: colors.dark.textDim,
-    fontSize: typography.sizes.xs,
-  },
-  variantPriceActive: {
-    color: colors.market.primary,
-  },
-  descriptionSection: {
-    marginBottom: spacing[4],
-  },
-  descriptionText: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.sm,
-    lineHeight: 22,
-  },
-  sellerCard: {
-    padding: spacing[3],
-    marginBottom: spacing[4],
-  },
-  sellerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-  },
-  sellerInfo: {
+  variantBannerLeft: {
     flex: 1,
     gap: 2,
   },
-  sellerName: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
+  variantBannerBadge: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: 6,
+    borderRadius: radii.lg,
+    flexShrink: 0,
   },
-  sellerDistrict: {
-    color: colors.dark.textDim,
-    fontSize: 11,
-  },
-  escrowGuaranteeCard: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+  sectionCard: {
+    marginTop: spacing[3],
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-    borderRadius: radii['2xl'],
-    padding: spacing[4],
-    gap: spacing[3],
-    marginBottom: spacing[5],
-  },
-  escrowTitle: {
-    color: '#10B981',
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-    marginBottom: 2,
-  },
-  escrowDesc: {
-    color: colors.dark.textMuted,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  similarSection: {
-    marginBottom: spacing[4],
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.dark.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
+    borderColor: colors.border.subtle,
+    padding: spacing[3],
     gap: spacing[2],
   },
-  whatsappBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.xl,
-    backgroundColor: '#25D366',
-    alignItems: 'center',
-    justifyContent: 'center',
+  overline: {
+    paddingHorizontal: 2,
   },
-  cartBtn: {
-    width: 48,
-    height: 48,
+  sectionOverline: {
+    marginTop: spacing[4],
+    marginBottom: spacing[1],
+    paddingHorizontal: 2,
+  },
+  sectionSubtitle: {
+    marginBottom: spacing[2],
+  },
+  readMoreBtn: {
+    marginTop: spacing[2],
+    alignSelf: 'flex-start',
+  },
+  ownerCard: {
+    marginTop: spacing[3],
+    backgroundColor: colors.bg.surface,
     borderRadius: radii.xl,
-    backgroundColor: colors.dark.surfaceRaised,
     borderWidth: 1,
-    borderColor: colors.dark.border,
+    borderColor: colors.primary[100],
+    padding: spacing[3],
+    gap: spacing[2],
+  },
+  ownerButtons: {
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  ownerBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  buyBtn: {
-    flex: 1,
+  ownerBtnOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+  },
+  similarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 0,
+    marginHorizontal: -5,
+  },
+  similarCell: {
+    width: '50%',
+    paddingHorizontal: 5,
+  },
+  bottomSpacer: {
+    height: spacing[6],
   },
 });

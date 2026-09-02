@@ -1,205 +1,198 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../src/context/AuthContext';
 import { PRICING_CONFIG } from '@daloa/config';
-import {
-  colors,
-  radii,
-  spacing,
-  typography,
-  Header,
-  Card,
-  Button,
-  Badge,
-  CurrencyText,
-} from '@daloa/ui';
-import {
-  Sparkles,
-  CheckCircle2,
-  Percent,
-  ShieldCheck,
-  Zap,
-  Star,
-} from 'lucide-react-native';
-import { Haptics } from '@daloa/utils';
+import { colors, radii, spacing, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react-native';
+import { formatFCFA, Haptics } from '@daloa/utils';
+
+const PERKS = [
+  { title: 'Badge PRO certifié', desc: 'Renforcez la confiance des acheteurs sur toutes vos annonces.' },
+  { title: 'Commission réduite (2.5%)', desc: 'Économisez 1% sur toutes vos ventes par rapport aux vendeurs standards.' },
+  { title: 'Vitrine boutique personnalisée', desc: 'Bannière, logo et lien exclusif daloamarket.com/shop/votrenom.' },
+  { title: 'Remontée prioritaire', desc: 'Vos annonces apparaissent au-dessus des annonces standards.' },
+  { title: 'Statistiques détaillées', desc: 'Suivi du nombre de vues, clics et contacts sur votre catalogue.' },
+  { title: 'Support prioritaire VIP', desc: 'Ligne directe WhatsApp avec notre équipe d’assistance à Daloa.' },
+];
 
 export default function BecomeProScreen() {
   const router = useRouter();
-  const { user, profile, refreshProfile } = useAuth();
+  const accent = useAccent();
+  const insets = useSafeAreaInsets();
   const [billingPlan, setBillingPlan] = useState<'monthly' | 'annual'>('monthly');
   const [isUpgrading, setIsUpgrading] = useState(false);
-
-  const perks = [
-    { title: 'Badge PRO Certifié', desc: 'Renforcez la confiance des acheteurs sur toutes vos annonces.' },
-    { title: 'Commission Réduite (2.5%)', desc: 'Économisez 1% sur toutes vos ventes par rapport aux vendeurs standards.' },
-    { title: 'Vitrine Boutique Personnalisée', desc: 'Bannière personnalisée, logo et lien exclusif daloamarket.com/shop/votrenom.' },
-    { title: 'Remontée Prioritaire', desc: 'Vos annonces apparaissent au-dessus des annonces standards dans la recherche.' },
-    { title: 'Statistiques Détaillées', desc: 'Suivi du nombre de vues, clics et contacts sur votre catalogue.' },
-    { title: 'Support Prioritaire VIP', desc: 'Ligne directe WhatsApp avec notre équipe d’assistance à Daloa.' },
-  ];
 
   const handleSubscribe = async () => {
     Haptics.success();
     setIsUpgrading(true);
-    setTimeout(async () => {
+    setTimeout(() => {
       setIsUpgrading(false);
       Alert.alert(
         'Félicitations ! 🎉',
         'Votre compte est désormais Vendeur Pro. Vos privilèges sont immédiatement actifs.',
-        [{ text: 'Super !', onPress: () => router.replace('/(tabs)/profile') }]
+        [{ text: 'Super !', onPress: () => router.replace('/(tabs)/profile' as any) }]
       );
     }, 1200);
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title="Devenir Vendeur Pro" onBack={() => router.back()} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Hero */}
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroTop}>
+          <AppPressable
+            onPress={() => router.back()}
+            rippleBorderless
+            style={styles.backBtn}
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={18} color={colors.text.inverse} />
+          </AppPressable>
+          <View style={styles.heroTitles}>
+            <AppText variant="overline" color={accent[100]}>
+              Abonnement marchand
+            </AppText>
+            <AppText variant="title" color={colors.text.inverse}>
+              Vendeur Pro
+            </AppText>
+          </View>
+          <View style={styles.iconCircle}>
+            <Sparkles size={18} color={accent[200]} />
+          </View>
+        </View>
+
+        <AppText variant="caption" color="rgba(255,255,255,0.85)" style={styles.heroSub}>
+          Propulsez vos ventes à Daloa avec des outils professionnels et une visibilité maximale.
+        </AppText>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Hero Card */}
-        <View style={styles.heroCard}>
-          <View style={styles.proIconBox}>
-            <Sparkles size={28} color="#F59E0B" />
-          </View>
-          <Text style={styles.heroTitle}>Propulsez vos ventes à Daloa avec le statut PRO</Text>
-          <Text style={styles.heroSub}>
-            Rejoignez les meilleurs commerçants et boutiques professionnelles de la ville.
-          </Text>
-        </View>
-
-        {/* Sélection du Plan */}
-        <Text style={styles.sectionTitle}>Choisissez votre formule</Text>
+        {/* Plans */}
+        <AppText variant="subtitle">Choisissez votre formule</AppText>
         <View style={styles.plansRow}>
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.selection();
-              setBillingPlan('monthly');
-            }}
-            style={[styles.planCard, billingPlan === 'monthly' && styles.planCardActive]}
+          <AppPressable
+            haptic="selection"
+            onPress={() => setBillingPlan('monthly')}
+            style={[styles.planCard, billingPlan === 'monthly' && { borderColor: accent.DEFAULT, backgroundColor: accent[50] }]}
           >
-            <Text style={[styles.planTitle, billingPlan === 'monthly' && styles.planTitleActive]}>
+            <AppText variant="bodyStrong" color={billingPlan === 'monthly' ? accent[700] : colors.text.DEFAULT}>
               Mensuel
-            </Text>
-            <CurrencyText
-              amount={PRICING_CONFIG.proSubscription.monthlyPrice}
-              size="lg"
-              weight="bold"
-              color={billingPlan === 'monthly' ? '#F59E0B' : colors.dark.text}
-            />
-            <Text style={styles.planPeriod}>Par mois</Text>
-          </TouchableOpacity>
+            </AppText>
+            <AppText variant="bodyStrong" color={billingPlan === 'monthly' ? accent[600] : colors.text.DEFAULT}>
+              {formatFCFA(PRICING_CONFIG.proSubscription.monthlyPrice)}
+            </AppText>
+            <AppText variant="caption" color={colors.text.subtle}>
+              Par mois
+            </AppText>
+          </AppPressable>
 
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.selection();
-              setBillingPlan('annual');
-            }}
-            style={[styles.planCard, billingPlan === 'annual' && styles.planCardActive]}
+          <AppPressable
+            haptic="selection"
+            onPress={() => setBillingPlan('annual')}
+            style={[styles.planCard, billingPlan === 'annual' && { borderColor: accent.DEFAULT, backgroundColor: accent[50] }]}
           >
             <View style={styles.saveBadge}>
-              <Text style={styles.saveText}>2 MOIS OFFERTS</Text>
+              <AppText variant="overline" color={colors.text.inverse}>
+                2 MOIS OFFERTS
+              </AppText>
             </View>
-            <Text style={[styles.planTitle, billingPlan === 'annual' && styles.planTitleActive]}>
+            <AppText variant="bodyStrong" color={billingPlan === 'annual' ? accent[700] : colors.text.DEFAULT}>
               Annuel
-            </Text>
-            <CurrencyText
-              amount={PRICING_CONFIG.proSubscription.annualPrice}
-              size="lg"
-              weight="bold"
-              color={billingPlan === 'annual' ? '#F59E0B' : colors.dark.text}
-            />
-            <Text style={styles.planPeriod}>Par an (25 000 FCFA)</Text>
-          </TouchableOpacity>
+            </AppText>
+            <AppText variant="bodyStrong" color={billingPlan === 'annual' ? accent[600] : colors.text.DEFAULT}>
+              {formatFCFA(PRICING_CONFIG.proSubscription.annualPrice)}
+            </AppText>
+            <AppText variant="caption" color={colors.text.subtle}>
+              Par an (25 000 FCFA)
+            </AppText>
+          </AppPressable>
         </View>
 
-        {/* Avantages Vendeur Pro */}
-        <Text style={styles.sectionTitle}>Les Privilèges Vendeur Pro</Text>
-        <Card style={styles.perksCard}>
-          {perks.map((p, idx) => (
-            <View key={idx} style={styles.perkRow}>
-              <CheckCircle2 size={18} color="#10B981" style={{ marginTop: 2 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.perkTitle}>{p.title}</Text>
-                <Text style={styles.perkDesc}>{p.desc}</Text>
+        {/* Privilèges */}
+        <AppText variant="subtitle">Les privilèges Vendeur Pro</AppText>
+        <View style={styles.perksCard}>
+          {PERKS.map((p) => (
+            <View key={p.title} style={styles.perkRow}>
+              <CheckCircle2 size={18} color={colors.status.successDark} style={styles.perkIcon} />
+              <View style={styles.flex1}>
+                <AppText variant="bodyStrong">{p.title}</AppText>
+                <AppText variant="caption" color={colors.text.muted} style={styles.perkDesc}>
+                  {p.desc}
+                </AppText>
               </View>
             </View>
           ))}
-        </Card>
+        </View>
 
-        {/* CTA d'activation */}
+        {/* CTA */}
         <Button
-          title={
-            billingPlan === 'monthly'
-              ? 'Activer pour 2 500 FCFA / mois'
-              : 'Activer pour 25 000 FCFA / an'
-          }
+          title={billingPlan === 'monthly' ? 'Activer pour 2 500 FCFA / mois' : 'Activer pour 25 000 FCFA / an'}
           variant="market"
           size="lg"
           loading={isUpgrading}
           onPress={handleSubscribe}
-          style={styles.subscribeBtn}
+          fullWidth
         />
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: insets.bottom + spacing[6] }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
+  },
+  hero: {
+    paddingHorizontal: spacing[4],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    gap: spacing[2],
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroTitles: {
+    flex: 1,
+    marginLeft: spacing[2],
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroSub: {
+    lineHeight: 18,
+    paddingHorizontal: spacing[1],
   },
   scrollContent: {
     padding: spacing[4],
     gap: spacing[4],
-  },
-  heroCard: {
-    backgroundColor: colors.dark.surface,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-    padding: spacing[4],
-    alignItems: 'center',
-    textAlign: 'center',
-  },
-  proIconBox: {
-    width: 60,
-    height: 60,
-    borderRadius: radii.full,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing[2],
-  },
-  heroTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  heroSub: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  sectionTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
   },
   plansRow: {
     flexDirection: 'row',
@@ -207,17 +200,14 @@ const styles = StyleSheet.create({
   },
   planCard: {
     flex: 1,
-    backgroundColor: colors.dark.surface,
+    backgroundColor: colors.bg.surface,
     borderRadius: radii.xl,
     borderWidth: 1.5,
-    borderColor: colors.dark.border,
+    borderColor: colors.border.DEFAULT,
     padding: spacing[3],
     alignItems: 'center',
     gap: 4,
-  },
-  planCardActive: {
-    borderColor: '#F59E0B',
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    overflow: 'hidden',
   },
   saveBadge: {
     backgroundColor: colors.status.success,
@@ -226,44 +216,26 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginBottom: 2,
   },
-  saveText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: typography.weights.extrabold,
-  },
-  planTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-  },
-  planTitleActive: {
-    color: '#F59E0B',
-  },
-  planPeriod: {
-    color: colors.dark.textDim,
-    fontSize: 10,
-  },
   perksCard: {
     padding: spacing[4],
     gap: spacing[3],
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
   },
   perkRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing[3],
   },
-  perkTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
+  perkIcon: {
+    marginTop: 2,
+  },
+  flex1: {
+    flex: 1,
   },
   perkDesc: {
-    color: colors.dark.textDim,
-    fontSize: typography.sizes.xs,
-    lineHeight: 16,
     marginTop: 1,
-  },
-  subscribeBtn: {
-    marginTop: spacing[2],
   },
 });

@@ -1,94 +1,196 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserOrders } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
-import { colors, radii, spacing, typography, StatusPill, CurrencyText, Card, EmptyState, Skeleton, Button } from '@daloa/ui';
-import { Package, ChevronRight, KeyRound, Truck, AlertTriangle } from 'lucide-react-native';
-import { formatDate, Haptics } from '@daloa/utils';
+import {
+  colors,
+  radii,
+  spacing,
+  Skeleton,
+  Button,
+  EmptyState,
+  AppText,
+  AppPressable,
+  useAccent,
+} from '@daloa/ui';
+import {
+  Package,
+  ShoppingBag,
+  Store,
+  ClipboardList,
+  ShieldCheck,
+} from 'lucide-react-native';
+import { UserOrderCard } from '../../src/components/orders/UserOrderCard';
+
+const STATUS_FILTERS = [
+  { id: 'all', label: 'Toutes' },
+  { id: 'awaiting_pickup', label: 'En attente' },
+  { id: 'in_transit', label: 'En livraison' },
+  { id: 'delivered', label: 'Livrées' },
+];
 
 export default function OrdersScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const accent = useAccent();
+  const { user, isAuthenticated } = useAuth();
+
   const [activeTab, setActiveTab] = useState<'buyer' | 'seller'>('buyer');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: orders, isLoading, refetch, isRefetching } = useUserOrders(
     user?.id,
     activeTab,
     statusFilter
   );
-
   const orderList = orders || [];
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.title}>Mes Commandes</Text>
-        {/* Toggle Acheteur / Vendeur */}
-        <View style={styles.roleToggle}>
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.selection();
-              setActiveTab('buyer');
-            }}
-            style={[styles.roleBtn, activeTab === 'buyer' && styles.roleBtnActive]}
-          >
-            <Text style={[styles.roleText, activeTab === 'buyer' && styles.roleTextActive]}>
-              Mes Achats
-            </Text>
-          </TouchableOpacity>
+  /* ── Guest ── */
+  if (!isAuthenticated || !user) {
+    return (
+      <View style={[styles.container, { paddingTop: 0 }]}>
+        <LinearGradient
+          colors={[accent[400], accent[600], accent[700]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.guestHero, { paddingTop: insets.top + spacing[4] }]}
+        >
+          <View style={styles.heroIconCircle}>
+            <Package size={22} color={accent[700]} strokeWidth={2} />
+          </View>
+          <AppText variant="overline" color={accent[100]}>MES COMMANDES</AppText>
+          <AppText variant="h2" color={colors.text.inverse}>Achats & ventes</AppText>
+          <AppText variant="caption" color={accent[100]}>
+            Livraisons sécurisées par séquestre
+          </AppText>
+        </LinearGradient>
 
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.selection();
-              setActiveTab('seller');
-            }}
-            style={[styles.roleBtn, activeTab === 'seller' && styles.roleBtnActive]}
-          >
-            <Text style={[styles.roleText, activeTab === 'seller' && styles.roleTextActive]}>
-              Mes Ventes
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.guestCard}>
+          <View style={styles.guestIconRow}>
+            <View style={[styles.guestFeatureIcon, { backgroundColor: accent[50] }]}>
+              <ClipboardList size={20} color={accent[600]} />
+            </View>
+            <View style={[styles.guestFeatureIcon, { backgroundColor: colors.status.successLight }]}>
+              <ShieldCheck size={20} color={colors.status.successDark} />
+            </View>
+            <View style={[styles.guestFeatureIcon, { backgroundColor: accent[50] }]}>
+              <ShoppingBag size={20} color={accent[600]} />
+            </View>
+          </View>
+          <AppText variant="h2" center>Suivez vos commandes en direct</AppText>
+          <AppText variant="body" color={colors.text.muted} center style={styles.guestSub}>
+            Consultez l'historique de vos achats, vos codes OTP de réception et gérez vos ventes à Daloa.
+          </AppText>
+          <Button
+            title="Se connecter à mon compte"
+            variant="market"
+            size="lg"
+            onPress={() => router.push('/auth/login' as any)}
+            style={styles.guestBtn}
+          />
         </View>
       </View>
+    );
+  }
 
-      {/* Filtres de statuts rapides */}
-      <View style={styles.filtersBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing[4], gap: spacing[2] }}>
-          {[
-            { id: 'all', label: 'Toutes' },
-            { id: 'awaiting_pickup', label: 'En cours' },
-            { id: 'delivered', label: 'Livrées' },
-            { id: 'disputed', label: 'Litiges' },
-          ].map((f) => (
-            <TouchableOpacity
-              key={f.id}
-              onPress={() => {
-                Haptics.selection();
-                setStatusFilter(f.id);
-              }}
-              style={[styles.filterChip, statusFilter === f.id && styles.filterChipActive]}
+  /* ── Authenticated ── */
+  return (
+    <View style={styles.container}>
+      {/* Hero gradient */}
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.hero, { paddingTop: insets.top + spacing[2] }]}
+      >
+        {/* Titre */}
+        <View style={styles.heroTitle}>
+          <View style={styles.heroIconCircle}>
+            <Package size={22} color={accent[700]} strokeWidth={2} />
+          </View>
+          <View>
+            <AppText variant="overline" color={accent[100]}>MES COMMANDES</AppText>
+            <AppText variant="h2" color={colors.text.inverse}>
+              {activeTab === 'buyer' ? 'Mes achats' : 'Mes ventes'}
+            </AppText>
+          </View>
+        </View>
+
+        {/* Toggle acheteur / vendeur */}
+        <View style={styles.roleToggle}>
+          <AppPressable
+            haptic="selection"
+            onPress={() => setActiveTab('buyer')}
+            style={[styles.roleBtn, activeTab === 'buyer' && styles.roleBtnActive]}
+          >
+            <ShoppingBag
+              size={13}
+              color={activeTab === 'buyer' ? accent[600] : 'rgba(255,255,255,0.75)'}
+              strokeWidth={2}
+            />
+            <AppText
+              variant="label"
+              color={activeTab === 'buyer' ? accent[600] : 'rgba(255,255,255,0.85)'}
             >
-              <Text style={[styles.filterText, statusFilter === f.id && styles.filterTextActive]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+              Mes achats
+            </AppText>
+          </AppPressable>
+
+          <AppPressable
+            haptic="selection"
+            onPress={() => setActiveTab('seller')}
+            style={[styles.roleBtn, activeTab === 'seller' && styles.roleBtnActive]}
+          >
+            <Store
+              size={13}
+              color={activeTab === 'seller' ? accent[600] : 'rgba(255,255,255,0.75)'}
+              strokeWidth={2}
+            />
+            <AppText
+              variant="label"
+              color={activeTab === 'seller' ? accent[600] : 'rgba(255,255,255,0.85)'}
+            >
+              Mes ventes
+            </AppText>
+          </AppPressable>
+        </View>
+      </LinearGradient>
+
+      {/* Filtres statut */}
+      <View style={styles.statusBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.statusPills}
+        >
+          {STATUS_FILTERS.map((s) => {
+            const isSelected = statusFilter === s.id;
+            return (
+              <AppPressable
+                key={s.id}
+                haptic="selection"
+                onPress={() => setStatusFilter(s.id)}
+                style={[
+                  styles.statusPill,
+                  isSelected && { backgroundColor: accent.DEFAULT, borderColor: accent.DEFAULT },
+                ]}
+              >
+                <AppText
+                  variant="caption"
+                  color={isSelected ? colors.text.inverse : colors.grey[600]}
+                >
+                  {s.label}
+                </AppText>
+              </AppPressable>
+            );
+          })}
         </ScrollView>
       </View>
 
-      {/* Liste des commandes */}
+      {/* Liste */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -96,277 +198,167 @@ export default function OrdersScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            tintColor={colors.market.primary}
+            tintColor={accent.DEFAULT}
+            colors={[accent.DEFAULT]}
           />
         }
       >
         {isLoading ? (
-          <View style={{ gap: spacing[3] }}>
-            <Skeleton height={140} borderRadius={radii['2xl']} />
-            <Skeleton height={140} borderRadius={radii['2xl']} />
-            <Skeleton height={140} borderRadius={radii['2xl']} />
+          <View style={styles.skeletonList}>
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} height={130} borderRadius={radii.xl} />
+            ))}
           </View>
         ) : orderList.length === 0 ? (
           <EmptyState
-            icon={<Package size={32} color={colors.market.primary} />}
+            icon={<Package size={30} color={accent.DEFAULT} />}
             title="Aucune commande trouvée"
             description={
               activeTab === 'buyer'
-                ? "Vous n'avez pas encore passé de commande. Explorez les articles disponibles à Daloa !"
+                ? "Vous n'avez pas encore passé de commande."
                 : "Vous n'avez pas encore reçu de commande pour vos articles."
             }
-            actionTitle={activeTab === 'buyer' ? "Explorer les articles" : "Publier une annonce"}
-            onActionPress={() => router.push(activeTab === 'buyer' ? '/(tabs)/index' : '/listing/create')}
+            actionTitle={activeTab === 'buyer' ? 'Explorer les annonces' : undefined}
+            onActionPress={
+              activeTab === 'buyer' ? () => router.push('/(tabs)' as any) : undefined
+            }
+            actionVariant="market"
           />
         ) : (
-          orderList.map((order) => {
-            const photoUrl = order.listing?.photos?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80';
-            const deliveryOtp = order.delivery_assignment?.delivery_otp;
-
-            return (
-              <Card
-                key={order.id}
-                onPress={() => router.push(`/order/${order.id}`)}
-                style={styles.orderCard}
-              >
-                {/* Header Carte : Date & Status */}
-                <View style={styles.cardHeader}>
-                  <View>
-                    <Text style={styles.orderNumber}>Commande #{order.id.slice(0, 8).toUpperCase()}</Text>
-                    <Text style={styles.orderDate}>{formatDate(order.created_at, true)}</Text>
-                  </View>
-                  <StatusPill status={order.status} size="sm" />
-                </View>
-
-                {/* Body Carte : Image, Titre & Montant */}
-                <View style={styles.cardBody}>
-                  <Image source={{ uri: photoUrl }} style={styles.listingImage} resizeMode="cover" />
-                  <View style={styles.listingInfo}>
-                    <Text style={styles.listingTitle} numberOfLines={2}>
-                      {order.listing?.title || 'Article DaloaMarket'}
-                    </Text>
-                    <Text style={styles.partnerName}>
-                      {activeTab === 'buyer'
-                        ? `Vendeur : ${order.seller?.shop_name || order.seller?.full_name || 'Boutique'}`
-                        : `Acheteur : ${order.buyer?.full_name || 'Client'}`}
-                    </Text>
-
-                    <View style={styles.amountRow}>
-                      <CurrencyText
-                        amount={order.total_amount}
-                        size="base"
-                        weight="bold"
-                        color={colors.market.primary}
-                      />
-                      <Text style={styles.qtyText}>x{order.quantity || 1}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Footer Carte : OTP & Suivi CTA */}
-                <View style={styles.cardFooter}>
-                  {deliveryOtp && order.status !== 'delivered' && order.status !== 'cancelled' ? (
-                    <View style={styles.otpPill}>
-                      <KeyRound size={13} color="#10B981" />
-                      <Text style={styles.otpLabel}>Code OTP :</Text>
-                      <Text style={styles.otpCode}>{deliveryOtp}</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.districtBadge}>
-                      <Truck size={13} color={colors.dark.textDim} />
-                      <Text style={styles.districtText}>
-                        {order.delivery_district || 'Daloa'}
-                      </Text>
-                    </View>
-                  )}
-
-                  <View style={styles.trackingLink}>
-                    <Text style={styles.trackingText}>Suivre en direct</Text>
-                    <ChevronRight size={16} color={colors.market.primary} />
-                  </View>
-                </View>
-              </Card>
-            );
-          })
+          <View style={styles.orderList}>
+            {orderList.map((order: any) => (
+              <UserOrderCard key={order.id} order={order} role={activeTab} />
+            ))}
+          </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
   },
-  topBar: {
+  // ── Hero ──
+  hero: {
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[4],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    gap: spacing[3],
+  },
+  heroTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
+    gap: spacing[3],
   },
-  title: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
+  heroIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  // ── Toggle ──
   roleToggle: {
     flexDirection: 'row',
-    backgroundColor: colors.dark.surfaceRaised,
+    backgroundColor: 'rgba(0,0,0,0.18)',
     borderRadius: radii.xl,
     padding: 3,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
   },
   roleBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: spacing[3],
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 36,
     borderRadius: radii.lg,
+    gap: 6,
+    overflow: 'hidden',
   },
   roleBtnActive: {
-    backgroundColor: colors.market.primary,
+    backgroundColor: colors.bg.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  roleText: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
-  },
-  roleTextActive: {
-    color: '#FFFFFF',
-  },
-  filtersBar: {
-    paddingVertical: spacing[2],
+  // ── Status bar ──
+  statusBar: {
+    backgroundColor: colors.bg.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
+    borderBottomColor: colors.border.subtle,
   },
-  filterChip: {
+  statusPills: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    gap: spacing[2],
+  },
+  statusPill: {
     paddingHorizontal: spacing[3],
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: radii.full,
-    backgroundColor: colors.dark.surfaceRaised,
+    backgroundColor: colors.bg.subtle,
     borderWidth: 1,
-    borderColor: colors.dark.border,
+    borderColor: colors.border.DEFAULT,
+    overflow: 'hidden',
   },
-  filterChipActive: {
-    backgroundColor: colors.market.primary,
-    borderColor: colors.market.primary,
-  },
-  filterText: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.medium,
-  },
-  filterTextActive: {
-    color: '#FFFFFF',
-    fontWeight: typography.weights.bold,
-  },
+  // ── Liste ──
   scrollContent: {
     padding: spacing[4],
+    paddingBottom: spacing[10],
+  },
+  skeletonList: {
     gap: spacing[3],
   },
-  orderCard: {
-    padding: spacing[3] + 2,
+  orderList: {
     gap: spacing[3],
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
-    paddingBottom: spacing[2],
-  },
-  orderNumber: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-  },
-  orderDate: {
-    color: colors.dark.textDim,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  cardBody: {
-    flexDirection: 'row',
-    gap: spacing[3],
-  },
-  listingImage: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.lg,
-    backgroundColor: colors.dark.surfaceRaised,
-  },
-  listingInfo: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  listingTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    lineHeight: 18,
-  },
-  partnerName: {
-    color: colors.dark.textDim,
-    fontSize: typography.sizes.xs,
-  },
-  amountRow: {
-    flexDirection: 'row',
+  // ── Guest ──
+  guestHero: {
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[12],
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
     alignItems: 'center',
     gap: 6,
-    marginTop: 2,
   },
-  qtyText: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-  },
-  cardFooter: {
-    flexDirection: 'row',
+  guestCard: {
+    backgroundColor: colors.bg.surface,
+    marginHorizontal: spacing[4],
+    marginTop: -spacing[8],
+    borderRadius: radii['2xl'],
+    padding: spacing[5],
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: colors.dark.border,
-    paddingTop: spacing[2],
+    gap: spacing[3],
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  otpPill: {
+  guestIconRow: {
     flexDirection: 'row',
+    gap: spacing[3],
+  },
+  guestFeatureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.xl,
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radii.md,
-    gap: 4,
+    justifyContent: 'center',
   },
-  otpLabel: {
-    color: colors.dark.textMuted,
-    fontSize: 11,
+  guestSub: {
+    marginTop: 4,
   },
-  otpCode: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 1,
-  },
-  districtBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  districtText: {
-    color: colors.dark.textDim,
-    fontSize: 11,
-  },
-  trackingLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  trackingText: {
-    color: colors.market.primary,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
+  guestBtn: {
+    alignSelf: 'stretch',
+    marginTop: spacing[2],
   },
 });

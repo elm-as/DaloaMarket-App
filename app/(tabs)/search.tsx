@@ -1,220 +1,222 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { useListings } from '@daloa/api';
-import { MARKET_CATEGORIES } from '@daloa/config';
-import { ListingFilters } from '@daloa/types';
-import { colors, radii, spacing, typography, SearchInput, Skeleton, EmptyState } from '@daloa/ui';
-import { ListingCard } from '../../src/components/ListingCard';
-import { FilterModal } from '../../src/components/FilterModal';
-import { CategoryPill } from '../../src/components/CategoryPill';
-import { ArrowUpDown } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SearchX } from 'lucide-react-native';
+import { useInfiniteListings } from '@daloa/api';
+import { colors, radii, spacing, ListingCard, Skeleton, EmptyState, useResponsive } from '@daloa/ui';
+import { useCart } from '../../src/context/CartContext';
+import { useFavorites } from '../../src/context/FavoritesContext';
 import { Haptics } from '@daloa/utils';
+import { SearchFilterModal, SearchFilterValues } from '../../src/components/search/SearchFilterModal';
+import { SearchTopBar } from '../../src/components/search/SearchTopBar';
+
+const EMPTY_FILTERS: SearchFilterValues = {
+  category: null,
+  district: null,
+  condition: null,
+  minPrice: '',
+  maxPrice: '',
+};
 
 export default function SearchScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [filters, setFilters] = useState<ListingFilters>({
-    sortBy: 'created_at_desc',
-  });
+  const { items, addToCart, updateQuantity } = useCart();
+  const { isFavorited, toggleFavorite } = useFavorites();
+  const { gridColumns } = useResponsive();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [filters, setFilters] = useState<SearchFilterValues>(EMPTY_FILTERS);
+  const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
 
-  const { data, isLoading } = useListings({
-    ...filters,
-    searchQuery: searchQuery.length > 0 ? searchQuery : undefined,
+  const {
+    data: listingsData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteListings({
+    category: filters.category || undefined,
+    district: filters.district || undefined,
+    condition: filters.condition || undefined,
+    minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
+    maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
   });
 
-  const listings = data?.data || [];
+  const filteredListings = useMemo(() => {
+    const rawList = listingsData?.pages.flatMap((p) => p.data) || [];
+    let list = [...rawList];
 
-  const handleCategoryToggle = (catId: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      category: prev.category === catId ? undefined : catId,
-    }));
-  };
-
-  const handleSortToggle = () => {
-    Haptics.selection();
-    setFilters((prev) => {
-      if (prev.sortBy === 'created_at_desc') return { ...prev, sortBy: 'price_asc' };
-      if (prev.sortBy === 'price_asc') return { ...prev, sortBy: 'price_desc' };
-      if (prev.sortBy === 'price_desc') return { ...prev, sortBy: 'popularity' };
-      return { ...prev, sortBy: 'created_at_desc' };
-    });
-  };
-
-  const getSortLabel = () => {
-    switch (filters.sortBy) {
-      case 'price_asc':
-        return 'Prix croissant';
-      case 'price_desc':
-        return 'Prix décroissant';
-      case 'popularity':
-        return 'Popularité';
-      default:
-        return 'Nouveautés';
+    if (searchQuery.trim().length > 0) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (l: any) =>
+          l.title.toLowerCase().includes(q) ||
+          (l.description && l.description.toLowerCase().includes(q)) ||
+          (l.district && l.district.toLowerCase().includes(q))
+      );
     }
+
+    if (sortBy === 'price_asc') {
+      list.sort((a: any, b: any) => a.price - b.price);
+    } else if (sortBy === 'price_desc') {
+      list.sort((a: any, b: any) => b.price - a.price);
+    }
+
+    return list;
+  }, [listingsData, searchQuery, sortBy]);
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filters.category) count++;
+    if (filters.district) count++;
+    if (filters.condition) count++;
+    if (filters.minPrice || filters.maxPrice) count++;
+    return count;
+  }, [filters]);
+
+  const toggleSort = () => {
+    Haptics.selection();
+    setSortBy((p) => (p === 'recent' ? 'price_asc' : p === 'price_asc' ? 'price_desc' : 'recent'));
+  };
+
+  const getCartQty = (listingId: string) => {
+    const it = items.find((i) => i.listing.id === listingId);
+    return it ? it.quantity : 0;
+  };
+
+  const handleUpdateCartQty = (listingId: string, qty: number) => {
+    const item = items.find((i) => i.listing.id === listingId);
+    if (item) updateQuantity(item.id, qty);
+  };
+
+  const resetAll = () => {
+    setFilters(EMPTY_FILTERS);
+    setSearchQuery('');
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Search Header */}
-      <View style={styles.header}>
-        <SearchInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Rechercher des articles à Daloa..."
-          onFilterPress={() => setIsFilterModalOpen(true)}
-          hasActiveFilters={Boolean(filters.district || filters.condition || filters.acceptsDeliveryOnly)}
-        />
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* 1. Header & Filtres Rapides */}
+      <SearchTopBar
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        activeFiltersCount={activeFiltersCount}
+        onOpenFilters={() => {
+          Haptics.lightImpact();
+          setIsFilterModalOpen(true);
+        }}
+        sortBy={sortBy}
+        onToggleSort={toggleSort}
+        resultCount={filteredListings.length}
+        filters={filters}
+        setFilters={setFilters}
+      />
 
-      {/* Catégories scroller */}
-      <View style={styles.categoriesContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing[4] }}>
-          <CategoryPill
-            id="all"
-            name="Tous"
-            isSelected={!filters.category}
-            onPress={() => setFilters((prev) => ({ ...prev, category: undefined }))}
-          />
-          {MARKET_CATEGORIES.map((cat) => (
-            <CategoryPill
-              key={cat.id}
-              id={cat.id}
-              name={cat.name}
-              isSelected={filters.category === cat.id}
-              onPress={() => handleCategoryToggle(cat.id)}
-            />
+      {/* 2. Résultats */}
+      {isLoading ? (
+        <View style={styles.grid}>
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={styles.skeletonCell}>
+              <Skeleton height={210} borderRadius={radii['2xl']} />
+            </View>
           ))}
-        </ScrollView>
-      </View>
-
-      {/* Meta Bar: Results count & Sort */}
-      <View style={styles.metaBar}>
-        <Text style={styles.resultsCount}>{listings.length} résultat(s)</Text>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={handleSortToggle}
-          style={styles.sortButton}
-        >
-          <ArrowUpDown size={14} color={colors.dark.textMuted} />
-          <Text style={styles.sortText}>{getSortLabel()}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Grille de Produits */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {isLoading ? (
-          <View style={styles.loadingGrid}>
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-          </View>
-        ) : listings.length === 0 ? (
-          <EmptyState
-            title="Aucun article trouvé"
-            description="Essayez d’ajuster vos mots-clés ou réinitialisez les filtres pour voir plus d’articles."
-            actionTitle="Réinitialiser les filtres"
-            onActionPress={() => {
-              setFilters({});
-              setSearchQuery('');
-            }}
-          />
-        ) : (
-          <View style={styles.productsGrid}>
-            {listings.map((item) => (
-              <View key={item.id} style={styles.gridItem}>
-                <ListingCard
-                  listing={item}
-                  onPress={() => router.push(`/listing/${item.id}`)}
-                />
+        </View>
+      ) : (
+        <FlashList
+          data={filteredListings}
+          numColumns={gridColumns}
+          keyExtractor={(item: any) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={styles.footer}>
+                <ActivityIndicator color={colors.primary.DEFAULT} />
               </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+            ) : null
+          }
+          renderItem={({ item }: { item: any }) => (
+            <View style={styles.cell}>
+              <ListingCard
+                listing={{
+                  id: item.id,
+                  title: item.title,
+                  price: item.price,
+                  originalPrice: item.original_price,
+                  photos: item.photos || [],
+                  district: item.district,
+                  createdAt: item.created_at,
+                  stock: item.stock,
+                  boostedUntil: item.boosted_until,
+                  cartQty: getCartQty(item.id),
+                  isFavorite: isFavorited(item.id),
+                }}
+                onPress={() => router.push(`/listing/${item.id}` as any)}
+                onAddToCart={() => addToCart(item, null, 1)}
+                onUpdateCartQty={(id, qty) => handleUpdateCartQty(id, qty)}
+                onToggleFavorite={() => toggleFavorite(item.id)}
+              />
+            </View>
+          )}
+          ListEmptyComponent={
+            <EmptyState
+              icon={<SearchX size={30} color={colors.primary.DEFAULT} />}
+              title="Aucun résultat trouvé"
+              description="Essayez d'autres mots-clés ou réinitialisez les filtres."
+              actionTitle={activeFiltersCount > 0 || searchQuery ? 'Réinitialiser' : undefined}
+              onActionPress={activeFiltersCount > 0 || searchQuery ? resetAll : undefined}
+              actionVariant="market"
+            />
+          }
+        />
+      )}
 
-      {/* Modale de Filtres */}
-      <FilterModal
+      {/* Modal des filtres */}
+      <SearchFilterModal
         visible={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
         filters={filters}
-        onApply={(newFilters) => setFilters(newFilters)}
-        onReset={() => setFilters({})}
+        onApply={setFilters}
+        onReset={() => setFilters(EMPTY_FILTERS)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
   },
-  header: {
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
+  listContent: {
+    paddingHorizontal: spacing[2],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[8],
   },
-  categoriesContainer: {
-    paddingVertical: spacing[2],
+  cell: {
+    flex: 1,
+    paddingHorizontal: 5,
   },
-  metaBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[2],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
-  },
-  resultsCount: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.medium,
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.dark.surfaceRaised,
-    paddingHorizontal: spacing[2] + 2,
-    paddingVertical: 4,
-    borderRadius: radii.md,
-  },
-  sortText: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
-  },
-  scrollContent: {
-    paddingTop: spacing[3],
-    paddingBottom: 40,
-  },
-  productsGrid: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing[4],
     justifyContent: 'space-between',
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
   },
-  gridItem: {
-    width: '48.5%',
+  skeletonCell: {
+    width: '48%',
+    marginBottom: spacing[3],
   },
-  loadingGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing[4],
-    justifyContent: 'space-between',
-    gap: spacing[3],
+  footer: {
+    paddingVertical: spacing[4],
   },
 });

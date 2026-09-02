@@ -1,15 +1,17 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "strict": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@daloa/types": ["./packages/types/src/index.ts", "../../packages/types/src/index.ts"],
-      "@daloa/config": ["./packages/config/src/index.ts", "../../packages/config/src/index.ts"],
-      "@daloa/utils": ["./packages/utils/src/index.ts", "../../packages/utils/src/index.ts"],
-      "@daloa/api": ["./packages/api/src/index.ts", "../../packages/api/src/index.ts"],
-      "@daloa/ui": ["./packages/ui/src/index.ts", "../../packages/ui/src/index.ts"]
+      "@daloa/types": ["../../packages/types/src/index.ts"],
+      "@daloa/config": ["../../packages/config/src/index.ts"],
+      "@daloa/utils": ["../../packages/utils/src/index.ts"],
+      "@daloa/api": ["../../packages/api/src/index.ts"],
+      "@daloa/ui": ["../../packages/ui/src/index.ts"]
     }
   },
   "include": [
@@ -17,5 +19,8 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
   ]
 }

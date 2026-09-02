@@ -1,501 +1,198 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-  Switch,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { listingsService } from '@daloa/api';
-import { MARKET_CATEGORIES, DALOA_DISTRICTS, LISTING_CONDITIONS } from '@daloa/config';
-import { ListingVariant } from '@daloa/types';
-import {
-  colors,
-  radii,
-  spacing,
-  typography,
-  Header,
-  Input,
-  Button,
-  Card,
-} from '@daloa/ui';
-import { Camera, Plus, Trash2, X, Sparkles, Check } from 'lucide-react-native';
+import { colors, spacing, Button, KeyboardScreen } from '@daloa/ui';
+import { ArrowRight, Check } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
+import { WizardHero } from '../../src/components/create-wizard/WizardHero';
+import { StepMediaTitle } from '../../src/components/create-wizard/StepMediaTitle';
+import { StepCategoryPricing } from '../../src/components/create-wizard/StepCategoryPricing';
+import { StepLocationDelivery } from '../../src/components/create-wizard/StepLocationDelivery';
+import { StepSummaryPreview } from '../../src/components/create-wizard/StepSummaryPreview';
+
+const STEP_TITLES = ['Photos & Titre', 'Catégorie & Prix', 'Quartier & Livraison', 'Aperçu & Publication'];
+
+const FALLBACK_PHOTO =
+  'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=320';
 
 export default function ListingCreateScreen() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
 
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [photos, setPhotos] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('fashion');
+  const [selectedCondition, setSelectedCondition] = useState('like_new');
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('fashion');
-  const [selectedCondition, setSelectedCondition] = useState<string>('like_new');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('Lobia');
-  const [stock, setStock] = useState('1');
+  const [selectedDistrict, setSelectedDistrict] = useState('Lobia');
+  const [stock, setStock] = useState(1);
   const [acceptsDelivery, setAcceptsDelivery] = useState(true);
-  const [variants, setVariants] = useState<Array<{ label: string; price?: number; stock: number }>>([]);
-  const [newVariantLabel, setNewVariantLabel] = useState('');
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const handlePickImage = async () => {
-    Haptics.lightImpact();
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets) {
-      const uris = result.assets.map((a) => a.uri);
-      setPhotos((prev) => [...prev, ...uris].slice(0, 6)); // max 6 photos
-    }
-  };
-
-  const handleRemovePhoto = (index: number) => {
-    Haptics.lightImpact();
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleAddVariant = () => {
-    if (!newVariantLabel.trim()) return;
+  const handleNext = () => {
     Haptics.selection();
-    setVariants((prev) => [
-      ...prev,
-      { label: newVariantLabel.trim(), stock: 1 },
-    ]);
-    setNewVariantLabel('');
+    if (currentStep === 1 && (!title.trim() || title.trim().length < 3)) {
+      Alert.alert('Titre requis', 'Veuillez saisir un titre d’au moins 3 caractères.');
+      return;
+    }
+    if (currentStep === 2) {
+      const num = parseFloat(price);
+      if (isNaN(num) || num <= 0) {
+        Alert.alert('Prix invalide', 'Veuillez renseigner un prix valide en FCFA.');
+        return;
+      }
+    }
+    setCurrentStep((p) => Math.min(4, p + 1));
   };
 
-  const handleRemoveVariant = (index: number) => {
-    Haptics.lightImpact();
-    setVariants((prev) => prev.filter((_, i) => i !== index));
+  const handlePrev = () => {
+    Haptics.selection();
+    if (currentStep === 1) router.back();
+    else setCurrentStep((p) => Math.max(1, p - 1));
   };
 
-  const handleSubmit = async () => {
+  const handlePublish = async () => {
     if (!isAuthenticated || !user) {
-      router.push('/auth/login');
-      return;
-    }
-
-    if (!title.trim() || title.length < 3) {
-      setErrorMsg('Veuillez renseigner un titre valide (min 3 caractères)');
-      return;
-    }
-    const numPrice = parseFloat(price);
-    if (isNaN(numPrice) || numPrice <= 0) {
-      setErrorMsg('Veuillez renseigner un prix valide en FCFA');
-      return;
-    }
-    if (photos.length === 0) {
-      setErrorMsg('Veuillez ajouter au moins une photo de votre article');
+      Alert.alert('Connexion requise', 'Veuillez vous connecter pour publier une annonce.', [
+        { text: 'Se connecter', onPress: () => router.push('/auth/login' as any) },
+      ]);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setErrorMsg(null);
-
-      // 1. Upload des photos vers Supabase Storage
-      const uploadedUrls: string[] = [];
-      for (const uri of photos) {
-        if (uri.startsWith('http')) {
-          uploadedUrls.push(uri);
-        } else {
-          const url = await listingsService.uploadImage(uri);
-          uploadedUrls.push(url);
-        }
-      }
-
-      // 2. Création de l'annonce
       const created = await listingsService.createListing(user.id, {
         title: title.trim(),
-        description: description.trim() || title.trim(),
-        price: numPrice,
+        description: description.trim(),
+        price: parseFloat(price),
         original_price: originalPrice ? parseFloat(originalPrice) : null,
         category: selectedCategory,
         condition: selectedCondition as any,
         district: selectedDistrict,
-        stock: parseInt(stock, 10) || 1,
+        stock,
         accepts_delivery: acceptsDelivery,
-        photos: uploadedUrls,
-        variants: variants.map((v) => ({
-          label: v.label,
-          price: v.price || numPrice,
-          stock: v.stock || 1,
-          active: true,
-        })),
+        photos: photos.length > 0 ? photos : [FALLBACK_PHOTO],
       });
 
       Haptics.success();
-      router.replace(`/listing/${created.id}`);
+      Alert.alert('Annonce en ligne ! 🎉', 'Votre article est maintenant visible par tous les acheteurs à Daloa.', [
+        { text: 'Voir l’annonce', onPress: () => router.replace(`/listing/${created.id}` as any) },
+      ]);
     } catch (err: any) {
-      console.error('Erreur publication:', err);
-      setErrorMsg(err.message || 'Échec de la publication de l’annonce');
+      Alert.alert('Erreur', err.message || 'Échec de la publication de votre annonce');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title="Déposer une annonce" onBack={() => router.back()} />
+    <KeyboardScreen>
+      <View style={styles.container}>
+        <WizardHero
+          currentStep={currentStep}
+          totalSteps={4}
+          stepTitles={STEP_TITLES}
+          onBack={handlePrev}
+        />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Photos Sélecteur */}
-        <Text style={styles.sectionTitle}>Photos de l’article ({photos.length}/6)</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScroll}>
-          {photos.map((uri, index) => (
-            <View key={index} style={styles.photoBox}>
-              <Image source={{ uri }} style={styles.photoImage} />
-              <TouchableOpacity
-                onPress={() => handleRemovePhoto(index)}
-                style={styles.photoDeleteBtn}
-              >
-                <X size={14} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          {photos.length < 6 && (
-            <TouchableOpacity
-              onPress={handlePickImage}
-              activeOpacity={0.8}
-              style={styles.addPhotoBtn}
-            >
-              <Camera size={26} color={colors.market.primary} />
-              <Text style={styles.addPhotoText}>Ajouter</Text>
-            </TouchableOpacity>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {currentStep === 1 && (
+            <StepMediaTitle
+              photos={photos}
+              setPhotos={setPhotos}
+              title={title}
+              setTitle={setTitle}
+              description={description}
+              setDescription={setDescription}
+            />
+          )}
+          {currentStep === 2 && (
+            <StepCategoryPricing
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              selectedCondition={selectedCondition}
+              setSelectedCondition={setSelectedCondition}
+              price={price}
+              setPrice={setPrice}
+              originalPrice={originalPrice}
+              setOriginalPrice={setOriginalPrice}
+            />
+          )}
+          {currentStep === 3 && (
+            <StepLocationDelivery
+              selectedDistrict={selectedDistrict}
+              setSelectedDistrict={setSelectedDistrict}
+              stock={stock}
+              setStock={setStock}
+              acceptsDelivery={acceptsDelivery}
+              setAcceptsDelivery={setAcceptsDelivery}
+            />
+          )}
+          {currentStep === 4 && (
+            <StepSummaryPreview
+              photos={photos}
+              title={title}
+              price={price}
+              originalPrice={originalPrice}
+              district={selectedDistrict}
+              stock={stock}
+              acceptsDelivery={acceptsDelivery}
+            />
           )}
         </ScrollView>
 
-        {/* Titre & Description */}
-        <Input
-          label="Titre de l'annonce *"
-          placeholder="Ex: iPhone 13 Pro 128 Go Bleu Pacifique"
-          value={title}
-          onChangeText={setTitle}
-        />
-
-        <Input
-          label="Description détaillée"
-          placeholder="Précisez l'état, les accessoires fournis, la garantie..."
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          inputStyle={{ minHeight: 90, textAlignVertical: 'top' }}
-        />
-
-        {/* Prix */}
-        <View style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Input
-              label="Prix de vente (FCFA) *"
-              placeholder="Ex: 25000"
-              value={price}
-              onChangeText={setPrice}
-              keyboardType="number-pad"
+        {/* Barre de navigation */}
+        <View style={styles.bottomBar}>
+          {currentStep < 4 ? (
+            <Button
+              title="Continuer"
+              variant="market"
+              onPress={handleNext}
+              style={styles.flex1}
+              rightIcon={<ArrowRight size={16} color={colors.text.inverse} strokeWidth={2.5} />}
             />
-          </View>
-          <View style={{ flex: 1, marginLeft: spacing[2] }}>
-            <Input
-              label="Prix d'origine (Optionnel)"
-              placeholder="Ex: 35000"
-              value={originalPrice}
-              onChangeText={setOriginalPrice}
-              keyboardType="number-pad"
-              helperText="Pour afficher une remise"
+          ) : (
+            <Button
+              title="Publier à Daloa"
+              variant="success"
+              onPress={handlePublish}
+              loading={isSubmitting}
+              style={styles.flex1}
+              leftIcon={<Check size={18} color={colors.text.inverse} strokeWidth={2.8} />}
             />
-          </View>
-        </View>
-
-        {/* Catégorie */}
-        <Text style={styles.sectionTitle}>Catégorie *</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
-          {MARKET_CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              onPress={() => setSelectedCategory(cat.id)}
-              style={[styles.chip, selectedCategory === cat.id && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, selectedCategory === cat.id && styles.chipTextActive]}>
-                {cat.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* État du produit */}
-        <Text style={styles.sectionTitle}>État de l'article *</Text>
-        <View style={styles.chipsGrid}>
-          {LISTING_CONDITIONS.map((cond) => (
-            <TouchableOpacity
-              key={cond.id}
-              onPress={() => setSelectedCondition(cond.id)}
-              style={[styles.chip, selectedCondition === cond.id && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, selectedCondition === cond.id && styles.chipTextActive]}>
-                {cond.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Quartier à Daloa */}
-        <Text style={styles.sectionTitle}>Quartier où se trouve l'article (Daloa) *</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
-          {DALOA_DISTRICTS.slice(0, 20).map((d) => (
-            <TouchableOpacity
-              key={d}
-              onPress={() => setSelectedDistrict(d)}
-              style={[styles.chip, selectedDistrict === d && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, selectedDistrict === d && styles.chipTextActive]}>
-                {d}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Variantes (Tailles / Couleurs) */}
-        <Card style={styles.variantsCard}>
-          <Text style={styles.variantsTitle}>Options & Variantes (Couleurs, Tailles...)</Text>
-          <View style={styles.variantInputRow}>
-            <View style={{ flex: 1 }}>
-              <Input
-                placeholder="Ex: Taille XL ou Noir"
-                value={newVariantLabel}
-                onChangeText={setNewVariantLabel}
-                containerStyle={{ marginBottom: 0 }}
-              />
-            </View>
-            <TouchableOpacity onPress={handleAddVariant} style={styles.addVariantBtn}>
-              <Plus size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-
-          {variants.length > 0 && (
-            <View style={styles.variantsList}>
-              {variants.map((v, i) => (
-                <View key={i} style={styles.variantTag}>
-                  <Text style={styles.variantTagText}>{v.label}</Text>
-                  <TouchableOpacity onPress={() => handleRemoveVariant(i)}>
-                    <X size={14} color={colors.dark.textDim} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
           )}
-        </Card>
-
-        {/* Livraison éligible */}
-        <View style={styles.deliverySwitchCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.deliverySwitchTitle}>Accepter la livraison par DaloaDelivery</Text>
-            <Text style={styles.deliverySwitchSub}>
-              Un coursier partenaire récupérera le colis chez vous après paiement sécurisé.
-            </Text>
-          </View>
-          <Switch
-            value={acceptsDelivery}
-            onValueChange={setAcceptsDelivery}
-            trackColor={{ false: colors.dark.surfaceRaised, true: colors.market.primary }}
-            thumbColor="#FFFFFF"
-          />
         </View>
-
-        {errorMsg && <Text style={styles.errorBanner}>{errorMsg}</Text>}
-
-        {/* Bouton de Publication */}
-        <Button
-          title="Publier mon annonce"
-          variant="market"
-          size="lg"
-          loading={isSubmitting}
-          onPress={handleSubmit}
-          style={styles.submitBtn}
-        />
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </KeyboardScreen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.surface,
   },
   scrollContent: {
-    padding: spacing[4],
+    paddingBottom: spacing[10],
   },
-  sectionTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing[2],
-    marginTop: spacing[2],
-  },
-  photosScroll: {
-    flexDirection: 'row',
-    marginBottom: spacing[4],
-  },
-  photoBox: {
-    width: 90,
-    height: 90,
-    borderRadius: radii.xl,
-    marginRight: spacing[2],
-    position: 'relative',
-    backgroundColor: colors.dark.surfaceRaised,
-  },
-  photoImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: radii.xl,
-  },
-  photoDeleteBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: radii.full,
-    padding: 3,
-  },
-  addPhotoBtn: {
-    width: 90,
-    height: 90,
-    borderRadius: radii.xl,
-    borderWidth: 1.5,
-    borderColor: 'rgba(249, 115, 22, 0.4)',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(249, 115, 22, 0.05)',
-  },
-  addPhotoText: {
-    color: colors.market.primary,
-    fontSize: 11,
-    fontWeight: typography.weights.bold,
-    marginTop: 4,
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  chipsScroll: {
-    flexDirection: 'row',
-    marginBottom: spacing[4],
-  },
-  chipsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing[2],
-    marginBottom: spacing[4],
-  },
-  chip: {
-    backgroundColor: colors.dark.surfaceRaised,
-    borderRadius: radii.full,
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[3],
-    marginRight: spacing[2],
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-  },
-  chipActive: {
-    backgroundColor: colors.market.primary,
-    borderColor: colors.market.primary,
-  },
-  chipText: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium,
-  },
-  chipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: typography.weights.bold,
-  },
-  variantsCard: {
-    padding: spacing[3],
-    marginBottom: spacing[4],
-    gap: spacing[2],
-  },
-  variantsTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-  },
-  variantInputRow: {
+  bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[2],
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
+    backgroundColor: colors.bg.surface,
+    gap: spacing[3],
   },
-  addVariantBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: radii.xl,
-    backgroundColor: colors.market.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  variantsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing[2],
-    marginTop: spacing[2],
-  },
-  variantTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.dark.surfaceRaised,
-    borderRadius: radii.lg,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    gap: 6,
-  },
-  variantTagText: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.xs,
-  },
-  deliverySwitchCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.dark.surface,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-    padding: spacing[4],
-    marginBottom: spacing[4],
-  },
-  deliverySwitchTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-  },
-  deliverySwitchSub: {
-    color: colors.dark.textDim,
-    fontSize: 11,
-    marginTop: 2,
-    maxWidth: 240,
-  },
-  errorBanner: {
-    color: colors.status.error,
-    fontSize: typography.sizes.xs,
-    textAlign: 'center',
-    marginBottom: spacing[3],
-  },
-  submitBtn: {
-    marginTop: spacing[2],
+  flex1: {
+    flex: 1,
   },
 });

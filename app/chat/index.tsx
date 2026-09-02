@@ -1,14 +1,8 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useConversations } from '@daloa/api';
@@ -16,25 +10,67 @@ import {
   colors,
   radii,
   spacing,
-  typography,
-  Header,
   Avatar,
   EmptyState,
   Skeleton,
+  AppText,
+  AppPressable,
+  useAccent,
 } from '@daloa/ui';
-import { MessageSquare, ChevronRight } from 'lucide-react-native';
-import { formatRelativeTime, Haptics } from '@daloa/utils';
+import { MessageSquare, ArrowLeft } from 'lucide-react-native';
+import { formatRelativeTime } from '@daloa/utils';
 
-export default function ChatListScreen() {
+export default function ChatListScreen({ isTab = false }: { isTab?: boolean }) {
   const router = useRouter();
+  const accent = useAccent();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data: conversations, isLoading, refetch, isRefetching } = useConversations(user?.id);
 
   const list = conversations || [];
+  const totalUnread = list.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title="Messagerie Directe" onBack={() => router.back()} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Hero gradient */}
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.heroBanner}
+      >
+        <View style={styles.heroRow}>
+          {!isTab && (
+            <AppPressable
+              onPress={() => router.back()}
+              rippleBorderless
+              style={styles.backBtn}
+              accessibilityLabel="Retour"
+            >
+              <ArrowLeft size={18} color={colors.text.inverse} />
+            </AppPressable>
+          )}
+          <View style={[styles.heroTitles, isTab && { marginLeft: 0 }]}>
+            <AppText variant="overline" color={accent[100]}>
+              Vos conversations
+            </AppText>
+            <AppText variant="title" color={colors.text.inverse}>
+              Messagerie
+            </AppText>
+          </View>
+          {totalUnread > 0 ? (
+            <View style={styles.unreadHeroBadge}>
+              <AppText variant="caption" color={colors.text.inverse}>
+                {totalUnread} non lu{totalUnread > 1 ? 's' : ''}
+              </AppText>
+            </View>
+          ) : (
+            <View style={styles.iconCircle}>
+              <MessageSquare size={18} color={accent[200]} />
+            </View>
+          )}
+        </View>
+      </LinearGradient>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -43,10 +79,11 @@ export default function ChatListScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            tintColor={colors.market.primary}
+            tintColor={accent.DEFAULT}
           />
         }
       >
+
         {isLoading ? (
           <View style={{ gap: spacing[3] }}>
             <Skeleton height={72} borderRadius={radii.xl} />
@@ -55,21 +92,20 @@ export default function ChatListScreen() {
           </View>
         ) : list.length === 0 ? (
           <EmptyState
-            icon={<MessageSquare size={32} color={colors.market.primary} />}
+            icon={<MessageSquare size={32} color={accent.DEFAULT} />}
             title="Aucune discussion"
             description="Contactez un vendeur depuis une annonce pour poser des questions ou négocier un prix."
             actionTitle="Explorer les articles"
-            onActionPress={() => router.push('/(tabs)/index')}
+            onActionPress={() => router.push('/(tabs)' as any)}
+            actionVariant="market"
           />
         ) : (
           list.map((conv) => (
-            <TouchableOpacity
+            <AppPressable
               key={conv.partnerId}
-              activeOpacity={0.75}
               onPress={() => {
-                Haptics.lightImpact();
                 router.push({
-                  pathname: `/chat/${conv.partnerId}`,
+                  pathname: `/chat/${conv.partnerId}` as any,
                   params: {
                     partnerName: conv.partnerName,
                     partnerAvatar: conv.partnerAvatar || '',
@@ -78,48 +114,92 @@ export default function ChatListScreen() {
                     listingPhoto: conv.listingPhoto || '',
                     listingPrice: conv.listingPrice?.toString() || '',
                   },
-                });
+                } as any);
               }}
               style={styles.convCard}
+              accessibilityLabel={`Discussion avec ${conv.partnerName}`}
             >
               <Avatar uri={conv.partnerAvatar} name={conv.partnerName} size={50} />
 
               <View style={styles.convInfo}>
                 <View style={styles.convHeader}>
-                  <Text style={styles.partnerName} numberOfLines={1}>
+                  <AppText variant="bodyStrong" numberOfLines={1} style={styles.partnerName}>
                     {conv.partnerName}
-                  </Text>
-                  <Text style={styles.timeText}>{formatRelativeTime(conv.lastMessageTime)}</Text>
+                  </AppText>
+                  <AppText variant="caption" color={colors.text.subtle}>
+                    {formatRelativeTime(conv.lastMessageTime)}
+                  </AppText>
                 </View>
 
                 {conv.listingTitle && (
-                  <Text style={styles.listingTag} numberOfLines={1}>
+                  <AppText variant="caption" color={accent[700]} numberOfLines={1}>
                     📦 {conv.listingTitle}
-                  </Text>
+                  </AppText>
                 )}
 
-                <Text style={styles.lastMessage} numberOfLines={1}>
+                <AppText variant="caption" color={colors.text.muted} numberOfLines={1}>
                   {conv.lastMessage}
-                </Text>
+                </AppText>
               </View>
 
               {conv.unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadText}>{conv.unreadCount}</Text>
+                <View style={[styles.unreadBadge, { backgroundColor: accent.DEFAULT }]}>
+                  <AppText variant="overline" color={colors.text.inverse}>
+                    {conv.unreadCount}
+                  </AppText>
                 </View>
               )}
-            </TouchableOpacity>
+            </AppPressable>
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
+  },
+  heroBanner: {
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroTitles: {
+    flex: 1,
+    marginLeft: spacing[2],
+  },
+  unreadHeroBadge: {
+    backgroundColor: colors.status.error,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 3,
+    borderRadius: radii.full,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     padding: spacing[4],
@@ -128,12 +208,13 @@ const styles = StyleSheet.create({
   convCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dark.surface,
+    backgroundColor: colors.bg.surface,
     borderRadius: radii.xl,
     padding: spacing[3],
     borderWidth: 1,
-    borderColor: colors.dark.border,
+    borderColor: colors.border.DEFAULT,
     gap: spacing[3],
+    overflow: 'hidden',
   },
   convInfo: {
     flex: 1,
@@ -145,35 +226,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   partnerName: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-  },
-  timeText: {
-    color: colors.dark.textDim,
-    fontSize: 10,
-  },
-  listingTag: {
-    color: colors.market.primary,
-    fontSize: 11,
-    fontWeight: typography.weights.medium,
-  },
-  lastMessage: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
+    flex: 1,
   },
   unreadBadge: {
-    backgroundColor: colors.market.primary,
     borderRadius: radii.full,
     minWidth: 20,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
-  },
-  unreadText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: typography.weights.bold,
   },
 });

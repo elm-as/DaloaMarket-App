@@ -6,11 +6,13 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "daloamarket",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B0F17"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": false,
@@ -19,32 +21,30 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0B0F17"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.daloamarket.app",
       "permissions": [
-        "CAMERA",
         "READ_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "CAMERA"
       ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "DaloaMarket utilise votre position pour calculer précisément les frais de livraison à Daloa."
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "DaloaMarket a besoin d'accéder à vos photos pour publier des annonces."
         }
-      ]
+      ],
+      "expo-notifications",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

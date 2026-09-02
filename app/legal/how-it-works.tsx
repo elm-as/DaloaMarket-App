@@ -1,25 +1,58 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, typography, Header, Card } from '@daloa/ui';
-import { ShieldCheck, Truck, KeyRound, CheckCircle2, Lock } from 'lucide-react-native';
+import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { ShieldCheck, ArrowLeft } from 'lucide-react-native';
 
 export default function HowItWorksScreen() {
   const router = useRouter();
+  const accent = useAccent();
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title="Comment ça marche" onBack={() => router.back()} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <LinearGradient
+        colors={[accent[400], accent[600], accent[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroTop}>
+          <AppPressable
+            onPress={() => router.back()}
+            rippleBorderless
+            style={styles.backBtn}
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={18} color={colors.text.inverse} />
+          </AppPressable>
+          <View style={styles.heroTitles}>
+            <AppText variant="overline" color={accent[100]}>
+              Paiement séquestre
+            </AppText>
+            <AppText variant="title" color={colors.text.inverse}>
+              Comment ça marche
+            </AppText>
+          </View>
+          <View style={styles.iconCircle}>
+            <ShieldCheck size={18} color={accent[200]} />
+          </View>
+        </View>
+      </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Intro */}
-        <View style={styles.heroBox}>
-          <ShieldCheck size={36} color="#10B981" />
-          <Text style={styles.heroTitle}>Le Séquestre Escrow DaloaMarket</Text>
-          <Text style={styles.heroSub}>
-            Un système 100% sécurisé qui protège à la fois l'acheteur, le vendeur et le livreur à Daloa.
-          </Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.escrowCard}>
+          <ShieldCheck size={28} color={colors.status.successDark} />
+          <View style={styles.escrowText}>
+            <AppText variant="bodyStrong" color={colors.status.successDark}>
+              Le séquestre Escrow DaloaMarket
+            </AppText>
+            <AppText variant="caption" color={colors.status.success}>
+              Un système 100% sécurisé qui protège à la fois l'acheteur, le vendeur et le livreur à Daloa.
+            </AppText>
+          </View>
         </View>
 
         <StepItem
@@ -27,76 +60,112 @@ export default function HowItWorksScreen() {
           title="L'acheteur commande & paye en séquestre"
           desc="Le paiement Mobile Money (Wave, Orange, MTN, Moov) est placé sous séquestre sécurisé. Le vendeur est notifié pour préparer le colis."
         />
-
         <StepItem
           number="2"
           title="Un livreur DaloaDelivery prend en charge la course"
           desc="Le livreur se rend chez le vendeur. Le vendeur transmet son code secret OTP Pickup et le livreur prend une photo de contrôle."
         />
-
         <StepItem
           number="3"
-          title="Livraison à l'acheteur & Inspection"
+          title="Livraison à l'acheteur & inspection"
           desc="Le livreur apporte le colis à l'adresse de l'acheteur. L'acheteur inspecte son article en main propre."
         />
-
         <StepItem
           number="4"
-          title="Validation OTP & Déblocage des fonds"
+          title="Validation OTP & déblocage des fonds"
           desc="L'acheteur donne son code secret OTP Delivery au livreur. Le séquestre est immédiatement libéré et le vendeur reçoit ses gains."
         />
+
+        <View style={{ height: insets.bottom + spacing[6] }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 function StepItem({ number, title, desc }: { number: string; title: string; desc: string }) {
+  const accent = useAccent();
   return (
-    <Card style={styles.stepCard}>
+    <View style={styles.stepCard}>
       <View style={styles.stepHeader}>
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepBadgeText}>{number}</Text>
+        <View style={[styles.stepBadge, { backgroundColor: accent.DEFAULT }]}>
+          <AppText variant="bodyStrong" color={colors.text.inverse}>
+            {number}
+          </AppText>
         </View>
-        <Text style={styles.stepTitle}>{title}</Text>
+        <AppText variant="bodyStrong" style={styles.stepTitle}>
+          {title}
+        </AppText>
       </View>
-      <Text style={styles.stepDesc}>{desc}</Text>
-    </Card>
+      <AppText variant="caption" color={colors.text.muted} style={styles.stepDesc}>
+        {desc}
+      </AppText>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
+  },
+  hero: {
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroTitles: {
+    flex: 1,
+    marginLeft: spacing[2],
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     padding: spacing[4],
     gap: spacing[4],
   },
-  heroBox: {
-    alignItems: 'center',
-    backgroundColor: colors.dark.surface,
-    borderRadius: radii['2xl'],
+  escrowCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.status.successLight,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-    padding: spacing[5],
-    gap: spacing[2],
+    borderColor: colors.status.successBorder,
+    padding: spacing[4],
+    gap: spacing[3],
   },
-  heroTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
-  },
-  heroSub: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    textAlign: 'center',
-    lineHeight: 16,
+  escrowText: {
+    flex: 1,
+    gap: 4,
   },
   stepCard: {
     padding: spacing[4],
     gap: spacing[2],
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
   },
   stepHeader: {
     flexDirection: 'row',
@@ -107,25 +176,13 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: radii.full,
-    backgroundColor: colors.market.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepBadgeText: {
-    color: '#FFFFFF',
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-  },
   stepTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
     flex: 1,
   },
   stepDesc: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    lineHeight: 18,
     marginLeft: 40,
   },
 });

@@ -1,397 +1,334 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { View, StyleSheet, RefreshControl, Image, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { useListings } from '@daloa/api';
-import { MARKET_CATEGORIES, DALOA_DISTRICTS } from '@daloa/config';
-import { ListingFull } from '@daloa/types';
-import { colors, radii, spacing, typography, SearchInput, Skeleton, EmptyState, Badge } from '@daloa/ui';
-import { ListingCard } from '../../src/components/ListingCard';
-import { CategoryPill } from '../../src/components/CategoryPill';
-import { Plus, MessageSquare, ShieldCheck, MapPin, Sparkles, Zap } from 'lucide-react-native';
-import { Haptics } from '@daloa/utils';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Search, ShoppingCart, Package, Sparkles, Heart } from 'lucide-react-native';
+import {
+  colors,
+  radii,
+  spacing,
+  AppText,
+  AppPressable,
+  ListingCard,
+  CategoryGrid,
+  Skeleton,
+  useResponsive,
+} from '@daloa/ui';
+import { useInfiniteListings } from '@daloa/api';
+import { useCart } from '../../src/context/CartContext';
+import { useFavorites } from '../../src/context/FavoritesContext';
+import { HomeHero } from '../../src/components/home/HomeHero';
+import { HomeDeliveryBanner } from '../../src/components/home/HomeDeliveryBanner';
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { itemCount, addToCart, updateQuantity, items } = useCart();
+  const { isFavorited, toggleFavorite } = useFavorites();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { gridColumns } = useResponsive();
 
-  const { data, isLoading, refetch, isRefetching } = useListings({
-    category: selectedCategory,
-    searchQuery: searchQuery.length > 0 ? searchQuery : undefined,
-  });
+  const {
+    data,
+    isLoading,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteListings({ category: selectedCategory || undefined });
 
-  const listings = data?.data || [];
-  const boostedListings = listings.filter(
-    (l) => l.boosted_until && new Date(l.boosted_until) > new Date()
-  );
+  const listingsList = data?.pages.flatMap((p) => p.data) || [];
 
-  const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategory((prev) => (prev === categoryId ? undefined : categoryId));
+  const getCartQty = (listingId: string) => {
+    const item = items.find((i) => i.listing.id === listingId);
+    return item ? item.quantity : 0;
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top Header Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>DM</Text>
-          </View>
-          <View>
-            <Text style={styles.brandTitle}>DaloaMarket</Text>
-            <View style={styles.locationRow}>
-              <MapPin size={11} color={colors.market.primary} />
-              <Text style={styles.locationText}>Daloa, Côte d’Ivoire</Text>
-            </View>
-          </View>
-        </View>
+  const handleAddToCart = (listingId: string) => {
+    const listing = listingsList.find((l) => l.id === listingId);
+    if (!listing) return;
+    addToCart(listing, null, 1);
+  };
 
-        <View style={styles.topActions}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.lightImpact();
-              router.push('/chat');
-            }}
-            style={styles.iconButton}
-          >
-            <MessageSquare size={20} color={colors.dark.text} />
-          </TouchableOpacity>
+  const handleUpdateCartQty = (listingId: string, qty: number) => {
+    const item = items.find((i) => i.listing.id === listingId);
+    if (item) updateQuantity(item.id, qty);
+  };
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.lightImpact();
-              router.push('/listing/create');
-            }}
-            style={styles.publishBtn}
-          >
-            <Plus size={18} color="#FFFFFF" />
-            <Text style={styles.publishText}>Vendre</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+  const ListHeader = (
+    <View>
+      <HomeHero />
+      <HomeDeliveryBanner />
 
-      {/* Barre de Recherche rapide */}
-      <View style={styles.searchContainer}>
-        <SearchInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Rechercher à Daloa (ex: iPhone, Moto, Robe...)"
-          onFilterPress={() => router.push('/(tabs)/search')}
-        />
-      </View>
-
-      {/* Contenu Défilant */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={colors.market.primary}
-          />
-        }
-      >
-        {/* Bannière Hero / Escrow Sécurisé */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroContent}>
-            <View style={styles.escrowPill}>
-              <ShieldCheck size={14} color="#10B981" />
-              <Text style={styles.escrowText}>100% Sécurisé par Séquestre</Text>
-            </View>
-            <Text style={styles.heroTitle}>Achetez & Vendez en toute confiance à Daloa</Text>
-            <Text style={styles.heroSubtitle}>
-              Paiement Wave / Orange / MTN retenu en sécurité jusqu'à la livraison chez vous.
-            </Text>
-          </View>
-        </View>
-
-        {/* Sélecteur de Catégories Horizontal */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Catégories</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
-            <Text style={styles.seeAllText}>Tout voir</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesScroll}
-        >
-          <CategoryPill
-            id="all"
-            name="Tous"
-            isSelected={!selectedCategory}
-            onPress={() => setSelectedCategory(undefined)}
-          />
-          {MARKET_CATEGORIES.map((cat) => (
-            <CategoryPill
-              key={cat.id}
-              id={cat.id}
-              name={cat.name}
-              isSelected={selectedCategory === cat.id}
-              onPress={() => handleCategorySelect(cat.id)}
-            />
-          ))}
-        </ScrollView>
-
-        {/* Annonces Boostées / En Vedette */}
-        {boostedListings.length > 0 && !selectedCategory && (
-          <View style={styles.boostedSection}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.titleWithIcon}>
-                <Zap size={18} color="#F59E0B" fill="#F59E0B" />
-                <Text style={styles.sectionTitle}>En Vedette à Daloa</Text>
-              </View>
-              <Badge label="TOP VENTES" variant="pro" />
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.boostedScroll}
-            >
-              {boostedListings.map((listing) => (
-                <View key={listing.id} style={{ width: 170, marginRight: spacing[3] }}>
-                  <ListingCard
-                    listing={listing}
-                    onPress={() => router.push(`/listing/${listing.id}`)}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+      <View style={styles.sectionHeader}>
+        <AppText variant="title">Catégories</AppText>
+        {selectedCategory && (
+          <AppPressable haptic="selection" rippleBorderless onPress={() => setSelectedCategory(null)}>
+            <AppText variant="label" color={colors.primary.DEFAULT}>
+              Réinitialiser
+            </AppText>
+          </AppPressable>
         )}
+      </View>
 
-        {/* Nouveautés / Flux Principal */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.titleWithIcon}>
-            <Sparkles size={18} color={colors.market.primary} />
-            <Text style={styles.sectionTitle}>
-              {selectedCategory
-                ? MARKET_CATEGORIES.find((c) => c.id === selectedCategory)?.name || 'Annonces'
-                : 'Dernières Annonces'}
-            </Text>
-          </View>
-          <Text style={styles.countText}>{listings.length} article(s)</Text>
+      <CategoryGrid selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} showAllOption />
+
+      <View style={[styles.sectionHeader, styles.sectionHeaderSpaced]}>
+        <View style={styles.sectionTitleRow}>
+          <Sparkles size={16} color={colors.primary.DEFAULT} />
+          <AppText variant="title">
+            {selectedCategory ? 'Annonces filtrées' : 'Dernières annonces'}
+          </AppText>
         </View>
+        <View style={styles.countBadge}>
+          <AppText variant="caption" color={colors.text.muted}>
+            {listingsList.length}
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
 
-        {isLoading ? (
-          <View style={styles.loadingGrid}>
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-            <Skeleton height={220} width="48%" borderRadius={radii['2xl']} />
-          </View>
-        ) : listings.length === 0 ? (
-          <EmptyState
-            title="Aucune annonce trouvée"
-            description="Il n’y a pas encore d’article dans cette sélection. Soyez le premier à publier !"
-            actionTitle="Publier une annonce"
-            onActionPress={() => router.push('/listing/create')}
-          />
-        ) : (
-          <View style={styles.productsGrid}>
-            {listings.map((item) => (
-              <View key={item.id} style={styles.gridItem}>
-                <ListingCard
-                  listing={item}
-                  onPress={() => router.push(`/listing/${item.id}`)}
-                />
+  return (
+    <View style={[styles.rootContainer, { paddingTop: insets.top }]}>
+      {/* App Bar */}
+      <View style={styles.appBar}>
+        <AppPressable haptic="none" rippleBorderless onPress={() => router.push('/(tabs)' as any)} style={styles.logoBox}>
+          <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+        </AppPressable>
+
+        <AppPressable
+          haptic="none"
+          onPress={() => router.push('/(tabs)/search' as any)}
+          style={styles.searchTrigger}
+          accessibilityRole="search"
+          accessibilityLabel="Rechercher un article ou un quartier"
+        >
+          <Search size={16} color={colors.text.subtle} />
+          <AppText variant="body" color={colors.text.subtle} style={styles.searchFlex} numberOfLines={1}>
+            Chercher un article, quartier...
+          </AppText>
+        </AppPressable>
+
+        <View style={styles.actionsGroup}>
+          <AppPressable rippleBorderless onPress={() => router.push('/favorites' as any)} style={styles.iconBtn} accessibilityLabel="Mes favoris">
+            <Heart size={20} color={colors.grey[600]} />
+          </AppPressable>
+          <AppPressable rippleBorderless onPress={() => router.push('/(tabs)/orders' as any)} style={styles.iconBtn} accessibilityLabel="Mes commandes">
+            <Package size={20} color={colors.grey[600]} />
+          </AppPressable>
+          <AppPressable
+            rippleBorderless
+            onPress={() => router.push('/(tabs)/cart' as any)}
+            style={[styles.iconBtn, styles.cartBtn]}
+            accessibilityLabel={`Panier, ${itemCount} article${itemCount > 1 ? 's' : ''}`}
+          >
+            <ShoppingCart size={20} color={colors.primary.DEFAULT} />
+            {itemCount > 0 && (
+              <View style={styles.cartBadge}>
+                <AppText variant="caption" color={colors.text.inverse} style={styles.cartBadgeText}>
+                  {itemCount}
+                </AppText>
+              </View>
+            )}
+          </AppPressable>
+        </View>
+      </View>
+
+      {/* Contenu */}
+      {isLoading ? (
+        <View>
+          {ListHeader}
+          <View style={styles.gridPad}>
+            {[1, 2, 3, 4].map((n) => (
+              <View key={n} style={styles.skeletonCell}>
+                <Skeleton height={210} borderRadius={radii['2xl']} />
               </View>
             ))}
           </View>
-        )}
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SafeAreaView>
+        </View>
+      ) : (
+        <FlashList
+          data={listingsList}
+          numColumns={gridColumns}
+          keyExtractor={(item: any) => item.id}
+          ListHeaderComponent={ListHeader}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary.DEFAULT} colors={[colors.primary.DEFAULT]} />
+          }
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <AppText variant="bodyStrong" center>
+                Aucune annonce disponible
+              </AppText>
+              <AppText variant="caption" center color={colors.text.subtle} style={styles.emptySub}>
+                Soyez le premier à publier dans cette catégorie à Daloa !
+              </AppText>
+            </View>
+          }
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={styles.footer}>
+                <ActivityIndicator color={colors.primary.DEFAULT} />
+              </View>
+            ) : null
+          }
+          renderItem={({ item }: { item: any }) => (
+            <View style={styles.cell}>
+              <ListingCard
+                listing={{
+                  id: item.id,
+                  title: item.title,
+                  price: item.price,
+                  originalPrice: item.original_price,
+                  photos: item.photos || [],
+                  district: item.district,
+                  createdAt: item.created_at,
+                  stock: item.stock,
+                  boostedUntil: item.boosted_until,
+                  cartQty: getCartQty(item.id),
+                  isFavorite: isFavorited(item.id),
+                }}
+                onPress={() => router.push(`/listing/${item.id}` as any)}
+                onAddToCart={() => handleAddToCart(item.id)}
+                onUpdateCartQty={(id, qty) => handleUpdateCartQty(id, qty)}
+                onToggleFavorite={() => toggleFavorite(item.id)}
+              />
+            </View>
+          )}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  rootContainer: {
     flex: 1,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.bg.DEFAULT,
   },
-  topBar: {
+  appBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.dark.border,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-  },
-  logoBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: radii.xl,
-    backgroundColor: colors.market.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: typography.weights.bold,
-  },
-  brandTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 1,
-  },
-  locationText: {
-    color: colors.dark.textDim,
-    fontSize: 11,
-  },
-  topActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.xl,
-    backgroundColor: colors.dark.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.dark.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  publishBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.market.primary,
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
-    borderRadius: radii.xl,
-    gap: 4,
-  },
-  publishText: {
-    color: '#FFFFFF',
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-  },
-  searchContainer: {
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[2],
-  },
-  heroCard: {
-    marginHorizontal: spacing[4],
-    marginVertical: spacing[2],
-    backgroundColor: colors.dark.surface,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.25)',
-    padding: spacing[4],
-  },
-  heroContent: {
+    backgroundColor: colors.bg.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
     gap: spacing[2],
   },
-  escrowPill: {
+  logoBox: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: 36,
+    height: 36,
+  },
+  searchTrigger: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: colors.bg.subtle,
     borderRadius: radii.full,
-    alignSelf: 'flex-start',
+    paddingHorizontal: spacing[3],
+    height: 40,
+    gap: spacing[2],
+    overflow: 'hidden',
+  },
+  searchFlex: {
+    flex: 1,
+  },
+  actionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
-  escrowText: {
-    color: '#10B981',
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg.subtle,
   },
-  heroTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    lineHeight: 22,
+  cartBtn: {
+    backgroundColor: colors.primary[50],
   },
-  heroSubtitle: {
-    color: colors.dark.textMuted,
-    fontSize: typography.sizes.xs,
-    lineHeight: 16,
+  cartBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: colors.primary.DEFAULT,
+    minWidth: 16,
+    height: 16,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  cartBadgeText: {
+    fontSize: 9.5,
+  },
+  listContent: {
+    paddingHorizontal: spacing[2],
+    paddingBottom: spacing[8],
+  },
+  cell: {
+    flex: 1,
+    paddingHorizontal: 5,
+  },
+  gridPad: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing[3],
+  },
+  skeletonCell: {
+    width: '48%',
+    marginBottom: spacing[3],
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    marginTop: spacing[4],
-    marginBottom: spacing[2],
+    paddingHorizontal: spacing[3],
+    marginVertical: spacing[2],
   },
-  titleWithIcon: {
+  sectionHeaderSpaced: {
+    marginTop: spacing[3],
+  },
+  sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  sectionTitle: {
-    color: colors.dark.text,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
+  countBadge: {
+    backgroundColor: colors.bg.subtle,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 3,
+    borderRadius: radii.full,
   },
-  seeAllText: {
-    color: colors.market.primary,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-  },
-  countText: {
-    color: colors.dark.textDim,
-    fontSize: typography.sizes.xs,
-  },
-  categoriesScroll: {
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing[10],
     paddingHorizontal: spacing[4],
-    paddingVertical: spacing[1],
   },
-  boostedSection: {
-    marginTop: spacing[2],
+  emptySub: {
+    marginTop: 4,
   },
-  boostedScroll: {
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[2],
-  },
-  productsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing[4],
-    justifyContent: 'space-between',
-  },
-  gridItem: {
-    width: '48.5%',
-  },
-  loadingGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing[4],
-    justifyContent: 'space-between',
-    gap: spacing[3],
-    marginTop: spacing[2],
+  footer: {
+    paddingVertical: spacing[4],
   },
 });
