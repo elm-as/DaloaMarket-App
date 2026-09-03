@@ -11,7 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { useAffiliatedDeliverers, affiliationsService, useSystemSettings } from '@daloa/api';
+import { usePhase } from '../../src/context/PhaseContext';
+import { useAffiliatedDeliverers, affiliationsService } from '@daloa/api';
 import { PRICING_CONFIG } from '@daloa/config';
 import {
   colors,
@@ -65,15 +66,14 @@ export default function AffiliationsScreen() {
   const { user, profile } = useAuth();
 
   const { data: affiliations, refetch } = useAffiliatedDeliverers(user?.id);
-  const { data: settings } = useSystemSettings();
+  const { isPhase0, allowAffiliatedDeliverers } = usePhase();
   const [refreshing, setRefreshing] = useState(false);
   const [invitePhone, setInvitePhone] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const isPro = profile?.isPro ?? false;
-  const isPhase0 = settings?.phaseConfig?.phase === 0 || PRICING_CONFIG.phase0.isFreeModeActive;
-  const isGated = !isPro && !isPhase0;
+  const isGated = !isPro && !allowAffiliatedDeliverers && !isPhase0;
 
   const list = affiliations || [];
   const pending = list.filter((a) => a.status === 'pending');

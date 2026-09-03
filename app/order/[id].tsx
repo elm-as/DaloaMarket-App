@@ -116,6 +116,8 @@ export default function OrderTrackingScreen() {
   const [disputeReason, setDisputeReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSellerActing, setIsSellerActing] = useState(false);
+  const [enteredPickupOtp, setEnteredPickupOtp] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -173,6 +175,50 @@ export default function OrderTrackingScreen() {
       Alert.alert('Erreur', err.message || 'Impossible de signaler le litige.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  /* ── Actions vendeur ─────────────────────────────────────────────── */
+
+  const handleConfirmAvailability = async () => {
+    try {
+      setIsSellerActing(true);
+      await ordersService.confirmSellerAvailability(order!.id);
+      Haptics.success();
+      refetch();
+      Alert.alert(
+        'Disponibilité confirmée',
+        'La course est maintenant visible par les livreurs. Préparez le colis.'
+      );
+    } catch (err: any) {
+      Alert.alert('Erreur', err.message || 'Confirmation impossible.');
+    } finally {
+      setIsSellerActing(false);
+    }
+  };
+
+  const handleCompletePickup = async (withOtp: boolean) => {
+    if (withOtp && enteredPickupOtp.trim().length < 4) {
+      Alert.alert('Code incomplet', "Saisissez le code communiqué par l'acheteur.");
+      return;
+    }
+    try {
+      setIsSellerActing(true);
+      await ordersService.completePickupOrder(
+        order!.id,
+        withOtp ? enteredPickupOtp.trim() : undefined
+      );
+      Haptics.success();
+      setEnteredPickupOtp('');
+      refetch();
+      Alert.alert(
+        'Retrait validé',
+        'La commande est marquée remise. Votre virement Mobile Money est programmé.'
+      );
+    } catch (err: any) {
+      Alert.alert('Validation refusée', err.message || 'Validation impossible.');
+    } finally {
+      setIsSellerActing(false);
     }
   };
 
@@ -369,6 +415,89 @@ export default function OrderTrackingScreen() {
             ))}
           </View>
         )}
+
+        {/* ── Actions vendeur : confirmation de disponibilité ── */}
+        {isSeller &&
+          (assignment?.status === 'pending_seller_confirmation' ||
+            assignment?.status === 'pending') && (
+            <View style={styles.sellerActionCard}>
+              <View style={styles.sellerActionHeader}>
+                <Package size={18} color={accent[600]} />
+                <AppText variant="bodyStrong" color={accent[700]}>
+                  Confirmez que vous avez l’article
+                </AppText>
+              </View>
+              <AppText variant="caption" color={colors.text.muted}>
+                Aucun livreur ne peut prendre cette course avant votre confirmation.
+                Cela évite qu’un livreur se déplace pour un article indisponible.
+              </AppText>
+              <Button
+                title="J’ai l’article — Confirmer"
+                variant="market"
+                size="md"
+                loading={isSellerActing}
+                onPress={handleConfirmAvailability}
+                leftIcon={<CheckCircle2 size={16} color={colors.text.inverse} />}
+                fullWidth
+                style={styles.verifyBtn}
+              />
+            </View>
+          )}
+
+        {/* ── Actions vendeur : validation du retrait en boutique ── */}
+        {isSeller &&
+          order.delivery_mode === 'pickup' &&
+          order.status !== 'delivered' &&
+          order.status !== 'cancelled' && (
+            <View style={styles.sellerActionCard}>
+              <View style={styles.sellerActionHeader}>
+                <ShieldCheck size={18} color={accent[600]} />
+                <AppText variant="bodyStrong" color={accent[700]}>
+                  Valider le retrait en boutique
+                </AppText>
+              </View>
+              <AppText variant="caption" color={colors.text.muted}>
+                Demandez son code à l’acheteur et saisissez-le ici. Le code est
+                vérifié par le serveur : 5 tentatives maximum.
+              </AppText>
+              <TextInput
+                style={styles.otpField}
+                keyboardType="number-pad"
+                placeholder="Code de l’acheteur"
+                placeholderTextColor={colors.text.subtle}
+                value={enteredPickupOtp}
+                onChangeText={(t) => setEnteredPickupOtp(t.replace(/\D/g, '').slice(0, 6))}
+                maxLength={6}
+              />
+              <Button
+                title="Vérifier le code et remettre l’article"
+                variant="market"
+                size="md"
+                loading={isSellerActing}
+                onPress={() => handleCompletePickup(true)}
+                leftIcon={<CheckCircle2 size={16} color={colors.text.inverse} />}
+                fullWidth
+                style={styles.verifyBtn}
+              />
+              <AppPressable
+                onPress={() =>
+                  Alert.alert(
+                    'Remise sans code',
+                    "À n'utiliser que si l'acheteur n'a pas son code. La remise sera enregistrée sans vérification.",
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      { text: 'Confirmer la remise', onPress: () => handleCompletePickup(false) },
+                    ]
+                  )
+                }
+                style={styles.linkBtn}
+              >
+                <AppText variant="caption" color={colors.text.muted}>
+                  L’acheteur n’a pas son code
+                </AppText>
+              </AppPressable>
+            </View>
+          )}
 
         {/* ── Code OTP vendeur : ramassage ── */}
         {isSeller &&
@@ -728,6 +857,38 @@ const styles = StyleSheet.create({
   },
   verifyBtn: {
     marginTop: spacing[2],
+  },
+  // ── Actions vendeur ──
+  sellerActionCard: {
+    backgroundColor: colors.bg.surface,
+    borderColor: colors.border.DEFAULT,
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing[4],
+    gap: spacing[2],
+    marginBottom: spacing[3],
+  },
+  sellerActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  otpField: {
+    marginTop: spacing[1],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    backgroundColor: colors.bg.subtle,
+    color: colors.text.DEFAULT,
+    fontSize: 18,
+    letterSpacing: 4,
+    textAlign: 'center',
+  },
+  linkBtn: {
+    alignSelf: 'center',
+    paddingVertical: spacing[2],
   },
   // ── Cards ──
   card: {

@@ -8,6 +8,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isProfileComplete: boolean;
+  /**
+   * Confort d'affichage uniquement : masque la console admin aux non-admins.
+   * L'autorisation réelle est appliquée en base par `is_admin_or_service_role()`,
+   * jamais par ce booléen.
+   */
+  isAdmin: boolean;
   login: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
@@ -15,6 +21,9 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/** Rôles donnant accès à la console d'administration mobile. */
+const ADMIN_ROLES = ['admin', 'superadmin'];
 
 /** Profil transactionnel complet : nom + téléphone WhatsApp + quartier. */
 function computeProfileComplete(profile: UserProfile | null): boolean {
@@ -104,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         isAuthenticated: Boolean(user),
         isProfileComplete: computeProfileComplete(profile),
+        isAdmin: ADMIN_ROLES.includes(String((profile as any)?.role || '').toLowerCase()),
         login,
         register,
         logout,

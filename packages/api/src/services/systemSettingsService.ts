@@ -92,4 +92,80 @@ export const systemSettingsService = {
 
     return result;
   },
+
+  /**
+   * Préréglages de phase. Alignés à l'identique sur l'admin web
+   * (DaloaMarket-v2/src/components/admin/AdminSettingsTab.tsx) pour que les deux
+   * consoles écrivent exactement la même configuration.
+   */
+  phasePreset(targetPhase: 0 | 1): PhaseConfig {
+    return targetPhase === 0
+      ? {
+          phase: 0,
+          allow_cod_for_all: true,
+          allow_pickup_for_all: true,
+          allow_affiliated_deliverers_for_all: true,
+          max_free_listings: 999999,
+          enable_boost: true,
+          enable_bump: true,
+          enable_seller_badge: true,
+          default_payment_method: 'cod',
+          seller_fee_override: 0,
+        }
+      : {
+          phase: 1,
+          allow_cod_for_all: false,
+          allow_pickup_for_all: false,
+          allow_affiliated_deliverers_for_all: false,
+          max_free_listings: 20,
+          enable_boost: true,
+          enable_bump: true,
+          enable_seller_badge: true,
+          default_payment_method: 'online',
+          seller_fee_override: null,
+        };
+  },
+
+  /**
+   * Écrit la configuration de phase via la RPC `update_system_setting`.
+   *
+   * Attention : cette RPC renvoie `{ success: false, reason: 'unauthorized' }`
+   * dans le corps de la réponse au lieu de lever une erreur Postgres. Un test
+   * sur `error` seul donnerait donc un faux succès à un non-admin — il faut
+   * lire `data.success`.
+   */
+  async updatePhaseConfig(
+    targetPhase: 0 | 1,
+    customOverrides?: Partial<PhaseConfig>
+  ): Promise<{ success: boolean; phaseConfig: PhaseConfig }> {
+    const payload: PhaseConfig = {
+      ...this.phasePreset(targetPhase),
+      ...(customOverrides || {}),
+    };
+
+    return this.savePhaseConfig(payload);
+  },
+
+  /** Enregistre une configuration de phase déjà composée (réglages fins). */
+  async savePhaseConfig(
+    payload: PhaseConfig
+  ): Promise<{ success: boolean; phaseConfig: PhaseConfig }> {
+    const { data, error } = await supabase.rpc('update_system_setting', {
+      p_key: 'phase_config',
+      p_value: payload as any,
+    });
+
+    if (error) throw error;
+
+    const res = data as { success?: boolean; reason?: string } | null;
+    if (res && res.success === false) {
+      throw new Error(
+        res.reason === 'unauthorized'
+          ? "Accès refusé : seul un administrateur peut changer la phase."
+          : res.reason || 'Erreur lors de la mise à jour de la phase.'
+      );
+    }
+
+    return { success: true, phaseConfig: payload };
+  },
 };

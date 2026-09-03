@@ -3,8 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { useSystemSettings } from '@daloa/api';
-import { PRICING_CONFIG } from '@daloa/config';
+import { usePhase } from '../../context/PhaseContext';
 
 interface ProfileProBannerProps {
   isPro: boolean;
@@ -16,11 +15,10 @@ export const ProfileProBanner: React.FC<ProfileProBannerProps> = ({
   onBecomePro,
 }) => {
   const accent = useAccent();
-  const { data: settings } = useSystemSettings();
-  const isPhase0 = settings?.phaseConfig?.phase === 0 || PRICING_CONFIG.phase0.isFreeModeActive;
+  const { isPhase0, enableSellerBadge } = usePhase();
 
-  // Si l'utilisateur est déjà Pro ou si l'application est en Phase 0 (gratuit pour tous), masquer la bannière
-  if (isPro || isPhase0) return null;
+  // Si l'utilisateur est déjà Pro, ou si la marketplace est en Phase 0, ou si le badge est désactivé : masquer
+  if (isPro || isPhase0 || !enableSellerBadge) return null;
 
   return (
     <View style={styles.container}>

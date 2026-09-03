@@ -4,9 +4,22 @@ import { calculateOrderBreakdown } from '@daloa/config';
 import { haversineDistance, generateSecureOtp } from '@daloa/utils';
 import { systemSettingsService } from './systemSettingsService';
 
+/** Traduction des `reason` renvoyés par les RPC vendeur. */
+const SELLER_RPC_ERRORS: Record<string, string> = {
+  unauthorized: "Vous n'êtes pas autorisé à effectuer cette action sur cette commande.",
+  order_not_found_or_unauthorized: 'Commande introuvable ou non rattachée à votre boutique.',
+  assignment_not_found: 'Aucune course rattachée à cette commande.',
+  invalid_status: "Cette commande n'est plus dans un état permettant cette action.",
+  locked: 'Trop de tentatives : la commande est passée en litige.',
+};
+
 export const ordersService = {
   /**
-   * Crée une commande avec séquestre Escrow et génération des codes OTP
+   * Crée la commande côté client (paiement à la livraison).
+   *
+   * Note : contrairement à ce que laissait entendre l'ancien commentaire, ce
+   * chemin ne crée AUCUN séquestre — le séquestre n'existe que pour le paiement
+   * en ligne, créé par l'API dans `/create-payment`.
    */
   async createOrder(buyerId: string, payload: CheckoutPayload): Promise<OrderWithDetails> {
     // 1. Récupérer l'annonce et les infos vendeur
@@ -108,15 +121,21 @@ export const ordersService = {
       throw orderErr;
     }
 
-    // 5. Si livraison demandée, créer le delivery_assignment avec les deux codes OTP aléatoires 4 chiffres
+    // 5. Si livraison demandée, créer le delivery_assignment avec ses deux codes.
+    //    OTP sur 6 chiffres pour s'aligner sur le serveur (createOrderFromEscrow) :
+    //    4 chiffres ne font que 10 000 combinaisons pour un code qui déclenche un
+    //    virement. Le scanner QR accepte déjà \d{4,6}.
     if (payload.delivery_mode === 'delivery') {
-      const pickupOtp = generateSecureOtp(4);
-      const deliveryOtp = generateSecureOtp(4);
+      const pickupOtp = generateSecureOtp(6);
+      const deliveryOtp = generateSecureOtp(6);
 
       const { error: assignErr } = await supabase.from('delivery_assignments').insert({
         order_id: order.id,
         seller_id: listing.user_id,
-        status: 'awaiting_pickup',
+        // Aligné sur le chemin de paiement en ligne : le vendeur doit confirmer
+        // qu'il a l'article (confirm_seller_availability) avant qu'un livreur
+        // puisse prendre la course. Sinon un livreur se déplace pour rien.
+        status: 'pending_seller_confirmation',
         pickup_location: `${seller?.shop_name || 'Boutique'} (${seller?.district || listing.district})`,
         dropoff_location: fullAddress,
         delivery_price: Math.round(breakdown.deliveryFee),
@@ -209,7 +228,11 @@ export const ordersService = {
           quantity: totalQty,
           product_amount: Math.round(breakdown.productSubtotal),
           delivery_fee: Math.round(breakdown.deliveryFee),
-          platform_commission: Math.round(breakdown.buyerServiceFee),
+          // Doit porter la commission VENDEUR, comme createOrder ci-dessus.
+          // Stockait buyerServiceFee (0 %), donc la commission d'une commande
+          // panier était enregistrée à 0 quelle que soit la phase.
+          platform_commission: Math.round(breakdown.sellerCommission),
+          reserve_fee: Math.round(breakdown.buyerServiceFee),
           total_amount: Math.round(breakdown.totalAmount),
           status: 'pending',
           delivery_mode: opts.deliveryMode === 'pickup' ? 'pickup' : 'delivery',
@@ -242,12 +265,12 @@ export const ordersService = {
         await supabase.from('delivery_assignments').insert({
           order_id: order.id,
           seller_id: sellerId,
-          status: 'awaiting_pickup',
+          status: 'pending_seller_confirmation',
           pickup_location: `${seller?.shop_name || 'Boutique'} (${seller?.district || ''})`.trim(),
           dropoff_location: opts.fullAddress,
           delivery_price: Math.round(breakdown.deliveryFee),
-          pickup_otp: generateSecureOtp(4),
-          delivery_otp: generateSecureOtp(4),
+          pickup_otp: generateSecureOtp(6),
+          delivery_otp: generateSecureOtp(6),
           pickup_confirmed_by_seller: false,
         });
       }
@@ -402,6 +425,51 @@ export const ordersService = {
       .eq('id', orderId);
 
     if (error) throw error;
+  },
+
+  /**
+   * Vendeur : confirme qu'il a bien l'article, ce qui rend la course visible
+   * aux livreurs (`pending_seller_confirmation` → `awaiting_pickup`).
+   *
+   * Ces RPC renvoient `{ success: false, reason }` dans le corps de la réponse
+   * plutôt qu'une erreur Postgres : il faut lire `data.success`, sinon un refus
+   * d'autorisation passe pour un succès.
+   */
+  async confirmSellerAvailability(orderId: string): Promise<void> {
+    const { data, error } = await supabase.rpc('confirm_seller_availability', {
+      p_order_id: orderId,
+    });
+    if (error) throw error;
+
+    const res = data as { success?: boolean; reason?: string; current_status?: string } | null;
+    if (res && res.success === false) {
+      throw new Error(SELLER_RPC_ERRORS[res.reason || ''] || res.reason || 'Confirmation impossible.');
+    }
+  },
+
+  /**
+   * Vendeur : valide la remise en boutique. Libère le séquestre et programme le
+   * virement vendeur. `enteredOtp` est optionnel — s'il est fourni, le serveur
+   * le vérifie réellement (5 tentatives puis litige).
+   */
+  async completePickupOrder(orderId: string, enteredOtp?: string): Promise<void> {
+    const { data, error } = await supabase.rpc('complete_pickup_order', {
+      p_order_id: orderId,
+      p_entered_otp: enteredOtp?.trim() || null,
+    });
+    if (error) throw error;
+
+    const res = data as
+      | { success?: boolean; reason?: string; attempts?: number; max_attempts?: number }
+      | null;
+    if (res && res.success === false) {
+      if (res.reason === 'invalid_otp') {
+        throw new Error(
+          `Code incorrect (tentative ${res.attempts ?? '?'}/${res.max_attempts ?? 5}).`
+        );
+      }
+      throw new Error(SELLER_RPC_ERRORS[res.reason || ''] || res.reason || 'Validation impossible.');
+    }
   },
 
   /**

@@ -8,6 +8,7 @@ import {
   Store,
   CreditCard,
   Shield,
+  ShieldCheck,
   ChevronRight,
   Trash2,
   ArrowLeft,
@@ -22,7 +23,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const accent = useAccent();
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
 
   const isPro = Boolean(profile?.pro_until && new Date(profile.pro_until) > new Date());
   const displayName = profile?.full_name || user?.email || 'Mon compte';
@@ -151,6 +152,25 @@ export default function SettingsScreen() {
             isLast
           />
         </View>
+
+        {/* Section administration — masquée pour les non-admins.
+            L'autorisation réelle est appliquée en base, pas par cet affichage. */}
+        {isAdmin ? (
+          <>
+            <AppText variant="overline" color={colors.text.muted} style={styles.sectionLabel}>
+              Administration
+            </AppText>
+            <View style={styles.card}>
+              <SettingRow
+                icon={<ShieldCheck size={18} color={colors.status.successDark} />}
+                iconBg={colors.status.successLight}
+                title="Configuration de phase"
+                onPress={() => router.push('/admin' as any)}
+                isLast
+              />
+            </View>
+          </>
+        ) : null}
 
         {/* Zone danger */}
         <AppText variant="overline" color={colors.status.error} style={styles.sectionLabel}>

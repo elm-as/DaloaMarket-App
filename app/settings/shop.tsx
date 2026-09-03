@@ -18,6 +18,7 @@ import { ShopLocationMap } from '../../src/components/settings/ShopLocationMap';
 import { DistrictPickerSheet } from '../../src/components/settings/DistrictPickerSheet';
 import { ShopHeaderBanner } from '../../src/components/settings/ShopHeaderBanner';
 import { ShopProGateCard } from '../../src/components/settings/ShopProGateCard';
+import { usePhase } from '../../src/context/PhaseContext';
 
 const THEME_COLORS = [
   { value: '#FF7F00', label: 'Orange' },
@@ -48,9 +49,9 @@ export default function ShopSettingsScreen() {
   const insets = useSafeAreaInsets();
   const accent = useAccent();
   const { user, profile, refreshProfile, isAuthenticated } = useAuth();
+  const { isPhase0 } = usePhase();
 
   const isPro = profile?.isPro ?? Boolean(profile?.pro_until && new Date(profile.pro_until) > new Date());
-  const isPhase0 = PRICING_CONFIG.phase0.isFreeModeActive;
   const shopUnlocked = isPro || isPhase0;
 
   const [shopName, setShopName] = useState(profile?.shop_name || profile?.full_name || '');

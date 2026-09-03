@@ -81,61 +81,24 @@ export const deliveryVerificationService = {
           message: 'Colis ramassé avec succès ! En route vers l’acheteur.',
         };
       }
+
+      // Erreur transport/permission : on remonte, on ne contourne pas.
+      if (rpcError) throw rpcError;
+      throw new Error('Réponse inattendue du serveur lors de la vérification du ramassage.');
     } catch (rpcErr: any) {
-      if (rpcErr.message && !rpcErr.message.includes('function') && !rpcErr.message.includes('schema')) {
-        throw rpcErr;
-      }
-      console.warn('RPC verify_pickup non disponible, exécution du contrôle sécurisé:', rpcErr);
+      throw rpcErr instanceof Error
+        ? rpcErr
+        : new Error(rpcErr?.message || 'Vérification du ramassage impossible.');
     }
 
-    // 3. Fallback sécurisé en cas d'indisponibilité de la fonction RPC
-    const { data: assignment, error } = await supabase
-      .from('delivery_assignments')
-      .select('pickup_otp, pickup_otp_attempts')
-      .eq('id', params.assignmentId)
-      .single();
-
-    if (error || !assignment) {
-      throw new Error('Assignation de livraison introuvable');
-    }
-
-    if (assignment.pickup_otp.trim() !== trimmedOtp) {
-      const nextAttempts = (assignment.pickup_otp_attempts || 0) + 1;
-      const isLocked = nextAttempts >= 3;
-
-      await supabase
-        .from('delivery_assignments')
-        .update({
-          pickup_otp_attempts: nextAttempts,
-          ...(isLocked
-            ? { status: 'disputed', dispute_reason: 'too_many_otp_attempts', disputed_at: new Date().toISOString() }
-            : {}),
-        })
-        .eq('id', params.assignmentId);
-
-      if (isLocked) {
-        throw new Error('Nombre maximal d’essais dépassé. La course est passée en litige.');
-      }
-      throw new Error(`Code OTP Vendeur incorrect (${nextAttempts}/3). Demandez le code au vendeur.`);
-    }
-
-    const { error: updateErr } = await supabase
-      .from('delivery_assignments')
-      .update({
-        status: 'picked_up',
-        pickup_confirmed_at: new Date().toISOString(),
-        pickup_photo_url: params.photoUrl,
-        pickup_gps: params.driverCoords,
-        pickup_gps_distance_m: distanceMeters,
-      })
-      .eq('id', params.assignmentId);
-
-    if (updateErr) throw updateErr;
-
-    return {
-      success: true,
-      message: 'Colis ramassé avec succès ! En route vers l’acheteur.',
-    };
+    // Le repli qui existait ici a été retiré volontairement.
+    // Il lisait `pickup_otp` en base puis comparait le code en JavaScript : le
+    // livreur, qui a accès à la ligne, pouvait donc lire le code attendu — la
+    // confirmation de prise en charge n'apportait alors aucune garantie. Il
+    // s'activait aussi silencieusement sur une simple erreur de permission.
+    // La RPC `verify_pickup` existe en base et contrôle correctement l'identité
+    // de l'appelant, l'OTP, les tentatives et la distance GPS : elle est
+    // désormais le seul chemin.
   },
 
   /**

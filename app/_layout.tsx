@@ -3,6 +3,7 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PhaseProvider } from '../src/context/PhaseContext';
 import { AuthProvider } from '../src/context/AuthContext';
 import { CartProvider } from '../src/context/CartContext';
 import { FavoritesProvider } from '../src/context/FavoritesContext';
@@ -58,53 +59,56 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider app="market">
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <FavoritesProvider>
-            <CartProvider>
-            <PushRegistrar />
-            <StatusBar style="dark" backgroundColor={colors.bg.surface} />
-            <AppGate>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.bg.surface },
-                animation: 'slide_from_right',
-              }}
-            >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="listing/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="listing/create" options={{ presentation: 'modal', headerShown: false }} />
-              <Stack.Screen name="seller/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="checkout/index" options={{ headerShown: false }} />
-              <Stack.Screen name="order/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="chat/index" options={{ headerShown: false }} />
-              <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="pro/become-pro" options={{ headerShown: false }} />
-              <Stack.Screen name="pro/packs" options={{ headerShown: false }} />
-              <Stack.Screen name="pro/revenue" options={{ headerShown: false }} />
-              <Stack.Screen name="pro/stats" options={{ headerShown: false }} />
-              <Stack.Screen name="auth/login" options={{ presentation: 'modal', headerShown: false }} />
-              <Stack.Screen name="auth/register" options={{ presentation: 'modal', headerShown: false }} />
-              <Stack.Screen name="auth/reset-password" options={{ presentation: 'modal', headerShown: false }} />
-              <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
-              <Stack.Screen name="settings/index" options={{ headerShown: false }} />
-              <Stack.Screen name="settings/shop" options={{ headerShown: false }} />
-              <Stack.Screen name="settings/payout" options={{ headerShown: false }} />
-              <Stack.Screen name="settings/delete-account" options={{ headerShown: false }} />
-              <Stack.Screen name="affiliations/index" options={{ headerShown: false }} />
-              <Stack.Screen name="favorites/index" options={{ headerShown: false }} />
-              <Stack.Screen name="banned" options={{ headerShown: false }} />
-              <Stack.Screen name="legal/how-it-works" options={{ headerShown: false }} />
-              <Stack.Screen name="legal/about" options={{ headerShown: false }} />
-              <Stack.Screen name="legal/faq" options={{ headerShown: false }} />
-              <Stack.Screen name="legal/terms" options={{ headerShown: false }} />
-              <Stack.Screen name="legal/privacy" options={{ headerShown: false }} />
-              <Stack.Screen name="legal/help" options={{ headerShown: false }} />
-            </Stack>
-            </AppGate>
-            </CartProvider>
-            </FavoritesProvider>
-          </AuthProvider>
+          <PhaseProvider>
+            <AuthProvider>
+              <FavoritesProvider>
+              <CartProvider>
+              <PushRegistrar />
+              <StatusBar style="dark" backgroundColor={colors.bg.surface} />
+              <AppGate>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.bg.surface },
+                  animation: 'slide_from_right',
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="listing/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="listing/create" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="seller/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="checkout/index" options={{ headerShown: false }} />
+                <Stack.Screen name="order/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="chat/index" options={{ headerShown: false }} />
+                <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="pro/become-pro" options={{ headerShown: false }} />
+                <Stack.Screen name="pro/packs" options={{ headerShown: false }} />
+                <Stack.Screen name="pro/revenue" options={{ headerShown: false }} />
+                <Stack.Screen name="pro/stats" options={{ headerShown: false }} />
+                <Stack.Screen name="auth/login" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="auth/register" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="auth/reset-password" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
+                <Stack.Screen name="settings/index" options={{ headerShown: false }} />
+                <Stack.Screen name="settings/shop" options={{ headerShown: false }} />
+                <Stack.Screen name="settings/payout" options={{ headerShown: false }} />
+                <Stack.Screen name="settings/delete-account" options={{ headerShown: false }} />
+                <Stack.Screen name="admin/index" options={{ headerShown: false }} />
+                <Stack.Screen name="affiliations/index" options={{ headerShown: false }} />
+                <Stack.Screen name="favorites/index" options={{ headerShown: false }} />
+                <Stack.Screen name="banned" options={{ headerShown: false }} />
+                <Stack.Screen name="legal/how-it-works" options={{ headerShown: false }} />
+                <Stack.Screen name="legal/about" options={{ headerShown: false }} />
+                <Stack.Screen name="legal/faq" options={{ headerShown: false }} />
+                <Stack.Screen name="legal/terms" options={{ headerShown: false }} />
+                <Stack.Screen name="legal/privacy" options={{ headerShown: false }} />
+                <Stack.Screen name="legal/help" options={{ headerShown: false }} />
+              </Stack>
+              </AppGate>
+              </CartProvider>
+              </FavoritesProvider>
+            </AuthProvider>
+          </PhaseProvider>
         </QueryClientProvider>
       </ThemeProvider>
     </SafeAreaProvider>

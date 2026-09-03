@@ -9,6 +9,7 @@ import { ArrowLeft, Lock } from 'lucide-react-native';
 import { calculateOrderBreakdown, PRICING_CONFIG } from '@daloa/config';
 import { Haptics } from '@daloa/utils';
 import { ordersService, paymentService, useListingDetail, analyticsService, useSystemSettings } from '@daloa/api';
+import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCart } from '../../src/context/CartContext';
 import { DistrictPickerSheet } from '../../src/components/settings/DistrictPickerSheet';
@@ -67,9 +68,9 @@ export default function CheckoutScreen() {
   const [isDistrictPickerOpen, setIsDistrictPickerOpen] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [buyerPhone, setBuyerPhone] = useState<string>(profile?.phone || '');
-  const isPhase0 = settings?.phaseConfig?.phase === 0 || PRICING_CONFIG.phase0.isFreeModeActive;
+  const { isPhase0, phaseConfig } = usePhase();
   const [paymentMode, setPaymentMode] = useState<PaymentMode>(
-    settings?.phaseConfig?.default_payment_method === 'cod' || isPhase0 ? 'cod' : 'online'
+    phaseConfig?.default_payment_method === 'cod' || isPhase0 ? 'cod' : 'online'
   );
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
   const [isSubmitting, setIsSubmitting] = useState(false);
