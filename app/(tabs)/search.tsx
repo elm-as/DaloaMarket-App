@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
@@ -50,14 +50,6 @@ export default function SearchScreen() {
   const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
   const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
 
-  const handleAddToCart = (listing: any) => {
-    if (listing.variants && listing.variants.length > 0) {
-      setActiveVariantListing(listing);
-      return;
-    }
-    addToCart(listing, null, 1);
-  };
-
   const {
     data: listingsData,
     isLoading,
@@ -72,12 +64,21 @@ export default function SearchScreen() {
     maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
   });
 
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 200);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const filteredListings = useMemo(() => {
     const rawList = listingsData?.pages.flatMap((p) => p.data) || [];
     let list = [...rawList];
 
-    if (searchQuery.trim().length > 0) {
-      const q = searchQuery.toLowerCase().trim();
+    if (debouncedQuery.trim().length > 0) {
+      const q = debouncedQuery.toLowerCase().trim();
       list = list.filter(
         (l: any) =>
           l.title.toLowerCase().includes(q) ||
@@ -93,7 +94,7 @@ export default function SearchScreen() {
     }
 
     return list;
-  }, [listingsData, searchQuery, sortBy]);
+  }, [listingsData, debouncedQuery, sortBy]);
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -104,25 +105,71 @@ export default function SearchScreen() {
     return count;
   }, [filters]);
 
-  const toggleSort = () => {
+  const toggleSort = useCallback(() => {
     Haptics.selection();
     setSortBy((p) => (p === 'recent' ? 'price_asc' : p === 'price_asc' ? 'price_desc' : 'recent'));
-  };
+  }, []);
 
-  const getCartQty = (listingId: string) => {
-    const it = items.find((i) => i.listing.id === listingId);
-    return it ? it.quantity : 0;
-  };
+  const getCartQty = useCallback(
+    (listingId: string) => {
+      const it = items.find((i) => i.listing.id === listingId);
+      return it ? it.quantity : 0;
+    },
+    [items]
+  );
 
-  const handleUpdateCartQty = (listingId: string, qty: number) => {
-    const item = items.find((i) => i.listing.id === listingId);
-    if (item) updateQuantity(item.id, qty);
-  };
+  const handleAddToCart = useCallback(
+    (listing: any) => {
+      if (listing.variants && listing.variants.length > 0) {
+        setActiveVariantListing(listing);
+        return;
+      }
+      addToCart(listing, null, 1);
+    },
+    [addToCart]
+  );
 
-  const resetAll = () => {
+  const handleUpdateCartQty = useCallback(
+    (listingId: string, qty: number) => {
+      const item = items.find((i) => i.listing.id === listingId);
+      if (item) updateQuantity(item.id, qty);
+    },
+    [items, updateQuantity]
+  );
+
+  const resetAll = useCallback(() => {
     setFilters(EMPTY_FILTERS);
     setSearchQuery('');
-  };
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: any }) => (
+      <View style={styles.cell}>
+        <ListingCard
+          listing={{
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            originalPrice: item.original_price,
+            photos: item.photos || [],
+            district: item.district,
+            createdAt: item.created_at,
+            stock: item.stock,
+            boostedUntil: item.boosted_until,
+            cartQty: getCartQty(item.id),
+            isFavorite: isFavorited(item.id),
+            variants: item.variants || [],
+            hasVariants: Boolean(item.variants && item.variants.length > 0),
+          }}
+          onPress={() => router.push(`/listing/${item.id}` as any)}
+          onAddToCart={() => handleAddToCart(item)}
+          onUpdateCartQty={handleUpdateCartQty}
+          onToggleFavorite={() => toggleFavorite(item.id)}
+        />
+      </View>
+    ),
+    [getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -169,31 +216,7 @@ export default function SearchScreen() {
               </View>
             ) : null
           }
-          renderItem={({ item }: { item: any }) => (
-            <View style={styles.cell}>
-              <ListingCard
-                listing={{
-                  id: item.id,
-                  title: item.title,
-                  price: item.price,
-                  originalPrice: item.original_price,
-                  photos: item.photos || [],
-                  district: item.district,
-                  createdAt: item.created_at,
-                  stock: item.stock,
-                  boostedUntil: item.boosted_until,
-                  cartQty: getCartQty(item.id),
-                  isFavorite: isFavorited(item.id),
-                  variants: item.variants || [],
-                  hasVariants: Boolean(item.variants && item.variants.length > 0),
-                }}
-                onPress={() => router.push(`/listing/${item.id}` as any)}
-                onAddToCart={() => handleAddToCart(item)}
-                onUpdateCartQty={(id, qty) => handleUpdateCartQty(id, qty)}
-                onToggleFavorite={() => toggleFavorite(item.id)}
-              />
-            </View>
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={
             <EmptyState
               icon={<SearchX size={30} color={colors.primary.DEFAULT} />}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -196,6 +196,11 @@ export default function CheckoutScreen() {
           if (!result.paymentUrl) throw new Error('Lien de paiement indisponible. Réessayez.');
 
           Haptics.success();
+          clearCart();
+          if (Platform.OS === 'web') {
+            window.location.href = result.paymentUrl;
+            return;
+          }
           await WebBrowser.openBrowserAsync(result.paymentUrl);
 
           let orderId: string | null = null;
@@ -272,6 +277,10 @@ export default function CheckoutScreen() {
         });
 
         Haptics.success();
+        if (Platform.OS === 'web') {
+          window.location.href = result.paymentUrl;
+          return;
+        }
         await WebBrowser.openBrowserAsync(result.paymentUrl);
 
         // Résout la commande créée côté serveur après paiement (quelques essais).

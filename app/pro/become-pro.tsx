@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,8 +54,13 @@ export default function BecomeProScreen() {
         throw new Error('Lien de paiement indisponible. Réessayez.');
       }
 
-      // Ouvre le paiement Mobile Money dans un navigateur in-app.
-      // L'activation Pro est faite côté serveur (webhook → confirm_seller_badge).
+      // Sur le Web : redirection directe pour éviter le bloqueur de fenêtres surgissantes
+      if (Platform.OS === 'web') {
+        window.location.href = result.paymentUrl;
+        return;
+      }
+
+      // Sur Mobile : ouvre le paiement Mobile Money dans un navigateur in-app (Chrome Custom Tab)
       await WebBrowser.openBrowserAsync(result.paymentUrl);
 
       // Laisse un instant au webhook, puis resynchronise le profil.

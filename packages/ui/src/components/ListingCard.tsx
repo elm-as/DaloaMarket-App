@@ -43,7 +43,7 @@ export interface ListingCardProps {
 const FALLBACK_PHOTO =
   'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=320';
 
-export const ListingCard: React.FC<ListingCardProps> = ({
+const ListingCardComponent: React.FC<ListingCardProps> = ({
   listing,
   onPress,
   onToggleFavorite,
@@ -115,6 +115,8 @@ export const ListingCard: React.FC<ListingCardProps> = ({
           transition={150}
           cachePolicy="memory-disk"
           recyclingKey={listing.id}
+          allowDownscaling={true}
+          priority="low"
         />
 
         {/* Badges superposés à gauche */}
@@ -445,4 +447,17 @@ const styles = StyleSheet.create({
   stepperCount: {
     fontVariant: ['tabular-nums'],
   },
+});
+
+export const ListingCard = React.memo<ListingCardProps>(ListingCardComponent, (prev, next) => {
+  return (
+    prev.listing.id === next.listing.id &&
+    prev.listing.isFavorite === next.listing.isFavorite &&
+    prev.listing.cartQty === next.listing.cartQty &&
+    prev.listing.price === next.listing.price &&
+    prev.listing.stock === next.listing.stock &&
+    prev.listing.photos?.[0] === next.listing.photos?.[0] &&
+    prev.listing.title === next.listing.title &&
+    prev.listing.boostedUntil === next.listing.boostedUntil
+  );
 });

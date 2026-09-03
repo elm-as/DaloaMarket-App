@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, RefreshControl, Image, ActivityIndicator, ScrollView } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
@@ -58,25 +58,63 @@ export default function HomeScreen() {
     return getRecommendationsForUser(listingsList, favs as any, { limit: 8 });
   }, [listingsList, favoriteListings, selectedCategory]);
 
-  const getCartQty = (listingId: string) => {
-    const item = items.find((i) => i.listing.id === listingId);
-    return item ? item.quantity : 0;
-  };
+  const getCartQty = useCallback(
+    (listingId: string) => {
+      const item = items.find((i) => i.listing.id === listingId);
+      return item ? item.quantity : 0;
+    },
+    [items]
+  );
 
-  const handleAddToCart = (listingId: string) => {
-    const listing = listingsList.find((l) => l.id === listingId);
-    if (!listing) return;
-    if (listing.variants && listing.variants.length > 0) {
-      setActiveVariantListing(listing);
-      return;
-    }
-    addToCart(listing, null, 1);
-  };
+  const handleAddToCart = useCallback(
+    (listingId: string) => {
+      const listing = listingsList.find((l) => l.id === listingId);
+      if (!listing) return;
+      if (listing.variants && listing.variants.length > 0) {
+        setActiveVariantListing(listing);
+        return;
+      }
+      addToCart(listing, null, 1);
+    },
+    [listingsList, addToCart]
+  );
 
-  const handleUpdateCartQty = (listingId: string, qty: number) => {
-    const item = items.find((i) => i.listing.id === listingId);
-    if (item) updateQuantity(item.id, qty);
-  };
+  const handleUpdateCartQty = useCallback(
+    (listingId: string, qty: number) => {
+      const item = items.find((i) => i.listing.id === listingId);
+      if (item) updateQuantity(item.id, qty);
+    },
+    [items, updateQuantity]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: any }) => (
+      <View style={styles.cell}>
+        <ListingCard
+          listing={{
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            originalPrice: item.original_price,
+            photos: item.photos || [],
+            district: item.district,
+            createdAt: item.created_at,
+            stock: item.stock,
+            boostedUntil: item.boosted_until,
+            cartQty: getCartQty(item.id),
+            isFavorite: isFavorited(item.id),
+            variants: item.variants || [],
+            hasVariants: Boolean(item.variants && item.variants.length > 0),
+          }}
+          onPress={() => router.push(`/listing/${item.id}` as any)}
+          onAddToCart={() => handleAddToCart(item.id)}
+          onUpdateCartQty={handleUpdateCartQty}
+          onToggleFavorite={() => toggleFavorite(item.id)}
+        />
+      </View>
+    ),
+    [getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
+  );
 
   const ListHeader = (
     <View>
@@ -211,31 +249,7 @@ export default function HomeScreen() {
               </View>
             ) : null
           }
-          renderItem={({ item }: { item: any }) => (
-            <View style={styles.cell}>
-              <ListingCard
-                listing={{
-                  id: item.id,
-                  title: item.title,
-                  price: item.price,
-                  originalPrice: item.original_price,
-                  photos: item.photos || [],
-                  district: item.district,
-                  createdAt: item.created_at,
-                  stock: item.stock,
-                  boostedUntil: item.boosted_until,
-                  cartQty: getCartQty(item.id),
-                  isFavorite: isFavorited(item.id),
-                  variants: item.variants || [],
-                  hasVariants: Boolean(item.variants && item.variants.length > 0),
-                }}
-                onPress={() => router.push(`/listing/${item.id}` as any)}
-                onAddToCart={() => handleAddToCart(item.id)}
-                onUpdateCartQty={(id, qty) => handleUpdateCartQty(id, qty)}
-                onToggleFavorite={() => toggleFavorite(item.id)}
-              />
-            </View>
-          )}
+          renderItem={renderItem}
         />
       )}
 
