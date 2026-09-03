@@ -97,20 +97,33 @@ export const deliveryService = {
   },
 
   /**
-   * Accepte une course disponible
+   * Accepte une course disponible (via RPC sécurisée accept_delivery_assignment pour passer les RLS)
    */
   async acceptRun(assignmentId: string, driverId: string): Promise<void> {
-    const { error } = await supabase
-      .from('delivery_assignments')
-      .update({
-        delivery_person_id: driverId,
-        status: 'accepted',
-        accepted_at: new Date().toISOString(),
-      })
-      .eq('id', assignmentId)
-      .is('delivery_person_id', null);
+    const { data, error } = await supabase.rpc('accept_delivery_assignment', {
+      p_assignment_id: assignmentId,
+      p_delivery_person_id: driverId,
+    });
 
-    if (error) throw error;
+    if (error) {
+      // Fallback si la RPC n'est pas encore migrée sur l'instance Supabase
+      const { error: updateError } = await supabase
+        .from('delivery_assignments')
+        .update({
+          delivery_person_id: driverId,
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+        })
+        .eq('id', assignmentId)
+        .is('delivery_person_id', null);
+
+      if (updateError) throw updateError;
+      return;
+    }
+
+    if (data && typeof data === 'object' && 'success' in (data as any) && !(data as any).success) {
+      throw new Error((data as any).reason || 'Cette course a déjà été acceptée par un autre livreur.');
+    }
   },
 
   /**
