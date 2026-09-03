@@ -99,12 +99,14 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
           var map = L.map('map', { zoomControl: false }).setView([lat, lng], 14);
           L.control.zoom({ position: 'topright' }).addTo(map);
 
-          var mapboxUrl = 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${MAPBOX_PUBLIC_TOKEN}';
-          L.tileLayer(mapboxUrl, {
-            maxZoom: 19,
-            attribution: '© Mapbox © OpenStreetMap',
-            tileSize: 512,
-            zoomOffset: -1
+          var mapboxToken = '${MAPBOX_PUBLIC_TOKEN}';
+          var tileUrl = mapboxToken
+            ? 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxToken
+            : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png';
+
+          L.tileLayer(tileUrl, {
+            maxZoom: 20,
+            attribution: '© Mapbox © CARTO © OpenStreetMap'
           }).addTo(map);
 
           var marker = L.marker([lat, lng], { draggable: true }).addTo(map);

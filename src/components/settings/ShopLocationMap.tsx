@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { DALOA_CENTER } from '@daloa/config';
+import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
 import { MapPin, Navigation, LocateFixed, AlertTriangle } from 'lucide-react-native';
 
 interface ShopLocationMapProps {
@@ -48,9 +48,14 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
           var map = L.map('map', { zoomControl: false }).setView([lat, lng], 14);
           L.control.zoom({ position: 'topright' }).addTo(map);
 
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
+          var mapboxToken = '${MAPBOX_PUBLIC_TOKEN}';
+          var tileUrl = mapboxToken
+            ? 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxToken
+            : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png';
+
+          L.tileLayer(tileUrl, {
+            maxZoom: 20,
+            attribution: '© Mapbox © CARTO © OpenStreetMap'
           }).addTo(map);
 
           var marker = L.marker([lat, lng], { draggable: true }).addTo(map);
