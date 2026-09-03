@@ -9,8 +9,9 @@ const config = getDefaultConfig(projectRoot);
 
 const packagesDir = path.resolve(projectRoot, 'packages');
 
-// 1. Regarder les packages locaux du projet
+// 1. Regarder les dossiers du workspace (pour pnpm node_modules) et les packages locaux
 config.watchFolders = [
+  workspaceRoot,
   path.resolve(packagesDir, 'ui'),
   path.resolve(packagesDir, 'api'),
   path.resolve(packagesDir, 'types'),
@@ -23,9 +24,6 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
-
-// 3. Désactiver package exports qui charge les versions Node de Supabase
-config.resolver.unstable_enablePackageExports = false;
 
 // 4. Extra node modules avec shims pour l'environnement React Native
 config.resolver.extraNodeModules = {
