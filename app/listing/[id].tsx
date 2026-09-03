@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useListingDetail, useSimilarListings, useReviews } from '@daloa/api';
+import { useListingDetail, useSimilarListings, useReviews, analyticsService } from '@daloa/api';
+import { findSimilar } from '../../src/lib/recommendationEngine';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -18,8 +19,8 @@ import {
   useAccent,
   useResponsive,
 } from '@daloa/ui';
-import { Tag } from 'lucide-react-native';
-import { formatFCFA, Haptics } from '@daloa/utils';
+import { Tag, MapPin, Truck } from 'lucide-react-native';
+import { formatFCFA, Haptics, getListingPriceRange } from '@daloa/utils';
 import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
 import { ListingSellerBox } from '../../src/components/listing-detail/ListingSellerBox';
 import { ListingStickyFooter } from '../../src/components/listing-detail/ListingStickyFooter';
@@ -63,8 +64,25 @@ export default function ListingDetailScreen() {
   const isFavorite = id ? isFavorited(id) : false;
 
   const { data: listing, isLoading } = useListingDetail(id);
-  const { data: similarItems } = useSimilarListings(listing?.category, id);
+  const { data: similarCandidates } = useSimilarListings(listing?.category, id);
   const { data: reviews = [] } = useReviews('seller', listing?.seller?.id);
+
+  // Re-classement pertinent du pool de candidats (garde-fou cluster + diversité)
+  const similarItems = useMemo(() => {
+    if (!listing || !similarCandidates?.length) return [];
+    return findSimilar(listing as any, similarCandidates as any, { limit: 6 });
+  }, [listing, similarCandidates]);
+
+  // Log comportemental (fire-and-forget) — graine pour le ML futur
+  useEffect(() => {
+    if (!listing?.id) return;
+    analyticsService.logEvent({
+      eventName: 'listing_view',
+      userId: user?.id ?? null,
+      listingId: listing.id,
+      props: { category: listing.category, price: listing.price, district: listing.district },
+    });
+  }, [listing?.id, user?.id]);
 
   const avgRating =
     reviews.length > 0
@@ -97,8 +115,16 @@ export default function ListingDetailScreen() {
   const photos = listing.photos && listing.photos.length > 0 ? listing.photos : [FALLBACK_PHOTO];
   const seller = listing.seller;
   const isPro = Boolean(seller?.pro_until && new Date(seller.pro_until) > new Date());
-  const activePrice = selectedVariant?.price ?? listing.price;
   const variants = listing.variants || [];
+  const priceInfo = React.useMemo(
+    () => getListingPriceRange(listing.price, variants),
+    [listing.price, variants]
+  );
+  const activePrice = selectedVariant?.price ?? listing.price;
+  const activePriceDisplay = selectedVariant
+    ? formatFCFA(selectedVariant.price ?? listing.price)
+    : priceInfo.label;
+
   const cartItemId = `${listing.id}_${selectedVariant?.id || 'base'}`;
   const cartItem = items.find((i) => i.id === cartItemId);
   const cartQty = cartItem?.quantity || 0;
@@ -117,7 +143,7 @@ export default function ListingDetailScreen() {
     Haptics.lightImpact();
     await Share.share({
       title: listing.title,
-      message: `🛍️ ${listing.title} à ${formatFCFA(activePrice)} sur DaloaMarket !\n👉 https://daloamarket.com/l/${listing.id.slice(0, 8)}`,
+      message: `${listing.title} à ${formatFCFA(activePrice)} sur DaloaMarket !\nhttps://daloamarket.com/l/${listing.id.slice(0, 8)}`,
     });
   };
 
@@ -140,6 +166,14 @@ export default function ListingDetailScreen() {
     }
     Haptics.lightImpact();
     addToCart(listing, null, 1);
+  };
+
+  const handleVariantsQuantitiesConfirm = (selections: { variant: ListingVariant; quantity: number }[]) => {
+    setShowVariantPicker(false);
+    Haptics.success();
+    selections.forEach(({ variant, quantity }) => {
+      addToCart(listing, variant, quantity);
+    });
   };
 
   const handleVariantConfirm = (variant: ListingVariant) => {
@@ -183,9 +217,9 @@ export default function ListingDetailScreen() {
           {/* Prix + badge réduction */}
           <View style={styles.priceRow}>
             <AppText variant="h1" color={accent[600]} style={styles.priceText}>
-              {formatFCFA(activePrice)}
+              {activePriceDisplay}
             </AppText>
-            {hasDiscount && listing.original_price && (
+            {hasDiscount && listing.original_price && !priceInfo.hasRange && (
               <AppText variant="body" color={colors.text.subtle} style={styles.originalPrice}>
                 {formatFCFA(listing.original_price)}
               </AppText>
@@ -216,14 +250,16 @@ export default function ListingDetailScreen() {
             )}
             {listing.district && (
               <View style={styles.tag}>
+                <MapPin size={12} color={colors.grey[600]} />
                 <AppText variant="caption" color={colors.grey[600]}>
-                  📍 {listing.district}
+                  {listing.district}
                 </AppText>
               </View>
             )}
             <View style={[styles.tag, styles.deliveryTag]}>
+              <Truck size={12} color={colors.status.successDark} />
               <AppText variant="caption" color={colors.status.successDark}>
-                🚚 Livraison Daloa
+                Livraison Daloa
               </AppText>
             </View>
           </View>
@@ -330,7 +366,7 @@ export default function ListingDetailScreen() {
           {similarItems && similarItems.length > 0 && (
             <View>
               <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
-                Dans la même catégorie
+                Articles similaires
               </AppText>
               <View style={styles.similarGrid}>
                 {similarItems.map((simItem: any) => (
@@ -361,7 +397,7 @@ export default function ListingDetailScreen() {
         <VariantPickerSheet
           visible={showVariantPicker}
           onClose={() => setShowVariantPicker(false)}
-          onConfirm={handleVariantConfirm}
+          onConfirmQuantities={handleVariantsQuantitiesConfirm}
           variants={variants}
           listingTitle={listing.title}
           listingPhoto={photos[0]}

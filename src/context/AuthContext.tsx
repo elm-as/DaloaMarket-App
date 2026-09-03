@@ -7,6 +7,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isProfileComplete: boolean;
   login: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
@@ -14,6 +15,14 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/** Profil transactionnel complet : nom + téléphone WhatsApp + quartier. */
+function computeProfileComplete(profile: UserProfile | null): boolean {
+  if (!profile) return false;
+  return [profile.full_name, profile.phone, (profile as any).district]
+    .map((v) => (v == null ? '' : String(v)))
+    .every((v) => v.trim().length > 0);
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
@@ -94,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         isLoading,
         isAuthenticated: Boolean(user),
+        isProfileComplete: computeProfileComplete(profile),
         login,
         register,
         logout,

@@ -24,7 +24,7 @@ export default function PacksScreen() {
         {
           text: 'Confirmer',
           onPress: () => {
-            Alert.alert('Succès ! 🎉', "Vos crédits d'annonces ont été ajoutés.");
+            Alert.alert('Succès !', "Vos crédits d'annonces ont été ajoutés.");
             router.back();
           },
         },
@@ -114,7 +114,7 @@ export default function PacksScreen() {
               <Zap size={22} color={accent.DEFAULT} />
             </View>
             <View style={styles.flex1}>
-              <AppText variant="bodyStrong">Boost en vedette ⚡ (7 jours)</AppText>
+              <AppText variant="bodyStrong">Boost en vedette (7 jours)</AppText>
               <AppText variant="caption" color={colors.text.muted} style={styles.boostSub}>
                 Bandeau doré, badge TOP et affichage prioritaire sur la page d'accueil de Daloa.
               </AppText>

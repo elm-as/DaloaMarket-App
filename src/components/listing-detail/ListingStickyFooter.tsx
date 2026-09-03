@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShoppingCart, Minus, Plus, Trash2, Lock, CreditCard } from 'lucide-react-native';
+import { ShoppingCart, Minus, Plus, Trash2, Lock, CreditCard, Edit3, Check } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 interface ListingStickyFooterProps {
@@ -41,8 +41,9 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
     return (
       <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing[3]) }]}>
         <View style={[styles.ownerBanner, { backgroundColor: accent[50], borderColor: accent[100] }]}>
-          <AppText variant="caption" color={accent[700]} center>
-            ✏️ Vous êtes le vendeur de cette annonce
+          <Edit3 size={13} color={accent[700]} />
+          <AppText variant="caption" color={accent[700]}>
+            Vous êtes le vendeur de cette annonce
           </AppText>
         </View>
       </View>
@@ -82,8 +83,9 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
               </AppPressable>
             </View>
             <View style={styles.inCartLabel}>
+              <Check size={12} color={accent[700]} />
               <AppText variant="overline" color={accent[700]}>
-                ✓ Dans le panier
+                Dans le panier
               </AppText>
             </View>
           </>
@@ -163,7 +165,10 @@ const styles = StyleSheet.create({
   },
   inCartLabel: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
   },
   // ─── Ajouter au panier (plein écran si pas en cart) ───
   addBtn: {
@@ -191,6 +196,10 @@ const styles = StyleSheet.create({
   },
   // ─── Owner ───
   ownerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     borderRadius: radii.xl,
     borderWidth: 1,
     paddingVertical: spacing[2],

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../src/context/AuthContext';
 import { CartProvider } from '../src/context/CartContext';
 import { FavoritesProvider } from '../src/context/FavoritesContext';
+import { AppGate } from '../src/components/system/AppGate';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { ThemeProvider, colors } from '@daloa/ui';
 
@@ -62,6 +63,7 @@ export default function RootLayout() {
             <CartProvider>
             <PushRegistrar />
             <StatusBar style="dark" backgroundColor={colors.bg.surface} />
+            <AppGate>
             <Stack
               screenOptions={{
                 headerShown: false,
@@ -84,6 +86,7 @@ export default function RootLayout() {
               <Stack.Screen name="auth/login" options={{ presentation: 'modal', headerShown: false }} />
               <Stack.Screen name="auth/register" options={{ presentation: 'modal', headerShown: false }} />
               <Stack.Screen name="auth/reset-password" options={{ presentation: 'modal', headerShown: false }} />
+              <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
               <Stack.Screen name="settings/index" options={{ headerShown: false }} />
               <Stack.Screen name="settings/shop" options={{ headerShown: false }} />
               <Stack.Screen name="settings/payout" options={{ headerShown: false }} />
@@ -98,6 +101,7 @@ export default function RootLayout() {
               <Stack.Screen name="legal/privacy" options={{ headerShown: false }} />
               <Stack.Screen name="legal/help" options={{ headerShown: false }} />
             </Stack>
+            </AppGate>
             </CartProvider>
             </FavoritesProvider>
           </AuthProvider>

@@ -1,16 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchX } from 'lucide-react-native';
-import { useInfiniteListings } from '@daloa/api';
+import { useInfiniteListings, analyticsService } from '@daloa/api';
+import { useAuth } from '../../src/context/AuthContext';
 import { colors, radii, spacing, ListingCard, Skeleton, EmptyState, useResponsive } from '@daloa/ui';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { Haptics } from '@daloa/utils';
 import { SearchFilterModal, SearchFilterValues } from '../../src/components/search/SearchFilterModal';
 import { SearchTopBar } from '../../src/components/search/SearchTopBar';
+import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 
 const EMPTY_FILTERS: SearchFilterValues = {
   category: null,
@@ -26,11 +28,35 @@ export default function SearchScreen() {
   const { items, addToCart, updateQuantity } = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
   const { gridColumns } = useResponsive();
+  const { user } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Log de recherche débouncé (évite un event par frappe) — graine pour le ML
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) return;
+    const t = setTimeout(() => {
+      analyticsService.logEvent({
+        eventName: 'search',
+        userId: user?.id ?? null,
+        props: { query: q },
+      });
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [searchQuery, user?.id]);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState<SearchFilterValues>(EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
+  const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
+
+  const handleAddToCart = (listing: any) => {
+    if (listing.variants && listing.variants.length > 0) {
+      setActiveVariantListing(listing);
+      return;
+    }
+    addToCart(listing, null, 1);
+  };
 
   const {
     data: listingsData,
@@ -158,9 +184,11 @@ export default function SearchScreen() {
                   boostedUntil: item.boosted_until,
                   cartQty: getCartQty(item.id),
                   isFavorite: isFavorited(item.id),
+                  variants: item.variants || [],
+                  hasVariants: Boolean(item.variants && item.variants.length > 0),
                 }}
                 onPress={() => router.push(`/listing/${item.id}` as any)}
-                onAddToCart={() => addToCart(item, null, 1)}
+                onAddToCart={() => handleAddToCart(item)}
                 onUpdateCartQty={(id, qty) => handleUpdateCartQty(id, qty)}
                 onToggleFavorite={() => toggleFavorite(item.id)}
               />
@@ -187,6 +215,24 @@ export default function SearchScreen() {
         onApply={setFilters}
         onReset={() => setFilters(EMPTY_FILTERS)}
       />
+
+      {/* Sheet de sélection multi-options / multi-quantités */}
+      {activeVariantListing && (
+        <VariantPickerSheet
+          visible={Boolean(activeVariantListing)}
+          onClose={() => setActiveVariantListing(null)}
+          variants={activeVariantListing.variants || []}
+          listingTitle={activeVariantListing.title}
+          listingPhoto={activeVariantListing.photos?.[0]}
+          basePrice={activeVariantListing.price}
+          onConfirmQuantities={(selections) => {
+            selections.forEach(({ variant, quantity }) => {
+              addToCart(activeVariantListing, variant, quantity);
+            });
+            setActiveVariantListing(null);
+          }}
+        />
+      )}
     </View>
   );
 }

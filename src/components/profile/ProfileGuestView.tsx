@@ -1,103 +1,206 @@
 import React from 'react';
-import { View, Image, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii, spacing, AppText, Button, useAccent } from '@daloa/ui';
-import { ShieldCheck, Truck, Store, LogIn, UserPlus } from 'lucide-react-native';
+import { colors, radii, spacing, AppText, AppPressable, Button, Avatar, useAccent } from '@daloa/ui';
+import {
+  User,
+  LogIn,
+  UserPlus,
+  Heart,
+  Package,
+  Store,
+  HelpCircle,
+  FileText,
+  Shield,
+  ChevronRight,
+  ShieldCheck,
+  Truck,
+} from 'lucide-react-native';
+import { useFavorites } from '../../context/FavoritesContext';
+
+interface MenuItemProps {
+  icon: React.ReactNode;
+  tint: string;
+  label: string;
+  sublabel?: string;
+  badgeCount?: number;
+  onPress: () => void;
+}
+
+function MenuItem({ icon, tint, label, sublabel, badgeCount, onPress }: MenuItemProps) {
+  return (
+    <AppPressable
+      onPress={onPress}
+      style={styles.menuItem}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <View style={[styles.menuIconCircle, { backgroundColor: tint }]}>{icon}</View>
+      <View style={styles.menuTexts}>
+        <AppText variant="bodyStrong" color={colors.text.body}>
+          {label}
+        </AppText>
+        {sublabel && (
+          <AppText variant="caption" color={colors.text.subtle}>
+            {sublabel}
+          </AppText>
+        )}
+      </View>
+      {badgeCount != null && badgeCount > 0 ? (
+        <View style={styles.menuBadge}>
+          <AppText variant="caption" color={colors.text.inverse} style={styles.badgeTxt}>
+            {badgeCount}
+          </AppText>
+        </View>
+      ) : (
+        <ChevronRight size={16} color={colors.text.subtle} />
+      )}
+    </AppPressable>
+  );
+}
 
 export const ProfileGuestView: React.FC = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const accent = useAccent();
-
-  const features = [
-    {
-      icon: <ShieldCheck size={18} color={colors.status.successDark} />,
-      tint: colors.status.successLight,
-      title: 'Paiement séquestre garanti',
-      desc: "Votre argent est protégé jusqu'à la remise du code OTP.",
-    },
-    {
-      icon: <Truck size={18} color={colors.status.infoDark} />,
-      tint: colors.status.infoLight,
-      title: 'Livraison express géolocalisée',
-      desc: 'Coursiers DaloaDelivery disponibles dans tous les quartiers.',
-    },
-    {
-      icon: <Store size={18} color={accent[600]} />,
-      tint: accent[50],
-      title: 'Votre boutique gratuite',
-      desc: 'Partagez facilement votre catalogue sur WhatsApp.',
-    },
-  ];
+  const { favoriteIds } = useFavorites();
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
-    >
-      {/* Header dégradé */}
-      <LinearGradient
-        colors={[accent[400], accent[600], accent[700]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.curvedHeader}
-      >
-        <View style={styles.logoBadge}>
-          <Image source={require('../../../assets/logo.png')} style={styles.logoImg} resizeMode="contain" />
-        </View>
-        <AppText variant="h1" color={colors.text.inverse}>
-          DaloaMarket
-        </AppText>
-        <AppText variant="body" color={accent[100]}>
-          La marketplace locale de Daloa
-        </AppText>
-      </LinearGradient>
+    <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* ── 1. Hero Dégradé identique au profil connecté ── */}
+        <LinearGradient
+          colors={[accent[400], accent[600], accent[700]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + spacing[4] }]}
+        >
+          <View style={styles.avatarBorder}>
+            <Avatar name="Invité" size={64} />
+          </View>
+          <View style={styles.heroInfo}>
+            <AppText variant="h2" color={colors.text.inverse} numberOfLines={1}>
+              Bienvenue sur DaloaMarket
+            </AppText>
+            <AppText variant="caption" color={accent[100]}>
+              Connectez-vous pour accéder à toutes les fonctionnalités
+            </AppText>
+          </View>
+        </LinearGradient>
 
-      {/* Carte d'accueil */}
-      <View style={styles.mainCard}>
-        <AppText variant="h2">Bienvenue !</AppText>
-        <AppText variant="body" color={colors.text.muted} style={styles.cardDesc}>
-          Connectez-vous pour publier des annonces, gérer votre boutique, suivre vos commandes et
-          discuter avec les commerçants.
-        </AppText>
+        {/* ── 2. Carte d'action : Connexion & Inscription ── */}
+        <View style={styles.authCard}>
+          <View style={styles.btnRow}>
+            <Button
+              title="Se connecter"
+              variant="market"
+              size="md"
+              leftIcon={<LogIn size={15} color={colors.text.inverse} />}
+              onPress={() => router.push('/auth/login' as any)}
+              style={styles.flex1}
+            />
+            <Button
+              title="Créer un compte"
+              variant="soft"
+              size="md"
+              leftIcon={<UserPlus size={15} color={accent[700]} />}
+              onPress={() => router.push('/auth/register' as any)}
+              style={styles.flex1}
+            />
+          </View>
 
-        <Button
-          title="Se connecter à mon compte"
-          variant="market"
-          size="lg"
-          onPress={() => router.push('/auth/login' as any)}
-          fullWidth
-          leftIcon={<LogIn size={16} color={colors.text.inverse} />}
-          style={styles.loginBtn}
-        />
-        <Button
-          title="Créer un compte gratuit"
-          variant="soft"
-          size="lg"
-          onPress={() => router.push('/auth/register' as any)}
-          fullWidth
-          leftIcon={<UserPlus size={16} color={accent[700]} />}
-        />
-
-        {/* Avantages */}
-        <View style={styles.featuresList}>
-          {features.map((f) => (
-            <View key={f.title} style={styles.featureItem}>
-              <View style={[styles.featureIconBox, { backgroundColor: f.tint }]}>{f.icon}</View>
-              <View style={styles.featureTexts}>
-                <AppText variant="bodyStrong">{f.title}</AppText>
-                <AppText variant="caption" color={colors.text.muted}>
-                  {f.desc}
-                </AppText>
-              </View>
+          <View style={styles.trustRow}>
+            <View style={styles.trustItem}>
+              <ShieldCheck size={14} color={colors.status.successDark} />
+              <AppText variant="caption" color={colors.text.muted}>
+                Séquestre Garanti
+              </AppText>
             </View>
-          ))}
+            <View style={styles.trustDivider} />
+            <View style={styles.trustItem}>
+              <Truck size={14} color={accent.DEFAULT} />
+              <AppText variant="caption" color={colors.text.muted}>
+                Livraison Daloa
+              </AppText>
+            </View>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* ── 3. Accès Rapides ── */}
+        <AppText variant="overline" color={colors.text.muted} style={styles.sectionTitle}>
+          Accès rapides
+        </AppText>
+        <View style={styles.menuGroup}>
+          <MenuItem
+            icon={<Heart size={18} color={accent[600]} />}
+            tint={accent[50]}
+            label="Mes favoris"
+            sublabel="Articles sauvegardés"
+            badgeCount={favoriteIds.size}
+            onPress={() => router.push('/favorites' as any)}
+          />
+          <View style={styles.sep} />
+          <MenuItem
+            icon={<Package size={18} color={colors.status.infoDark} />}
+            tint={colors.status.infoLight}
+            label="Mes commandes"
+            sublabel="Suivi des achats en cours"
+            onPress={() => router.push('/auth/login' as any)}
+          />
+          <View style={styles.sep} />
+          <MenuItem
+            icon={<Store size={18} color={accent[600]} />}
+            tint={accent[50]}
+            label="Vendre sur DaloaMarket"
+            sublabel="Ouvrez votre vitrine gratuitement"
+            onPress={() => router.push('/auth/login' as any)}
+          />
+        </View>
+
+        {/* ── 4. Informations & Support (identique au profil connecté) ── */}
+        <AppText variant="overline" color={colors.text.muted} style={styles.sectionTitle}>
+          Informations & support
+        </AppText>
+        <View style={styles.menuGroup}>
+          <MenuItem
+            icon={<HelpCircle size={18} color={colors.grey[600]} />}
+            tint={colors.bg.subtle}
+            label="Aide & support"
+            onPress={() => router.push('/legal/help' as any)}
+          />
+          <View style={styles.sep} />
+          <MenuItem
+            icon={<HelpCircle size={18} color={colors.grey[600]} />}
+            tint={colors.bg.subtle}
+            label="Questions fréquentes (FAQ)"
+            onPress={() => router.push('/legal/faq' as any)}
+          />
+          <View style={styles.sep} />
+          <MenuItem
+            icon={<Store size={18} color={colors.grey[600]} />}
+            tint={colors.bg.subtle}
+            label="À propos de DaloaMarket"
+            onPress={() => router.push('/legal/about' as any)}
+          />
+          <View style={styles.sep} />
+          <MenuItem
+            icon={<FileText size={18} color={colors.grey[600]} />}
+            tint={colors.bg.subtle}
+            label="Conditions générales (CGU)"
+            onPress={() => router.push('/legal/terms' as any)}
+          />
+          <View style={styles.sep} />
+          <MenuItem
+            icon={<Shield size={18} color={colors.grey[600]} />}
+            tint={colors.bg.subtle}
+            label="Garantie séquestre & litiges"
+            onPress={() => router.push('/legal/how-it-works' as any)}
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -109,73 +212,115 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: spacing[10],
   },
-  curvedHeader: {
-    paddingTop: spacing[4],
-    paddingBottom: spacing[12],
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    alignItems: 'center',
-  },
-  logoBadge: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
-    backgroundColor: colors.bg.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing[2],
-    transform: [{ rotate: '-3deg' }],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  logoImg: {
-    width: 40,
-    height: 40,
-  },
-  mainCard: {
-    backgroundColor: colors.bg.surface,
-    marginHorizontal: spacing[4],
-    marginTop: -28,
-    borderRadius: radii['2xl'],
-    padding: spacing[4],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  cardDesc: {
-    marginTop: 4,
-    marginBottom: spacing[4],
-  },
-  loginBtn: {
-    marginBottom: spacing[2],
-  },
-  featuresList: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-    paddingTop: spacing[3],
-    marginTop: spacing[4],
-    gap: spacing[3],
-  },
-  featureItem: {
+  hero: {
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[6],
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing[3],
+  },
+  avatarBorder: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  heroInfo: {
+    flex: 1,
+    gap: spacing[1],
+  },
+  authCard: {
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    marginHorizontal: spacing[4],
+    marginTop: -16,
+    padding: spacing[4],
+    gap: spacing[3],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  btnRow: {
+    flexDirection: 'row',
     gap: spacing[2],
   },
-  featureIconBox: {
-    width: 38,
-    height: 38,
+  flex1: { flex: 1 },
+  trustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[3],
+    paddingTop: spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
+  },
+  trustItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  trustDivider: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border.strong,
+  },
+  sectionTitle: {
+    marginTop: spacing[4],
+    marginBottom: spacing[2],
+    paddingHorizontal: spacing[4] + 4,
+  },
+  menuGroup: {
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    marginHorizontal: spacing[4],
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing[3],
+    gap: spacing[3],
+  },
+  menuIconCircle: {
+    width: 36,
+    height: 36,
     borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  featureTexts: {
+  menuTexts: {
     flex: 1,
+    gap: 1,
+  },
+  menuBadge: {
+    backgroundColor: colors.primary.DEFAULT,
+    borderRadius: radii.full,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  badgeTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  sep: {
+    height: 1,
+    backgroundColor: colors.border.subtle,
+    marginLeft: 36 + spacing[3] * 2,
   },
 });
+
+export default ProfileGuestView;

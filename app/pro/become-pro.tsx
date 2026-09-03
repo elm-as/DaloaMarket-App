@@ -30,7 +30,7 @@ export default function BecomeProScreen() {
     setTimeout(() => {
       setIsUpgrading(false);
       Alert.alert(
-        'Félicitations ! 🎉',
+        'Félicitations !',
         'Votre compte est désormais Vendeur Pro. Vos privilèges sont immédiatement actifs.',
         [{ text: 'Super !', onPress: () => router.replace('/(tabs)/profile' as any) }]
       );

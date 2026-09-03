@@ -8,6 +8,7 @@ import {
   Pressable,
   TextInput,
   FlatList,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DALOA_DISTRICTS } from '@daloa/config';
@@ -51,7 +52,7 @@ export const StepLocationDelivery: React.FC<StepLocationDeliveryProps> = ({
       toValue: 0,
       damping: 22,
       stiffness: 200,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -59,7 +60,7 @@ export const StepLocationDelivery: React.FC<StepLocationDeliveryProps> = ({
     Animated.timing(slideY, {
       toValue: 600,
       duration: 220,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start(() => setPickerOpen(false));
   };
 

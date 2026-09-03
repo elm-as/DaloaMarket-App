@@ -8,12 +8,11 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { colors, useAccent } from '@daloa/ui';
+import { colors, radii, useAccent } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { useConversations } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 
-/* Pastille de notification (badge) réutilisable — fidèle au web */
 function TabBadge({ count, color }: { count: number; color: string }) {
   if (count <= 0) return null;
   return (
@@ -23,39 +22,57 @@ function TabBadge({ count, color }: { count: number; color: string }) {
   );
 }
 
-/* Icône d'onglet avec point orange animé sous le label (fidèle au web) */
-function TabIcon({
+function TabItemView({
   icon: Icon,
-  color,
+  label,
   focused,
   badgeCount = 0,
   badgeColor = colors.status.error,
 }: {
   icon: any;
-  color: string;
+  label: string;
   focused: boolean;
   badgeCount?: number;
   badgeColor?: string;
 }) {
-  const scale = useSharedValue(focused ? 1 : 0);
+  const accent = useAccent();
+  const scale = useSharedValue(focused ? 1 : 0.95);
 
   useEffect(() => {
-    scale.value = withSpring(focused ? 1 : 0, { stiffness: 500, damping: 35 });
+    scale.value = withSpring(focused ? 1 : 0.95, { stiffness: 450, damping: 28 });
   }, [focused, scale]);
 
-  const dotStyle = useAnimatedStyle(() => ({
+  const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity: scale.value,
   }));
 
   return (
-    <View style={styles.tabIconWrapper}>
-      <View style={styles.tabIconInner}>
-        <Icon size={22} color={color} strokeWidth={focused ? 2.5 : 1.8} />
+    <Animated.View
+      style={[
+        styles.tabItemContainer,
+        focused && [styles.tabItemFocused, { backgroundColor: accent[50] }],
+        animatedStyle,
+      ]}
+    >
+      <View style={styles.iconBox}>
+        <Icon
+          size={20}
+          color={focused ? accent[700] : colors.grey[500]}
+          strokeWidth={focused ? 2.4 : 1.8}
+        />
         {badgeCount > 0 && <TabBadge count={badgeCount} color={badgeColor} />}
       </View>
-      <Animated.View style={[styles.activeDot, dotStyle]} />
-    </View>
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.tabLabel,
+          { color: focused ? accent[700] : colors.grey[500] },
+          focused && styles.tabLabelFocused,
+        ]}
+      >
+        {label}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -74,26 +91,20 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: colors.primary[600],
-        tabBarInactiveTintColor: colors.grey[400],
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: colors.bg.surface,
-          borderTopColor: colors.border.subtle,
+          borderTopColor: colors.border.DEFAULT,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 84 : 64,
+          height: Platform.OS === 'ios' ? 86 : 68,
           paddingBottom: Platform.OS === 'ios' ? 24 : 8,
           paddingTop: 6,
+          paddingHorizontal: 6,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '700',
-          marginTop: 2,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 10,
         },
       }}
     >
@@ -101,20 +112,28 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Accueil',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon icon={Home} color={color} focused={focused} />
+          tabBarIcon: ({ focused }) => (
+            <TabItemView icon={Home} label="Accueil" focused={focused} />
           ),
         }}
+        listeners={{
+          tabPress: () => Haptics.selection(),
+        }}
       />
+
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Rechercher',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon icon={Search} color={color} focused={focused} />
+          title: 'Recherche',
+          tabBarIcon: ({ focused }) => (
+            <TabItemView icon={Search} label="Explorer" focused={focused} />
           ),
         }}
+        listeners={{
+          tabPress: () => Haptics.selection(),
+        }}
       />
+
       <Tabs.Screen
         name="create"
         options={{
@@ -126,36 +145,38 @@ export default function TabLayout() {
                 Haptics.mediumImpact();
                 router.push('/listing/create' as any);
               }}
-              style={styles.centerActionWrapper}
+              style={styles.centerBtnWrapper}
               accessibilityLabel="Vendre un article"
             >
               <LinearGradient
                 colors={[accent[400], accent.DEFAULT, accent[700]]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.centerActionButton}
+                style={[styles.centerBtnCircle, { shadowColor: accent.DEFAULT }]}
               >
                 <Plus size={24} color={colors.text.inverse} strokeWidth={2.8} />
               </LinearGradient>
-              <Text style={styles.centerActionLabel}>Vendre</Text>
+              <Text style={[styles.centerBtnLabel, { color: accent[700] }]}>Vendre</Text>
             </TouchableOpacity>
           ),
         }}
       />
+
       <Tabs.Screen
         name="orders"
         options={{
-          href: null, // Commandes accessible via l'AppBar (icône Package) + Profil, comme le web
+          href: null,
         }}
       />
+
       <Tabs.Screen
         name="chat"
         options={{
           title: 'Messages',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
+          tabBarIcon: ({ focused }) => (
+            <TabItemView
               icon={MessageSquare}
-              color={color}
+              label="Messages"
               focused={focused}
               badgeCount={unreadCount}
               badgeColor={colors.status.error}
@@ -170,19 +191,24 @@ export default function TabLayout() {
           },
         }}
       />
+
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profil',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon icon={User} color={color} focused={focused} />
+          tabBarIcon: ({ focused }) => (
+            <TabItemView icon={User} label="Profil" focused={focused} />
           ),
         }}
+        listeners={{
+          tabPress: () => Haptics.selection(),
+        }}
       />
+
       <Tabs.Screen
         name="cart"
         options={{
-          href: null, // Masqué de la barre de navigation car accessible via l'AppBar en haut
+          href: null,
         }}
       />
     </Tabs>
@@ -190,66 +216,72 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabIconWrapper: {
+  tabItemContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: radii.xl,
+    minWidth: 62,
+    gap: 2,
   },
-  tabIconInner: {
+  tabItemFocused: {
+    transform: [{ scale: 1 }],
+  },
+  iconBox: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.primary[600],
-    marginTop: 3,
+  tabLabel: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  tabLabelFocused: {
+    fontWeight: '800',
   },
   badge: {
     position: 'absolute',
-    top: -6,
-    right: -11,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
+    top: -5,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
     borderColor: colors.bg.surface,
   },
   badgeText: {
     color: colors.text.inverse,
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '900',
+    fontVariant: ['tabular-nums'],
   },
-  centerActionWrapper: {
+  centerBtnWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -16,
-    zIndex: 10,
-    width: 68,
+    width: 64,
   },
-  centerActionButton: {
+  centerBtnCircle: {
     width: 48,
     height: 48,
-    borderRadius: 18,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    shadowColor: colors.primary.DEFAULT,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 8,
     borderWidth: 3,
     borderColor: colors.bg.surface,
   },
-  centerActionLabel: {
+  centerBtnLabel: {
     fontSize: 9.5,
-    fontWeight: '900',
-    color: colors.primary[600],
+    fontWeight: '800',
     marginTop: 2,
     letterSpacing: -0.1,
   },

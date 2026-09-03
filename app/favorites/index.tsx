@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Heart, ArrowLeft } from 'lucide-react-native';
-import { useFavoriteListings } from '@daloa/api';
+import { Heart, ArrowLeft, Info } from 'lucide-react-native';
+import { useFavoriteListings, useGuestFavoriteListings } from '@daloa/api';
 import {
   colors,
   radii,
@@ -28,11 +28,29 @@ export default function FavoritesScreen() {
   const accent = useAccent();
   const { user, isAuthenticated } = useAuth();
   const { items, addToCart, updateQuantity } = useCart();
-  const { isFavorited, toggleFavorite } = useFavorites();
+  const { isFavorited, toggleFavorite, favoriteIds } = useFavorites();
   const { gridColumns } = useResponsive();
 
-  const { data: favorites, isLoading, refetch, isRefetching } = useFavoriteListings(user?.id);
-  const list = favorites || [];
+  const guestIds = React.useMemo(() => Array.from(favoriteIds), [favoriteIds]);
+
+  const {
+    data: userFavorites,
+    isLoading: userLoading,
+    refetch: userRefetch,
+    isRefetching: userRefetching,
+  } = useFavoriteListings(user?.id);
+
+  const {
+    data: guestFavorites,
+    isLoading: guestLoading,
+    refetch: guestRefetch,
+    isRefetching: guestRefetching,
+  } = useGuestFavoriteListings(guestIds);
+
+  const list = user ? (userFavorites || []) : (guestFavorites || []);
+  const isLoading = user ? userLoading : (guestLoading && guestIds.length > 0);
+  const refetch = user ? userRefetch : guestRefetch;
+  const isRefetching = user ? userRefetching : guestRefetching;
 
   const getCartQty = (listingId: string) => {
     const it = items.find((i) => i.listing.id === listingId);
@@ -84,18 +102,20 @@ export default function FavoritesScreen() {
         </View>
       </LinearGradient>
 
-      {!isAuthenticated ? (
-        <View style={styles.centered}>
-          <EmptyState
-            icon={<Heart size={30} color={colors.primary.DEFAULT} />}
-            title="Connectez-vous"
-            description="Connectez-vous pour retrouver vos articles favoris sur tous vos appareils."
-            actionTitle="Se connecter"
-            onActionPress={() => router.push('/auth/login' as any)}
-            actionVariant="market"
-          />
-        </View>
-      ) : isLoading ? (
+      {/* Message de synchronisation pour les invités */}
+      {!isAuthenticated && list.length > 0 && (
+        <AppPressable
+          onPress={() => router.push('/auth/login' as any)}
+          style={styles.syncBanner}
+        >
+          <Info size={14} color={accent[700]} />
+          <AppText variant="caption" color={accent[800]} style={styles.syncBannerText}>
+            Connectez-vous pour synchroniser vos {list.length} favori{list.length > 1 ? 's' : ''} sur tous vos appareils
+          </AppText>
+        </AppPressable>
+      )}
+
+      {isLoading ? (
         <View style={styles.grid}>
           {[1, 2, 3, 4].map((i) => (
             <View key={i} style={styles.skeletonCell}>
@@ -127,6 +147,8 @@ export default function FavoritesScreen() {
                   boostedUntil: item.boosted_until,
                   cartQty: getCartQty(item.id),
                   isFavorite: isFavorited(item.id),
+                  variants: item.variants || [],
+                  hasVariants: Boolean(item.variants && item.variants.length > 0),
                 }}
                 onPress={() => router.push(`/listing/${item.id}` as any)}
                 onAddToCart={() => addToCart(item, null, 1)}
@@ -200,6 +222,22 @@ const styles = StyleSheet.create({
   centered: {
     flex: 1,
     justifyContent: 'center',
+  },
+  syncBanner: {
+    marginHorizontal: spacing[3],
+    marginTop: spacing[2],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radii.lg,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[100],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  syncBannerText: {
+    flex: 1,
   },
   listContent: {
     paddingHorizontal: spacing[2],

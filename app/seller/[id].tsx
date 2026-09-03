@@ -17,6 +17,7 @@ import {
   AppText,
   AppPressable,
   useAccent,
+  WhatsAppIcon,
 } from '@daloa/ui';
 import {
   ArrowLeft,
@@ -41,6 +42,8 @@ export default function SellerShopScreen() {
   const accent = useAccent();
 
   const [seller, setSeller] = useState<SellerInfo | null>(null);
+  const [reviewCount, setReviewCount] = useState<number>(0);
+  const [avgRating, setAvgRating] = useState<number | null>(null);
 
   const { data: listingsData } = useListings({ sellerId: id });
   const listings = listingsData?.data || [];
@@ -49,14 +52,28 @@ export default function SellerShopScreen() {
     async function fetchSeller() {
       if (!id) return;
       const { data } = await supabase.from('users').select('*').eq('id', id).single();
-      if (data) setSeller(data as any);
+      if (data) {
+        setSeller(data as any);
+        if (data.rating) setAvgRating(Number(data.rating));
+      }
+
+      // Vrais avis de la boutique
+      const { data: revs, count } = await supabase
+        .from('reviews')
+        .select('rating', { count: 'exact' })
+        .eq('reviewed_id', id);
+
+      const realCount = count ?? 0;
+      setReviewCount(realCount);
+      if (realCount > 0 && revs && revs.length > 0) {
+        const sum = revs.reduce((acc: number, curr: any) => acc + (curr.rating || 0), 0);
+        setAvgRating(sum / revs.length);
+      }
     }
     fetchSeller();
   }, [id]);
 
   const isPro = Boolean(seller?.pro_until && new Date(seller.pro_until) > new Date());
-  const rating = seller?.rating || 5.0;
-  const reviewCount = seller?.review_count || listings.length;
   const themeColor = (seller as any)?.shop_theme_color || accent.DEFAULT;
 
   const handleShareShop = async () => {
@@ -152,7 +169,9 @@ export default function SellerShopScreen() {
               <View style={[styles.statIcon, { backgroundColor: '#FEF3C7' }]}>
                 <Star size={14} color="#D97706" />
               </View>
-              <AppText variant="bodyStrong">{rating.toFixed(1)}</AppText>
+              <AppText variant="bodyStrong">
+                {avgRating != null ? avgRating.toFixed(1) : '-'}
+              </AppText>
               <AppText variant="caption" color={colors.text.muted}>note</AppText>
             </View>
             <View style={styles.statDivider} />
@@ -161,7 +180,9 @@ export default function SellerShopScreen() {
                 <ShieldCheck size={14} color={colors.status.infoDark} />
               </View>
               <AppText variant="bodyStrong">{reviewCount}</AppText>
-              <AppText variant="caption" color={colors.text.muted}>avis</AppText>
+              <AppText variant="caption" color={colors.text.muted}>
+                {reviewCount > 1 ? 'avis' : 'avis'}
+              </AppText>
             </View>
           </View>
 
@@ -170,7 +191,17 @@ export default function SellerShopScreen() {
             <AppText variant="caption" color={colors.text.muted}>
               {seller?.district || 'Daloa'}
             </AppText>
-            <View style={styles.starsMargin}><RatingStars rating={rating} totalReviews={reviewCount} size={12} /></View>
+            {reviewCount > 0 && avgRating != null ? (
+              <View style={styles.starsMargin}>
+                <RatingStars rating={avgRating} totalReviews={reviewCount} size={12} />
+              </View>
+            ) : (
+              <View style={styles.starsMargin}>
+                <AppText variant="caption" color={colors.text.subtle}>
+                  · Nouveau vendeur
+                </AppText>
+              </View>
+            )}
           </View>
 
           {/* CTA */}
@@ -179,7 +210,7 @@ export default function SellerShopScreen() {
               title="WhatsApp"
               variant="whatsapp"
               size="md"
-              leftIcon={<MessageCircle size={16} color={colors.text.inverse} />}
+              leftIcon={<WhatsAppIcon size={16} color={colors.text.inverse} />}
               onPress={handleWhatsApp}
               style={styles.flex1}
             />

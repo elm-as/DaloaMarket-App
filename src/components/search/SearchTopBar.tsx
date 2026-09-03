@@ -87,7 +87,7 @@ export const SearchTopBar: React.FC<SearchTopBarProps> = ({
             style={[styles.catChip, !filters.category && { backgroundColor: colors.bg.surface }]}
           >
             <AppText variant="label" color={!filters.category ? accent[600] : colors.text.inverse}>
-              🔥 Tout
+              Tout
             </AppText>
           </AppPressable>
 

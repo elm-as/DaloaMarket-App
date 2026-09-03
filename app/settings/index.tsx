@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   Settings,
   Sparkles,
+  MapPin,
+  User,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -57,8 +59,12 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Profile card inline in hero */}
-        <View style={styles.profileCard}>
+        {/* Profile card inline in hero (Cliquable vers Informations personnelles) */}
+        <AppPressable
+          onPress={() => router.push('/settings/account' as any)}
+          style={styles.profileCard}
+          accessibilityLabel="Modifier mes informations personnelles"
+        >
           <Avatar
             name={displayName}
             uri={profile?.avatar_url || undefined}
@@ -85,16 +91,33 @@ export default function SettingsScreen() {
               </AppText>
             ) : null}
             {profile?.district ? (
-              <AppText variant="caption" color={accent[600]} numberOfLines={1}>
-                📍 {profile.district}
-              </AppText>
+              <View style={styles.districtRow}>
+                <MapPin size={11} color={accent[600]} />
+                <AppText variant="caption" color={accent[600]} numberOfLines={1}>
+                  {profile.district}
+                </AppText>
+              </View>
             ) : null}
           </View>
           <ChevronRight size={16} color={colors.grey[400]} />
-        </View>
+        </AppPressable>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Section Mon compte */}
+        <AppText variant="overline" color={colors.text.muted} style={styles.sectionLabel}>
+          Mon compte
+        </AppText>
+        <View style={styles.card}>
+          <SettingRow
+            icon={<User size={18} color={accent.DEFAULT} />}
+            iconBg={accent[50]}
+            title="Informations personnelles"
+            onPress={() => router.push('/settings/account' as any)}
+            isLast
+          />
+        </View>
+
         {/* Section boutique */}
         <AppText variant="overline" color={colors.text.muted} style={styles.sectionLabel}>
           Ma boutique
@@ -285,5 +308,10 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     flex: 1,
+  },
+  districtRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
 });

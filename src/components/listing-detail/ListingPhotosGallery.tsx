@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { ChevronLeft, Share2, Heart, Flag } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable } from '@daloa/ui';
@@ -15,9 +15,10 @@ interface ListingPhotosGalleryProps {
 }
 
 const BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
+const FALLBACK = 'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=600';
 
 export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
-  photos,
+  photos: rawPhotos,
   screenWidth,
   isFavorite,
   onBack,
@@ -26,6 +27,7 @@ export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
   onReport,
 }) => {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const photos = rawPhotos && rawPhotos.length > 0 ? rawPhotos : [FALLBACK];
 
   return (
     <View style={styles.galleryContainer}>
@@ -43,10 +45,10 @@ export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
           <Image
             key={index}
             source={{ uri: photo }}
-            style={[styles.galleryImage, { width: screenWidth }]}
+            style={[styles.galleryImage, { width: screenWidth || '100%' }]}
             contentFit="cover"
-            transition={220}
-            placeholder={{ blurhash: BLURHASH }}
+            transition={Platform.OS === 'web' ? 0 : 220}
+            placeholder={Platform.OS === 'web' ? undefined : { blurhash: BLURHASH }}
             cachePolicy="memory-disk"
           />
         ))}

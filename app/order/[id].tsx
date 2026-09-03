@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -12,7 +12,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useOrderDetail, ordersService } from '@daloa/api';
+import { useOrderDetail, ordersService, paymentService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 import {
   colors,
@@ -72,7 +72,7 @@ function getStatusMeta(status: string, accent: any) {
       };
     case 'delivered':
       return {
-        label: 'Livré ✓',
+        label: 'Livré',
         bg: colors.status.successLight,
         text: colors.status.successDark,
         border: colors.status.successBorder,
@@ -115,6 +115,7 @@ export default function OrderTrackingScreen() {
   const [isDisputeOpen, setIsDisputeOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -122,11 +123,39 @@ export default function OrderTrackingScreen() {
     return () => { channel.unsubscribe(); };
   }, [id, refetch]);
 
+  // Vérifie activement le paiement auprès de l'API (le simple refetch DB ne suffit
+  // pas : le statut ne change que si le paiement est confirmé côté serveur).
+  const verifyPayment = useCallback(async () => {
+    if (!id) return null;
+    try {
+      const res = await paymentService.checkPaymentStatus(id);
+      await refetch();
+      return res;
+    } catch {
+      return null;
+    }
+  }, [id, refetch]);
+
   useEffect(() => {
     if (!order || order.status !== 'pending_payment') return;
-    const timer = setInterval(() => refetch(), 5000);
+    const timer = setInterval(() => { verifyPayment(); }, 5000);
     return () => clearInterval(timer);
-  }, [order?.status, refetch]);
+  }, [order?.status, verifyPayment]);
+
+  const handleManualVerify = async () => {
+    setIsVerifying(true);
+    Haptics.lightImpact();
+    const res = await verifyPayment();
+    setIsVerifying(false);
+    if (res?.isPaid) {
+      Haptics.success();
+    } else {
+      Alert.alert(
+        'Paiement en attente',
+        "Nous n'avons pas encore reçu la confirmation. Si vous venez de payer, patientez quelques instants puis réessayez."
+      );
+    }
+  };
 
   const handleReportDispute = async () => {
     if (!disputeReason.trim()) return;
@@ -284,6 +313,32 @@ export default function OrderTrackingScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* ── Vérification de paiement (acheteur, commande non réglée) ── */}
+        {!isSeller && order.status === 'pending_payment' && (
+          <View style={styles.paymentPendingCard}>
+            <View style={styles.paymentPendingHeader}>
+              <CreditCard size={18} color={colors.status.warningDark} />
+              <AppText variant="bodyStrong" color={colors.status.warningDark}>
+                En attente de paiement
+              </AppText>
+            </View>
+            <AppText variant="caption" color={colors.text.muted}>
+              Si vous venez de payer via Mobile Money, la confirmation peut prendre
+              quelques instants. Vérifiez maintenant.
+            </AppText>
+            <Button
+              title="J'ai payé — Vérifier"
+              variant="market"
+              size="md"
+              loading={isVerifying}
+              onPress={handleManualVerify}
+              leftIcon={<CreditCard size={16} color={colors.text.inverse} />}
+              fullWidth
+              style={styles.verifyBtn}
+            />
+          </View>
+        )}
+
         {/* ── Code OTP vendeur : ramassage ── */}
         {isSeller &&
           pickupOtp &&
@@ -598,6 +653,23 @@ const styles = StyleSheet.create({
   },
   codeCard: {
     marginBottom: spacing[3],
+  },
+  paymentPendingCard: {
+    backgroundColor: colors.status.warningLight,
+    borderColor: colors.status.warningBorder,
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing[4],
+    gap: spacing[2],
+    marginBottom: spacing[3],
+  },
+  paymentPendingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  verifyBtn: {
+    marginTop: spacing[2],
   },
   // ── Cards ──
   card: {

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, RefreshControl, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, RefreshControl, Image, ActivityIndicator, ScrollView } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,19 +14,27 @@ import {
   CategoryGrid,
   Skeleton,
   useResponsive,
+  CurrencyText,
 } from '@daloa/ui';
-import { useInfiniteListings } from '@daloa/api';
+import { Image as ExpoImage } from 'expo-image';
+import { useInfiniteListings, useFavoriteListings } from '@daloa/api';
+import { useAuth } from '../../src/context/AuthContext';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { HomeHero } from '../../src/components/home/HomeHero';
 import { HomeDeliveryBanner } from '../../src/components/home/HomeDeliveryBanner';
+import { HomeRecommendations } from '../../src/components/home/HomeRecommendations';
+import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
+import { getRecommendationsForUser } from '../../src/lib/recommendationEngine';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const { itemCount, addToCart, updateQuantity, items } = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
   const { gridColumns } = useResponsive();
 
   const {
@@ -39,7 +47,16 @@ export default function HomeScreen() {
     isFetchingNextPage,
   } = useInfiniteListings({ category: selectedCategory || undefined });
 
+  const { data: favoriteListings } = useFavoriteListings(user?.id);
+
   const listingsList = data?.pages.flatMap((p) => p.data) || [];
+
+  // Section "Pour vous" — Recommandations intelligentes (Personnalisées ou Découverte Cold-Start)
+  const recommendations = useMemo(() => {
+    if (!listingsList.length || selectedCategory) return [];
+    const favs = favoriteListings || [];
+    return getRecommendationsForUser(listingsList, favs as any, { limit: 8 });
+  }, [listingsList, favoriteListings, selectedCategory]);
 
   const getCartQty = (listingId: string) => {
     const item = items.find((i) => i.listing.id === listingId);
@@ -49,6 +66,10 @@ export default function HomeScreen() {
   const handleAddToCart = (listingId: string) => {
     const listing = listingsList.find((l) => l.id === listingId);
     if (!listing) return;
+    if (listing.variants && listing.variants.length > 0) {
+      setActiveVariantListing(listing);
+      return;
+    }
     addToCart(listing, null, 1);
   };
 
@@ -61,6 +82,15 @@ export default function HomeScreen() {
     <View>
       <HomeHero />
       <HomeDeliveryBanner />
+
+      {/* Section Recommandations Pour vous (Cold-Start & Personnalisé) */}
+      <HomeRecommendations
+        recommendations={recommendations}
+        onPressItem={(item) => router.push(`/listing/${item.id}` as any)}
+        onAddToCart={(item) => handleAddToCart(item.id)}
+        onToggleFavorite={(id) => toggleFavorite(id)}
+        isFavorited={(id) => isFavorited(id)}
+      />
 
       <View style={styles.sectionHeader}>
         <AppText variant="title">Catégories</AppText>
@@ -196,6 +226,8 @@ export default function HomeScreen() {
                   boostedUntil: item.boosted_until,
                   cartQty: getCartQty(item.id),
                   isFavorite: isFavorited(item.id),
+                  variants: item.variants || [],
+                  hasVariants: Boolean(item.variants && item.variants.length > 0),
                 }}
                 onPress={() => router.push(`/listing/${item.id}` as any)}
                 onAddToCart={() => handleAddToCart(item.id)}
@@ -204,6 +236,24 @@ export default function HomeScreen() {
               />
             </View>
           )}
+        />
+      )}
+
+      {/* Sheet de sélection multi-options / multi-quantités */}
+      {activeVariantListing && (
+        <VariantPickerSheet
+          visible={Boolean(activeVariantListing)}
+          onClose={() => setActiveVariantListing(null)}
+          variants={activeVariantListing.variants || []}
+          listingTitle={activeVariantListing.title}
+          listingPhoto={activeVariantListing.photos?.[0]}
+          basePrice={activeVariantListing.price}
+          onConfirmQuantities={(selections) => {
+            selections.forEach(({ variant, quantity }) => {
+              addToCart(activeVariantListing, variant, quantity);
+            });
+            setActiveVariantListing(null);
+          }}
         />
       )}
     </View>

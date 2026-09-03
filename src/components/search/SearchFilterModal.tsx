@@ -8,6 +8,7 @@ import {
   Animated,
   Pressable,
   FlatList,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Check, SlidersHorizontal, MapPin, Search, Tag, Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen } from 'lucide-react-native';
@@ -67,13 +68,13 @@ export const SearchFilterModal: React.FC<SearchFilterModalProps> = ({
         toValue: 0,
         damping: 22,
         stiffness: 200,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     } else {
       Animated.timing(slideY, {
         toValue: 800,
         duration: 220,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   }, [visible]);

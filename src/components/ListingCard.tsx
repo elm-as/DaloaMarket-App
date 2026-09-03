@@ -35,6 +35,8 @@ export const ListingCard: React.FC<ListingCardProps> = ({
     acceptsDelivery: listing.accepts_delivery,
     stock: listing.stock,
     cartQty,
+    variants: listing.variants || [],
+    hasVariants: Boolean(listing.variants && listing.variants.length > 0),
   };
 
   return (

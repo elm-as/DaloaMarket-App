@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Alert, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { usePayoutSettings, usePayoutHistory, paymentService, supabase } from '@daloa/api';
+import { usePayoutSettings, usePayoutHistory, payoutService } from '@daloa/api';
 import {
   colors,
   radii,
   spacing,
-  Button,
   CurrencyText,
   StatusPill,
   EmptyState,
@@ -18,74 +17,37 @@ import {
   useAccent,
 } from '@daloa/ui';
 import { Wallet, ArrowDownRight, Clock, ArrowLeft, TrendingUp, ShoppingBag } from 'lucide-react-native';
-import { formatDate, formatFCFA, Haptics } from '@daloa/utils';
+import { formatDate } from '@daloa/utils';
 
 interface Balance {
   available: number;
   escrow: number;
 }
 
-async function fetchSellerBalance(userId: string): Promise<Balance> {
-  const [deliveredRes, escrowRes, confirmedPayoutsRes, pendingPayoutsRes] = await Promise.all([
-    supabase
-      .from('orders')
-      .select('product_amount, seller_fee')
-      .eq('seller_id', userId)
-      .eq('status', 'delivered'),
-    supabase
-      .from('orders')
-      .select('product_amount, seller_fee')
-      .eq('seller_id', userId)
-      .in('status', ['awaiting_pickup', 'picked_up', 'in_transit', 'pending_payment']),
-    supabase
-      .from('payouts')
-      .select('net_amount')
-      .eq('user_id', userId)
-      .eq('status', 'confirmed'),
-    supabase
-      .from('payouts')
-      .select('net_amount')
-      .eq('user_id', userId)
-      .eq('status', 'pending'),
-  ]);
-
-  const totalEarned = (deliveredRes.data || []).reduce(
-    (s, o) => s + Math.max(0, (o.product_amount || 0) - (o.seller_fee || 0)),
-    0
-  );
-  const totalPaidOut = (confirmedPayoutsRes.data || []).reduce((s, p) => s + (p.net_amount || 0), 0);
-  const totalPendingPayout = (pendingPayoutsRes.data || []).reduce((s, p) => s + (p.net_amount || 0), 0);
-  const escrow = (escrowRes.data || []).reduce(
-    (s, o) => s + Math.max(0, (o.product_amount || 0) - (o.seller_fee || 0)),
-    0
-  );
-
-  const available = Math.max(0, totalEarned - totalPaidOut - totalPendingPayout);
-
-  return { available, escrow };
-}
-
 export default function RevenueScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const { data: payoutSettings } = usePayoutSettings(user?.id);
   const { data: payouts, refetch: refetchPayouts } = usePayoutHistory(user?.id);
 
+  const payoutPhone = (profile as any)?.payout_number || payoutSettings?.phone || '';
+  const payoutNetwork = (profile as any)?.payout_network || payoutSettings?.network || '';
+  const hasPayoutAccount = Boolean(payoutPhone && payoutNetwork);
+
   const [balance, setBalance] = useState<Balance>({ available: 0, escrow: 0 });
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
-  const [isRequesting, setIsRequesting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadBalance = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const b = await fetchSellerBalance(user.id);
+      const b = await payoutService.getSellerBalance(user.id);
       setBalance(b);
     } catch {
-      // silently keep last value
+      // conserver dernière valeur
     } finally {
       setIsLoadingBalance(false);
     }
@@ -99,42 +61,6 @@ export default function RevenueScreen() {
     setRefreshing(true);
     await Promise.all([loadBalance(), refetchPayouts()]);
     setRefreshing(false);
-  };
-
-  const handleRequestPayout = async () => {
-    if (!payoutSettings) {
-      Alert.alert(
-        'Numéro manquant',
-        'Veuillez d\'abord configurer votre numéro Mobile Money pour recevoir vos fonds.',
-        [{ text: 'Configurer', onPress: () => router.push('/settings/payout' as any) }]
-      );
-      return;
-    }
-    if (balance.available <= 0) {
-      Alert.alert('Solde insuffisant', 'Vous n\'avez pas encore de fonds disponibles.');
-      return;
-    }
-
-    Haptics.success();
-    setIsRequesting(true);
-    try {
-      await paymentService.requestPayout({
-        userId: user!.id,
-        recipientType: 'seller',
-        amount: balance.available,
-        network: payoutSettings.network,
-        phone: payoutSettings.phone,
-      });
-      await Promise.all([loadBalance(), refetchPayouts()]);
-      Alert.alert(
-        'Demande envoyée !',
-        `Votre demande de retrait de ${formatFCFA(balance.available)} a été transmise.`
-      );
-    } catch (err: any) {
-      Alert.alert('Erreur', err.message || 'Échec de la demande de retrait');
-    } finally {
-      setIsRequesting(false);
-    }
   };
 
   return (
@@ -209,39 +135,41 @@ export default function RevenueScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={accent.DEFAULT} />
         }
       >
-        {/* Retrait */}
+        {/* Compte de versement automatique */}
         <View style={styles.withdrawCard}>
           <View style={styles.withdrawTop}>
             <View style={styles.flex1}>
-              <AppText variant="bodyStrong">Compte de retrait</AppText>
+              <AppText variant="bodyStrong">Compte de réception Mobile Money</AppText>
               <AppText variant="caption" color={colors.text.muted}>
-                {payoutSettings
-                  ? `${payoutSettings.network.toUpperCase()} · ${payoutSettings.phone}`
-                  : 'Aucun compte Mobile Money configuré'}
+                {hasPayoutAccount
+                  ? `${String(payoutNetwork).toUpperCase()} · ${payoutPhone}`
+                  : 'Aucun compte configuré pour recevoir vos fonds'}
               </AppText>
             </View>
             <AppPressable
               onPress={() => router.push('/settings/payout' as any)}
               style={[styles.configBtn, { backgroundColor: accent[50] }]}
-              accessibilityLabel="Modifier le compte de retrait"
+              accessibilityLabel="Modifier le compte de réception"
             >
               <AppText variant="caption" color={accent[700]}>
-                Modifier
+                {hasPayoutAccount ? 'Modifier' : 'Configurer'}
               </AppText>
             </AppPressable>
           </View>
 
-          <Button
-            title="Demander le retrait Mobile Money"
-            variant="market"
-            size="lg"
-            disabled={balance.available <= 0 || isRequesting || isLoadingBalance}
-            loading={isRequesting}
-            onPress={handleRequestPayout}
-            leftIcon={<ArrowDownRight size={18} color={colors.text.inverse} />}
-            fullWidth
-            style={styles.withdrawBtn}
-          />
+          <View style={styles.autoPayoutBanner}>
+            <View style={styles.autoPayoutIconCircle}>
+              <ArrowDownRight size={14} color={colors.status.successDark} />
+            </View>
+            <View style={styles.flex1}>
+              <AppText variant="caption" color={colors.status.successDark} style={styles.autoPayoutTitle}>
+                Versements 100% automatiques
+              </AppText>
+              <AppText variant="caption" color={colors.text.subtle} style={styles.autoPayoutDesc}>
+                Dès que le coursier valide le code OTP à la livraison, vos gains sont automatiquement virés vers votre compte Mobile Money.
+              </AppText>
+            </View>
+          </View>
         </View>
 
         {/* Historique des versements */}
@@ -364,8 +292,34 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     overflow: 'hidden',
   },
-  withdrawBtn: {
+  autoPayoutBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    padding: spacing[3],
+    borderRadius: radii.lg,
     marginTop: spacing[3],
+  },
+  autoPayoutIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  autoPayoutTitle: {
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  autoPayoutDesc: {
+    fontSize: 10,
+    marginTop: 2,
+    lineHeight: 14,
   },
   payoutItem: {
     flexDirection: 'row',

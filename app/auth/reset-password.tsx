@@ -25,7 +25,7 @@ export default function ResetPasswordScreen() {
       await authService.resetPassword(email.trim());
       Haptics.success();
       Alert.alert(
-        'Email envoyé ! ✉️',
+        'Email envoyé',
         'Un lien de réinitialisation de mot de passe a été envoyé à votre adresse email.',
         [{ text: 'OK', onPress: () => router.back() }]
       );

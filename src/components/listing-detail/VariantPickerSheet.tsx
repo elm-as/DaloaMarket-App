@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Modal,
@@ -7,67 +7,123 @@ import {
   Pressable,
   ScrollView,
   Image,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Check, ShoppingCart } from 'lucide-react-native';
+import { X, Plus, Minus, ShoppingCart, Check } from 'lucide-react-native';
 import { AppText, AppPressable, colors, radii, spacing, useAccent } from '@daloa/ui';
-import { formatFCFA } from '@daloa/utils';
+import { formatFCFA, Haptics } from '@daloa/utils';
 import { ListingVariant } from '@daloa/types';
 
 const FALLBACK =
   'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=120';
 
+export interface VariantSelection {
+  variant: ListingVariant;
+  quantity: number;
+}
+
 interface VariantPickerSheetProps {
   visible: boolean;
   onClose: () => void;
-  /** Appelé quand l'utilisateur confirme : variante choisie */
-  onConfirm: (variant: ListingVariant) => void;
   variants: ListingVariant[];
   listingTitle: string;
   listingPhoto?: string;
   basePrice: number;
+  /** Sélection multi-options avec quantités individuelles */
+  onConfirmQuantities: (selections: VariantSelection[]) => void;
+  /** Compatibilité ascendante : sélection d'une seule variante */
+  onConfirm?: (variant: ListingVariant) => void;
 }
 
 export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
   visible,
   onClose,
-  onConfirm,
   variants,
   listingTitle,
   listingPhoto,
   basePrice,
+  onConfirmQuantities,
+  onConfirm,
 }) => {
   const insets = useSafeAreaInsets();
   const accent = useAccent();
   const slideY = useRef(new Animated.Value(600)).current;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Dictionnaire { variantId: quantité choisie }
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (visible) {
-      setSelectedId(null);
+      // Par défaut : 1 unité sur la 1ère variante en stock s'il n'y a pas encore de sélection
+      const initial: Record<string, number> = {};
+      const firstInStock = variants.find((v) => (v.stock ?? 1) > 0);
+      if (firstInStock?.id) {
+        initial[firstInStock.id] = 1;
+      }
+      setQuantities(initial);
+
       Animated.spring(slideY, {
         toValue: 0,
-        damping: 22,
-        stiffness: 200,
-        useNativeDriver: true,
+        damping: 24,
+        stiffness: 220,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     } else {
       Animated.timing(slideY, {
         toValue: 600,
-        duration: 220,
-        useNativeDriver: true,
+        duration: 200,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
-  }, [visible]);
+  }, [visible, variants]);
 
-  const selectedVariant = variants.find((v) => v.id === selectedId) ?? null;
-
-  const handleConfirm = () => {
-    if (!selectedVariant) return;
-    onConfirm(selectedVariant);
+  const handleIncrement = (variantId: string, maxStock: number) => {
+    const current = quantities[variantId] || 0;
+    if (current >= maxStock) return;
+    Haptics.selection();
+    setQuantities((prev) => ({ ...prev, [variantId]: current + 1 }));
   };
 
-  const displayPrice = selectedVariant?.price ?? basePrice;
+  const handleDecrement = (variantId: string) => {
+    const current = quantities[variantId] || 0;
+    if (current <= 0) return;
+    Haptics.selection();
+    setQuantities((prev) => {
+      const next = { ...prev };
+      if (current === 1) delete next[variantId];
+      else next[variantId] = current - 1;
+      return next;
+    });
+  };
+
+  const summary = useMemo(() => {
+    let totalQty = 0;
+    let totalPrice = 0;
+    const selectedList: VariantSelection[] = [];
+
+    variants.forEach((v) => {
+      const q = v.id ? quantities[v.id] || 0 : 0;
+      if (q > 0) {
+        totalQty += q;
+        totalPrice += q * (v.price ?? basePrice);
+        selectedList.push({ variant: v, quantity: q });
+      }
+    });
+
+    return { totalQty, totalPrice, selectedList };
+  }, [variants, quantities, basePrice]);
+
+  const handleConfirm = () => {
+    if (summary.totalQty === 0) return;
+    Haptics.success();
+    if (onConfirmQuantities) {
+      onConfirmQuantities(summary.selectedList);
+    } else if (onConfirm && summary.selectedList[0]) {
+      onConfirm(summary.selectedList[0].variant);
+    }
+    onClose();
+  };
 
   return (
     <Modal
@@ -77,30 +133,28 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      {/* Backdrop */}
       <Pressable style={styles.backdrop} onPress={onClose} />
 
-      {/* Sheet */}
       <Animated.View
         style={[
           styles.sheet,
-          { paddingBottom: Math.max(insets.bottom, spacing[4]), transform: [{ translateY: slideY }] },
+          {
+            paddingBottom: Math.max(insets.bottom, spacing[4]),
+            transform: [{ translateY: slideY }],
+          },
         ]}
       >
-        {/* Drag handle */}
         <View style={styles.handle} />
 
         {/* Header */}
         <View style={styles.header}>
-          <AppText variant="title" style={styles.headerTitle}>
-            Choisir une option
-          </AppText>
-          <AppPressable
-            onPress={onClose}
-            rippleBorderless
-            style={styles.closeBtn}
-            accessibilityLabel="Fermer"
-          >
+          <View style={styles.headerTitleWrap}>
+            <AppText variant="title">Options & Quantités</AppText>
+            <AppText variant="caption" color={colors.text.subtle}>
+              Ajustez les quantités pour chaque option souhaitée
+            </AppText>
+          </View>
+          <AppPressable onPress={onClose} rippleBorderless style={styles.closeBtn} accessibilityLabel="Fermer">
             <X size={18} color={colors.text.muted} />
           </AppPressable>
         </View>
@@ -116,96 +170,134 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
             <AppText variant="bodyStrong" numberOfLines={2} color={colors.text.body}>
               {listingTitle}
             </AppText>
-            <AppText variant="h2" color={accent[600]} style={styles.previewPrice}>
-              {formatFCFA(displayPrice)}
+            <AppText variant="caption" color={accent[700]} style={styles.startingPrice}>
+              Dès {formatFCFA(basePrice)}
             </AppText>
           </View>
         </View>
 
         <View style={styles.divider} />
 
-        {/* Liste des variantes */}
+        {/* Liste des variantes avec ajustement de quantité par ligne */}
         <ScrollView
           style={styles.variantList}
           contentContainerStyle={styles.variantListContent}
           showsVerticalScrollIndicator={false}
         >
           {variants.map((v) => {
-            const isSelected = v.id === selectedId;
-            const outOfStock = (v.stock ?? 1) <= 0;
-            const variantPrice = v.price ?? basePrice;
+            const vId = v.id || '';
+            const qty = quantities[vId] || 0;
+            const maxStock = v.stock ?? 1;
+            const outOfStock = maxStock <= 0;
+            const unitPrice = v.price ?? basePrice;
+            const isSelected = qty > 0;
 
             return (
-              <AppPressable
-                key={v.id}
-                haptic="selection"
-                onPress={() => { if (!outOfStock && v.id) setSelectedId(v.id); }}
+              <View
+                key={vId}
                 style={[
                   styles.variantRow,
                   isSelected && { borderColor: accent[300], backgroundColor: accent[50] },
                   outOfStock && styles.variantRowDisabled,
                 ]}
-                accessibilityLabel={`Option ${v.label}`}
-                accessibilityState={{ disabled: outOfStock, selected: isSelected }}
               >
-                {/* Radio circle */}
-                <View style={[
-                  styles.radio,
-                  isSelected && { backgroundColor: accent.DEFAULT, borderColor: accent.DEFAULT },
-                  outOfStock && styles.radioDisabled,
-                ]}>
-                  {isSelected && <Check size={12} color={colors.text.inverse} strokeWidth={3} />}
-                </View>
-
-                {/* Label + stock */}
+                {/* Infos Variante */}
                 <View style={styles.variantMeta}>
-                  <AppText
-                    variant="bodyStrong"
-                    color={outOfStock ? colors.text.subtle : isSelected ? accent[800] ?? accent[700] : colors.text.body}
-                    style={outOfStock && { textDecorationLine: 'line-through' }}
-                  >
-                    {v.label}
-                  </AppText>
-                  {outOfStock ? (
-                    <AppText variant="caption" color={colors.text.subtle}>Épuisé</AppText>
-                  ) : v.stock != null && v.stock < 5 ? (
-                    <AppText variant="caption" color={colors.status.warning ?? '#F59E0B'}>
-                      Plus que {v.stock} en stock
+                  <View style={styles.variantTitleRow}>
+                    <AppText
+                      variant="bodyStrong"
+                      color={outOfStock ? colors.text.subtle : isSelected ? accent[900] ?? accent[700] : colors.text.body}
+                      style={outOfStock && { textDecorationLine: 'line-through' }}
+                    >
+                      {v.label}
                     </AppText>
-                  ) : null}
+                    {isSelected && (
+                      <View style={[styles.selectedCheck, { backgroundColor: accent.DEFAULT }]}>
+                        <Check size={10} color={colors.text.inverse} strokeWidth={3} />
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.variantSubRow}>
+                    <AppText variant="caption" color={accent[700]} style={styles.priceTag}>
+                      {formatFCFA(unitPrice)} / unité
+                    </AppText>
+                    <AppText
+                      variant="caption"
+                      color={outOfStock ? colors.status.error : colors.text.subtle}
+                    >
+                      {outOfStock ? 'Épuisé' : `${maxStock} dispo`}
+                    </AppText>
+                  </View>
                 </View>
 
-                {/* Prix */}
-                <AppText
-                  variant="bodyStrong"
-                  color={isSelected ? accent[700] : colors.text.body}
-                  style={styles.variantPrice}
-                >
-                  {formatFCFA(variantPrice)}
-                </AppText>
-              </AppPressable>
+                {/* Stepper de quantité dédié à cette option */}
+                {!outOfStock ? (
+                  <View style={[styles.stepperWrap, isSelected && { borderColor: accent[200] }]}>
+                    <AppPressable
+                      haptic="light"
+                      rippleBorderless
+                      disabled={qty <= 0}
+                      onPress={() => handleDecrement(vId)}
+                      style={[styles.stepBtn, qty <= 0 && styles.stepBtnDisabled]}
+                      accessibilityLabel={`Diminuer ${v.label}`}
+                    >
+                      <Minus size={14} color={qty > 0 ? accent.DEFAULT : colors.text.subtle} strokeWidth={2.5} />
+                    </AppPressable>
+
+                    <View style={styles.qtyBox}>
+                      <AppText
+                        variant="bodyStrong"
+                        color={qty > 0 ? accent[800] ?? colors.text.body : colors.text.subtle}
+                        style={styles.qtyText}
+                      >
+                        {qty}
+                      </AppText>
+                    </View>
+
+                    <AppPressable
+                      haptic="light"
+                      rippleBorderless
+                      disabled={qty >= maxStock}
+                      onPress={() => handleIncrement(vId, maxStock)}
+                      style={[styles.stepBtn, qty >= maxStock && styles.stepBtnDisabled]}
+                      accessibilityLabel={`Augmenter ${v.label}`}
+                    >
+                      <Plus size={14} color={qty < maxStock ? accent.DEFAULT : colors.text.subtle} strokeWidth={2.5} />
+                    </AppPressable>
+                  </View>
+                ) : (
+                  <View style={styles.outBadge}>
+                    <AppText variant="caption" color={colors.text.subtle}>
+                      Indisponible
+                    </AppText>
+                  </View>
+                )}
+              </View>
             );
           })}
         </ScrollView>
 
-        {/* CTA */}
+        {/* Barre CTA récapitulative dynamique */}
         <View style={styles.ctaWrap}>
           <AppPressable
             haptic="success"
             onPress={handleConfirm}
-            disabled={!selectedVariant}
+            disabled={summary.totalQty === 0}
             rippleColor="rgba(255,255,255,0.24)"
             style={[
               styles.ctaBtn,
-              selectedVariant
+              summary.totalQty > 0
                 ? { backgroundColor: accent.DEFAULT }
                 : { backgroundColor: colors.grey[300] },
             ]}
             accessibilityLabel="Ajouter au panier"
           >
-            <ShoppingCart size={18} color={colors.text.inverse} strokeWidth={2} />
+            <ShoppingCart size={18} color={colors.text.inverse} strokeWidth={2.2} />
             <AppText variant="label" color={colors.text.inverse} style={styles.ctaText}>
-              {selectedVariant ? `Ajouter — ${formatFCFA(displayPrice)}` : 'Choisissez une option'}
+              {summary.totalQty > 0
+                ? `Ajouter ${summary.totalQty} article${summary.totalQty > 1 ? 's' : ''} — ${formatFCFA(summary.totalPrice)}`
+                : 'Sélectionnez au moins une option'}
             </AppText>
           </AppPressable>
         </View>
@@ -217,7 +309,7 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sheet: {
     position: 'absolute',
@@ -227,15 +319,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '82%',
+    maxHeight: '84%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
     elevation: 24,
   },
   handle: {
-    width: 40,
+    width: 44,
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.border.strong,
@@ -250,8 +342,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[3],
   },
-  headerTitle: {
+  headerTitleWrap: {
     flex: 1,
+    gap: 2,
   },
   closeBtn: {
     width: 34,
@@ -270,17 +363,18 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
   previewImg: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.xl,
+    width: 56,
+    height: 56,
+    borderRadius: radii.lg,
     backgroundColor: colors.bg.subtle,
   },
   previewInfo: {
     flex: 1,
     gap: 2,
   },
-  previewPrice: {
-    lineHeight: 26,
+  startingPrice: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '700',
   },
   divider: {
     height: 1,
@@ -290,7 +384,7 @@ const styles = StyleSheet.create({
   },
   variantList: {
     flexGrow: 0,
-    maxHeight: 300,
+    maxHeight: 320,
   },
   variantListContent: {
     paddingHorizontal: spacing[4],
@@ -300,38 +394,79 @@ const styles = StyleSheet.create({
   variantRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderRadius: radii.xl,
     borderWidth: 1.5,
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.bg.surface,
-    paddingVertical: spacing[3],
+    paddingVertical: spacing[2] + 4,
     paddingHorizontal: spacing[3],
-    gap: spacing[3],
+    gap: spacing[2],
   },
   variantRowDisabled: {
     opacity: 0.45,
     backgroundColor: colors.bg.subtle,
   },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: radii.full,
-    borderWidth: 2,
-    borderColor: colors.border.strong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  radioDisabled: {
-    borderColor: colors.border.subtle,
-  },
   variantMeta: {
     flex: 1,
-    gap: 1,
+    gap: 3,
   },
-  variantPrice: {
-    flexShrink: 0,
+  variantTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  selectedCheck: {
+    width: 16,
+    height: 16,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  variantSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  priceTag: {
     fontVariant: ['tabular-nums'],
+    fontWeight: '700',
+  },
+  stepperWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg.subtle,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    height: 36,
+    paddingHorizontal: 3,
+  },
+  stepBtn: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.md,
+    backgroundColor: colors.bg.surface,
+  },
+  stepBtnDisabled: {
+    opacity: 0.35,
+    backgroundColor: 'transparent',
+  },
+  qtyBox: {
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyText: {
+    fontVariant: ['tabular-nums'],
+  },
+  outBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radii.md,
+    backgroundColor: colors.bg.subtle,
   },
   ctaWrap: {
     paddingHorizontal: spacing[4],
@@ -341,12 +476,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 54,
+    height: 52,
     borderRadius: radii.xl,
     gap: 8,
     overflow: 'hidden',
   },
   ctaText: {
-    fontSize: 15,
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
+
+export default VariantPickerSheet;

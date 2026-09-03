@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Image } from 'react-native';
+import { View, ScrollView, StyleSheet, Image, Platform, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
+import { supabase } from '@daloa/api';
 import {
   colors,
   radii,
@@ -14,9 +15,11 @@ import {
   Input,
   KeyboardScreen,
   useAccent,
+  GoogleIcon,
 } from '@daloa/ui';
-import { Lock, Mail, ArrowLeft, ShieldCheck, Truck } from 'lucide-react-native';
+import { Mail, Lock, ArrowLeft, LogIn, Sparkles, UserPlus, ShieldCheck, Truck } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
+import { safeBack } from '../../src/utils/navigation';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +30,7 @@ export default function LoginScreen() {
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleLogin = async () => {
@@ -53,6 +57,37 @@ export default function LoginScreen() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setErrorMsg(null);
+      const redirectUrl =
+        Platform.OS === 'web' && typeof window !== 'undefined'
+          ? `${window.location.origin}/`
+          : 'daloamarket://auth/callback';
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.href = data.url;
+        } else {
+          await Linking.openURL(data.url);
+        }
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Impossible de se connecter avec Google.');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
   return (
     <KeyboardScreen>
       <ScrollView
@@ -67,7 +102,7 @@ export default function LoginScreen() {
           style={styles.curvedHeader}
         >
           <AppPressable
-            onPress={() => router.back()}
+            onPress={() => safeBack(router, '/(tabs)/profile')}
             rippleBorderless
             style={styles.backBtn}
             accessibilityLabel="Retour"
@@ -83,7 +118,7 @@ export default function LoginScreen() {
             Bon retour !
           </AppText>
           <AppText variant="body" color={accent[100]}>
-            Connectez-vous à DaloaMarket
+            Connectez-vous à votre espace DaloaMarket
           </AppText>
         </LinearGradient>
 
@@ -96,6 +131,29 @@ export default function LoginScreen() {
               </AppText>
             </View>
           )}
+
+          {/* Bouton Google OAuth */}
+          <AppPressable
+            haptic="light"
+            onPress={handleGoogleLogin}
+            disabled={isGoogleLoading}
+            style={styles.googleBtn}
+            accessibilityLabel="Continuer avec Google"
+          >
+            <GoogleIcon size={18} />
+            <AppText variant="bodyStrong" color={colors.text.body}>
+              {isGoogleLoading ? 'Connexion Google…' : 'Continuer avec Google'}
+            </AppText>
+          </AppPressable>
+
+          {/* Séparateur */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <AppText variant="caption" color={colors.text.subtle} style={styles.dividerText}>
+              OU AVEC VOS IDENTIFIANTS
+            </AppText>
+            <View style={styles.dividerLine} />
+          </View>
 
           <Input
             label="Adresse email ou téléphone"
@@ -160,7 +218,7 @@ export default function LoginScreen() {
           <View style={styles.trustBadge}>
             <Truck size={14} color={accent.DEFAULT} />
             <AppText variant="caption" color={colors.text.muted}>
-              Livraison Locale
+              Livraison Partout à Daloa
             </AppText>
           </View>
         </View>
@@ -234,6 +292,38 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     padding: spacing[3],
     marginBottom: spacing[3],
+  },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: radii.xl,
+    backgroundColor: colors.bg.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border.DEFAULT,
+    gap: spacing[2],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing[4],
+    gap: spacing[2],
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border.subtle,
+  },
+  dividerText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   forgotBtn: {
     alignSelf: 'flex-end',

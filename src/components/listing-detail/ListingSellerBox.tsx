@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Avatar, AppText, AppPressable, Button, colors, radii, spacing, useAccent } from '@daloa/ui';
+import { Avatar, AppText, AppPressable, Button, colors, radii, spacing, useAccent, WhatsAppIcon } from '@daloa/ui';
 import { MessageCircle, Store, Star, Sparkles } from 'lucide-react-native';
 import { formatDate, formatWhatsAppPhone } from '@daloa/utils';
 
@@ -16,7 +16,7 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
 
   const shopName = seller?.shop_name || seller?.full_name || 'Boutique Partenaire';
   const memberSince = seller?.created_at ? formatDate(seller.created_at) : null;
-  const rating = seller?.rating ?? 5.0;
+  const rating = seller?.rating != null ? Number(seller.rating) : null;
   const reviewCount = seller?.review_count ?? 0;
 
   const goToShop = () => seller?.id && router.push(`/seller/${seller.id}` as any);
@@ -78,20 +78,31 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
           </View>
 
           <View style={styles.ratingRow}>
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Star
-                key={s}
-                size={11}
-                color="#F59E0B"
-                fill={s <= Math.round(rating) ? '#F59E0B' : 'transparent'}
-              />
-            ))}
-            <AppText variant="caption" color={colors.text.body}>
-              {rating.toFixed(1)}
-            </AppText>
-            <AppText variant="caption" color={colors.text.muted}>
-              ({reviewCount > 0 ? `${reviewCount} avis` : 'Nouveau'})
-            </AppText>
+            {reviewCount > 0 && rating != null ? (
+              <>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star
+                    key={s}
+                    size={11}
+                    color="#F59E0B"
+                    fill={s <= Math.round(rating) ? '#F59E0B' : 'transparent'}
+                  />
+                ))}
+                <AppText variant="caption" color={colors.text.body}>
+                  {rating.toFixed(1)}
+                </AppText>
+                <AppText variant="caption" color={colors.text.muted}>
+                  ({reviewCount} avis)
+                </AppText>
+              </>
+            ) : (
+              <>
+                <Star size={11} color={colors.text.muted} />
+                <AppText variant="caption" color={colors.text.muted}>
+                  Nouveau vendeur (0 avis)
+                </AppText>
+              </>
+            )}
           </View>
 
           {memberSince && (
@@ -116,7 +127,7 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
           title="WhatsApp"
           variant="whatsapp"
           size="sm"
-          leftIcon={<MessageCircle size={14} color={colors.text.inverse} />}
+          leftIcon={<WhatsAppIcon size={16} color={colors.text.inverse} />}
           onPress={handleWhatsApp}
           style={styles.ctaFlex}
         />

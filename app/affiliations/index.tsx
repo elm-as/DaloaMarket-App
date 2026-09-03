@@ -26,9 +26,11 @@ import {
 } from '@daloa/ui';
 import { Bike, ArrowLeft, UserPlus, X, Clock, CheckCircle, Sparkles, Truck, Smartphone } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
+import { safeBack } from '../../src/utils/navigation';
+import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 
-// Flip to false when Phase 0 ends — non-Pro sellers will see the upsell gate
-const PHASE_ZERO = true;
+// Phase 1 active : les vendeurs non-Pro voient le portail ProGate
+const PHASE_ZERO = false;
 
 function ProGate({ accent }: { accent: any }) {
   const router = useRouter();
@@ -135,6 +137,16 @@ export default function AffiliationsScreen() {
     );
   };
 
+  if (!user) {
+    return (
+      <AuthGuardView
+        title="Livreurs Affiliés"
+        description="Connectez-vous pour inviter et gérer vos coursiers de confiance à Daloa."
+        fallbackRoute="/(tabs)/profile"
+      />
+    );
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <LinearGradient
@@ -145,7 +157,7 @@ export default function AffiliationsScreen() {
       >
         <View style={styles.heroRow}>
           <AppPressable
-            onPress={() => router.back()}
+            onPress={() => safeBack(router, '/(tabs)/profile')}
             rippleBorderless
             style={styles.backBtn}
             accessibilityLabel="Retour"

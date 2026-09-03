@@ -29,7 +29,7 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
       case 'picked_up':
         return { label: 'En livraison', bg: accent[50], text: accent[700] };
       case 'delivered':
-        return { label: 'Livrée ✓', bg: colors.status.successLight, text: colors.status.successDark };
+        return { label: 'Livrée', bg: colors.status.successLight, text: colors.status.successDark };
       case 'cancelled':
         return { label: 'Annulée', bg: colors.status.errorLight, text: colors.status.errorDark };
       default:

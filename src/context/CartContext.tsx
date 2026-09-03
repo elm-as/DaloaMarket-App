@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ListingFull, ListingVariant } from '@daloa/types';
+import { analyticsService } from '@daloa/api';
 import { Haptics } from '@daloa/utils';
 
 export interface CartItem {
@@ -33,6 +34,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = (listing: ListingFull, variant?: ListingVariant | null, quantity = 1) => {
     Haptics.success();
+    analyticsService.logEvent({
+      eventName: 'add_to_cart',
+      listingId: listing.id,
+      props: { category: listing.category, price: variant?.price ?? listing.price, quantity },
+    });
     const itemId = `${listing.id}_${variant?.id || 'base'}`;
 
     setItems((prev) => {

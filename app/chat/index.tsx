@@ -17,7 +17,7 @@ import {
   AppPressable,
   useAccent,
 } from '@daloa/ui';
-import { MessageSquare, ArrowLeft } from 'lucide-react-native';
+import { MessageSquare, ArrowLeft, Package } from 'lucide-react-native';
 import { formatRelativeTime } from '@daloa/utils';
 
 export default function ChatListScreen({ isTab = false }: { isTab?: boolean }) {
@@ -132,9 +132,12 @@ export default function ChatListScreen({ isTab = false }: { isTab?: boolean }) {
                 </View>
 
                 {conv.listingTitle && (
-                  <AppText variant="caption" color={accent[700]} numberOfLines={1}>
-                    📦 {conv.listingTitle}
-                  </AppText>
+                  <View style={styles.listingTagRow}>
+                    <Package size={11} color={accent[700]} />
+                    <AppText variant="caption" color={accent[700]} numberOfLines={1}>
+                      {conv.listingTitle}
+                    </AppText>
+                  </View>
                 )}
 
                 <AppText variant="caption" color={colors.text.muted} numberOfLines={1}>
@@ -235,5 +238,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
+  },
+  listingTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
 });

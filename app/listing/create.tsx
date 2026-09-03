@@ -4,8 +4,11 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { listingsService } from '@daloa/api';
 import { colors, spacing, Button, KeyboardScreen } from '@daloa/ui';
-import { ArrowRight, Check } from 'lucide-react-native';
+import { ArrowRight, Check, CreditCard, MapPin } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
+import { safeBack } from '../../src/utils/navigation';
+import { AuthGuardView } from '../../src/components/common/AuthGuardView';
+import { RequirementGuardView } from '../../src/components/common/RequirementGuardView';
 import { WizardHero } from '../../src/components/create-wizard/WizardHero';
 import { StepMediaTitle } from '../../src/components/create-wizard/StepMediaTitle';
 import { StepCategoryPricing } from '../../src/components/create-wizard/StepCategoryPricing';
@@ -19,7 +22,7 @@ const FALLBACK_PHOTO =
 
 export default function ListingCreateScreen() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, profile, isAuthenticated } = useAuth();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,9 +34,46 @@ export default function ListingCreateScreen() {
   const [selectedCondition, setSelectedCondition] = useState('like_new');
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('Lobia');
+  const [selectedDistrict, setSelectedDistrict] = useState(profile?.district || 'Centre-ville');
   const [stock, setStock] = useState(1);
   const [acceptsDelivery, setAcceptsDelivery] = useState(true);
+
+  if (!isAuthenticated || !user) {
+    return (
+      <AuthGuardView
+        title="Connexion requise"
+        description="Vous devez être connecté à votre compte pour publier une annonce sur DaloaMarket."
+        fallbackRoute="/(tabs)"
+      />
+    );
+  }
+
+  const hasPayoutInfo = Boolean((profile as any)?.payout_network && (profile as any)?.payout_number);
+  const hasShopLocation = Boolean(profile?.district && (profile as any)?.shop_latitude != null);
+
+  if (!hasPayoutInfo) {
+    return (
+      <RequirementGuardView
+        icon={<CreditCard size={32} color={colors.status.warningDark} />}
+        title="Coordonnées de retrait requises"
+        description="Pour vendre sur DaloaMarket, vous devez d'abord configurer le compte Mobile Money (Wave, Orange, MTN...) sur lequel vous recevrez vos gains de vente."
+        actionLabel="Configurer mes coordonnées"
+        onAction={() => router.push('/settings/payout' as any)}
+      />
+    );
+  }
+
+  if (!hasShopLocation) {
+    return (
+      <RequirementGuardView
+        icon={<MapPin size={32} color={colors.status.infoDark} />}
+        title="Localisation de boutique requise"
+        description="Afin que vos acheteurs et les livreurs de Daloa puissent localiser vos articles et calculer la livraison, veuillez positionner votre boutique sur la carte."
+        actionLabel="Définir la position de ma boutique"
+        onAction={() => router.push('/settings/shop' as any)}
+      />
+    );
+  }
 
   const handleNext = () => {
     Haptics.selection();
@@ -53,7 +93,7 @@ export default function ListingCreateScreen() {
 
   const handlePrev = () => {
     Haptics.selection();
-    if (currentStep === 1) router.back();
+    if (currentStep === 1) safeBack(router, '/(tabs)');
     else setCurrentStep((p) => Math.max(1, p - 1));
   };
 
@@ -81,7 +121,7 @@ export default function ListingCreateScreen() {
       });
 
       Haptics.success();
-      Alert.alert('Annonce en ligne ! 🎉', 'Votre article est maintenant visible par tous les acheteurs à Daloa.', [
+      Alert.alert('Annonce en ligne !', 'Votre article est maintenant visible par tous les acheteurs à Daloa.', [
         { text: 'Voir l’annonce', onPress: () => router.replace(`/listing/${created.id}` as any) },
       ]);
     } catch (err: any) {

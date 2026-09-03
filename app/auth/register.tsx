@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Image } from 'react-native';
+import { View, ScrollView, StyleSheet, Image, Platform, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
+import { supabase } from '@daloa/api';
 import {
   colors,
   radii,
@@ -14,10 +15,12 @@ import {
   Input,
   KeyboardScreen,
   useAccent,
+  GoogleIcon,
 } from '@daloa/ui';
 import { DALOA_DISTRICTS } from '@daloa/config';
 import { User, Mail, Phone, Lock, MapPin, ArrowLeft, ShieldCheck } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
+import { safeBack } from '../../src/utils/navigation';
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
@@ -25,32 +28,69 @@ export default function RegisterScreen() {
   const accent = useAccent();
   const { register } = useAuth();
 
-  const [role, setRole] = useState<'buyer' | 'seller'>('buyer');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [district, setDistrict] = useState<string>(DALOA_DISTRICTS[0] || 'Centre-ville');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleRegister = async () => {
     if (!fullName.trim()) return setErrorMsg('Veuillez saisir votre nom complet');
     if (!email.trim() || !email.includes('@')) return setErrorMsg('Veuillez renseigner une adresse email valide');
-    if (!phone.trim()) return setErrorMsg('Veuillez saisir votre numéro de téléphone');
+    if (!phone.trim()) return setErrorMsg('Veuillez saisir votre numéro de téléphone WhatsApp');
     if (password.length < 6) return setErrorMsg('Le mot de passe doit comporter au moins 6 caractères');
 
     try {
       setIsLoading(true);
       setErrorMsg(null);
-      await register({ fullName: fullName.trim(), email: email.trim(), phone: phone.trim(), district, password, role });
+      await register({
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        district,
+        password,
+        role: 'buyer',
+      });
       Haptics.success();
-      if (router.canGoBack()) router.back();
-      else router.replace('/(tabs)/profile' as any);
+      safeBack(router, '/(tabs)/profile');
     } catch (err: any) {
       setErrorMsg(err.message || "Erreur lors de l'inscription. Veuillez réessayer.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setErrorMsg(null);
+      const redirectUrl =
+        Platform.OS === 'web' && typeof window !== 'undefined'
+          ? `${window.location.origin}/`
+          : 'daloamarket://auth/callback';
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.href = data.url;
+        } else {
+          await Linking.openURL(data.url);
+        }
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Impossible de s’inscrire avec Google.');
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -67,7 +107,12 @@ export default function RegisterScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.curvedHeader}
         >
-          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn} accessibilityLabel="Retour">
+          <AppPressable
+            onPress={() => safeBack(router, '/(tabs)/profile')}
+            rippleBorderless
+            style={styles.backBtn}
+            accessibilityLabel="Retour"
+          >
             <ArrowLeft size={18} color={colors.text.inverse} />
           </AppPressable>
 
@@ -79,7 +124,7 @@ export default function RegisterScreen() {
             Bienvenue !
           </AppText>
           <AppText variant="body" color={accent[100]}>
-            Créez votre compte DaloaMarket
+            Créez votre compte unique DaloaMarket
           </AppText>
         </LinearGradient>
 
@@ -93,26 +138,27 @@ export default function RegisterScreen() {
             </View>
           )}
 
-          {/* Rôle */}
-          <View style={styles.roleTabs}>
-            <AppPressable
-              haptic="selection"
-              onPress={() => setRole('buyer')}
-              style={[styles.roleTab, role === 'buyer' && styles.roleTabActive]}
-            >
-              <AppText variant="caption" color={role === 'buyer' ? accent[600] : colors.text.muted}>
-                🛍️ Acheteur
-              </AppText>
-            </AppPressable>
-            <AppPressable
-              haptic="selection"
-              onPress={() => setRole('seller')}
-              style={[styles.roleTab, role === 'seller' && styles.roleTabActive]}
-            >
-              <AppText variant="caption" color={role === 'seller' ? accent[600] : colors.text.muted}>
-                🏪 Vendeur / Boutique
-              </AppText>
-            </AppPressable>
+          {/* Bouton Google OAuth */}
+          <AppPressable
+            haptic="light"
+            onPress={handleGoogleRegister}
+            disabled={isGoogleLoading}
+            style={styles.googleBtn}
+            accessibilityLabel="Continuer avec Google"
+          >
+            <GoogleIcon size={18} />
+            <AppText variant="bodyStrong" color={colors.text.body}>
+              {isGoogleLoading ? 'Inscription Google…' : 'Continuer avec Google'}
+            </AppText>
+          </AppPressable>
+
+          {/* Séparateur */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <AppText variant="caption" color={colors.text.subtle} style={styles.dividerText}>
+              OU AVEC VOTRE EMAIL
+            </AppText>
+            <View style={styles.dividerLine} />
           </View>
 
           <Input
@@ -122,17 +168,19 @@ export default function RegisterScreen() {
             onChangeText={setFullName}
             leftIcon={<User size={16} color={colors.text.subtle} />}
           />
+
           <Input
             label="Adresse email *"
-            placeholder="vous@exemple.com"
+            placeholder="jean.kouassi@gmail.com"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
             leftIcon={<Mail size={16} color={colors.text.subtle} />}
           />
+
           <Input
-            label="Numéro WhatsApp / Téléphone *"
+            label="Numéro WhatsApp *"
             placeholder="07 01 02 03 04"
             value={phone}
             onChangeText={setPhone}
@@ -140,40 +188,13 @@ export default function RegisterScreen() {
             leftIcon={<Phone size={16} color={colors.text.subtle} />}
           />
 
-          {/* Quartier */}
-          <AppText variant="label" color={colors.text.body} style={styles.districtLabel}>
-            Quartier à Daloa *
-          </AppText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.districtScroll}>
-            {DALOA_DISTRICTS.map((d) => {
-              const isSelected = district === d;
-              return (
-                <AppPressable
-                  key={d}
-                  haptic="selection"
-                  onPress={() => setDistrict(d)}
-                  style={[
-                    styles.districtChip,
-                    isSelected && { backgroundColor: accent[50], borderColor: accent[300] },
-                  ]}
-                >
-                  <MapPin size={11} color={isSelected ? accent[600] : colors.text.muted} />
-                  <AppText variant="caption" color={isSelected ? accent[700] : colors.grey[600]}>
-                    {d}
-                  </AppText>
-                </AppPressable>
-              );
-            })}
-          </ScrollView>
-
           <Input
-            label="Mot de passe (6 caractères min) *"
-            placeholder="••••••••"
+            label="Mot de passe secret *"
+            placeholder="Au moins 6 caractères"
             value={password}
             onChangeText={setPassword}
             isPassword
             leftIcon={<Lock size={16} color={colors.text.subtle} />}
-            containerStyle={styles.passwordSpacing}
           />
 
           <Button
@@ -188,7 +209,7 @@ export default function RegisterScreen() {
 
           <View style={styles.loginRow}>
             <AppText variant="body" color={colors.text.muted}>
-              Vous avez déjà un compte ?{' '}
+              Déjà inscrit ?{' '}
             </AppText>
             <AppPressable haptic="none" onPress={() => router.replace('/auth/login' as any)}>
               <AppText variant="label" color={accent[600]}>
@@ -198,11 +219,11 @@ export default function RegisterScreen() {
           </View>
         </View>
 
-        {/* Garantie */}
-        <View style={styles.trustStrip}>
+        {/* Réassurance */}
+        <View style={styles.trustFooter}>
           <ShieldCheck size={14} color={colors.status.successDark} />
-          <AppText variant="caption" color={colors.text.muted} center style={styles.trustText}>
-            En vous inscrivant, vous acceptez les CGU et bénéficiez de la protection séquestre.
+          <AppText variant="caption" color={colors.text.muted}>
+            Sécurisé par le protocole séquestre DaloaMarket
           </AppText>
         </View>
       </ScrollView>
@@ -259,7 +280,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing[4],
     marginTop: -28,
     borderRadius: radii['2xl'],
-    padding: spacing[4],
+    padding: spacing[5],
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -276,51 +297,59 @@ const styles = StyleSheet.create({
     padding: spacing[3],
     marginBottom: spacing[3],
   },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: radii.xl,
+    backgroundColor: colors.bg.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border.DEFAULT,
+    gap: spacing[2],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing[3],
+    gap: spacing[2],
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border.subtle,
+  },
+  dividerText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   roleTabs: {
     flexDirection: 'row',
     backgroundColor: colors.bg.subtle,
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     padding: 3,
     marginBottom: spacing[3],
     gap: 4,
   },
   roleTab: {
     flex: 1,
+    paddingVertical: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing[2],
-    borderRadius: radii.lg,
-    overflow: 'hidden',
+    borderRadius: radii.md,
   },
   roleTabActive: {
     backgroundColor: colors.bg.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 2,
     elevation: 1,
-  },
-  districtLabel: {
-    marginBottom: 5,
-  },
-  districtScroll: {
-    gap: 6,
-    paddingBottom: spacing[3],
-  },
-  districtChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg.subtle,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    paddingHorizontal: spacing[3],
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    gap: 4,
-    overflow: 'hidden',
-  },
-  passwordSpacing: {
-    marginTop: spacing[1],
   },
   submitBtn: {
     marginTop: spacing[2],
@@ -329,17 +358,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing[3],
+    marginTop: spacing[4],
   },
-  trustStrip: {
+  trustFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: spacing[6],
-    marginTop: spacing[3],
     gap: 6,
-  },
-  trustText: {
-    flexShrink: 1,
+    marginTop: spacing[4],
   },
 });

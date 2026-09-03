@@ -6,17 +6,19 @@ import { useRouter } from 'expo-router';
 import { notificationsService } from '@daloa/api';
 import { useAuth } from '../context/AuthContext';
 
-// Affiche les notifications même app au premier plan.
-Notifications.setNotificationHandler({
-  handleNotification: async () =>
-    ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    } as any),
-});
+// Affiche les notifications même app au premier plan (iOS / Android uniquement).
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () =>
+      ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      } as any),
+  });
+}
 
 /**
  * Enregistre l'appareil pour les notifications push (Expo) dès qu'un utilisateur
@@ -28,8 +30,9 @@ export function usePushNotifications() {
   const router = useRouter();
   const responseSub = useRef<Notifications.Subscription | null>(null);
 
-  // 1. Enregistrement du token à la connexion.
+  // 1. Enregistrement du token à la connexion (désactivé sur web pour éviter le warning VAPID).
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     if (!user?.id) return;
 
     (async () => {
@@ -65,8 +68,9 @@ export function usePushNotifications() {
     })();
   }, [user?.id]);
 
-  // 2. Tap sur une notification → navigation contextuelle.
+  // 2. Tap sur une notification → navigation contextuelle (iOS / Android uniquement).
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     responseSub.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as any;
       if (data?.orderId) {

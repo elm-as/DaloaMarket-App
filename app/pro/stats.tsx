@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '@daloa/api';
 import { colors, radii, spacing, StatCard, Card, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { Eye, TrendingUp, ShoppingBag, LayoutGrid, ArrowLeft } from 'lucide-react-native';
+import { Eye, TrendingUp, ShoppingBag, LayoutGrid, ArrowLeft, Camera, Share2 } from 'lucide-react-native';
 import { formatFCFA } from '@daloa/utils';
 
 interface SellerStats {
@@ -146,18 +146,24 @@ export default function StatsScreen() {
 
         <AppText variant="subtitle">Conseils pour vendre plus vite</AppText>
         <Card style={styles.tipsCard}>
-          <AppText variant="bodyStrong" style={styles.tipTitle}>
-            📸 Photos nettes et lumineuses
-          </AppText>
+          <View style={styles.tipHeaderRow}>
+            <Camera size={15} color={accent[600]} />
+            <AppText variant="bodyStrong">
+              Photos nettes et lumineuses
+            </AppText>
+          </View>
           <AppText variant="caption" color={colors.text.muted}>
             Les annonces avec 3 photos ou plus et un fond dégagé reçoivent 3 fois plus de contacts.
           </AppText>
 
           <View style={styles.tipGap} />
 
-          <AppText variant="bodyStrong" style={styles.tipTitle}>
-            📲 Partagez sur WhatsApp
-          </AppText>
+          <View style={styles.tipHeaderRow}>
+            <Share2 size={15} color={accent[600]} />
+            <AppText variant="bodyStrong">
+              Partagez sur WhatsApp
+            </AppText>
+          </View>
           <AppText variant="caption" color={colors.text.muted}>
             Partagez le lien de votre vitrine dans votre statut le matin entre 8h30 et 10h pour capter les acheteurs.
           </AppText>
@@ -228,6 +234,12 @@ const styles = StyleSheet.create({
   },
   tipsCard: {
     padding: spacing[4],
+  },
+  tipHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 4,
   },
   tipTitle: {
     marginBottom: 2,
