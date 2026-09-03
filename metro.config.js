@@ -18,10 +18,21 @@ config.watchFolders = [
   path.resolve(packagesDir, 'utils'),
 ];
 
-// 2. Extra node modules
+// 2. Résolution node_modules
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
+
+// 3. Désactiver package exports qui charge les versions Node de Supabase
+config.resolver.unstable_enablePackageExports = false;
+
+// 4. Extra node modules avec shims pour l'environnement React Native
 config.resolver.extraNodeModules = {
   react: path.resolve(projectRoot, 'node_modules/react'),
   'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
+  stream: path.resolve(projectRoot, 'src/shims/stream.js'),
+  ws: path.resolve(projectRoot, 'src/shims/ws.js'),
   '@daloa/ui': path.resolve(packagesDir, 'ui'),
   '@daloa/api': path.resolve(packagesDir, 'api'),
   '@daloa/types': path.resolve(packagesDir, 'types'),
