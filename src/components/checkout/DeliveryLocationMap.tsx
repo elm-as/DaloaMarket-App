@@ -2,9 +2,9 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { DALOA_CENTER } from '@daloa/config';
+import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
 import { MapPin, Navigation, LocateFixed } from 'lucide-react-native';
-import { haversineDistance, Haptics } from '@daloa/utils';
+import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics } from '@daloa/utils';
 
 interface DeliveryLocationMapProps {
   latitude: number | null;
@@ -26,22 +26,36 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
   const currentLng = longitude ?? DALOA_CENTER.lng;
   const [isLocating, setIsLocating] = useState(false);
 
-  // Calcul dynamique de la distance entre le vendeur et le point de livraison
-  const distanceKm = useMemo(() => {
+  const [routeInfo, setRouteInfo] = useState<DrivingRouteResult>({
+    distanceKm: 2.5,
+    distanceMeters: 2500,
+    durationMinutes: 7,
+    coordinates: [],
+    isRoadNetwork: false,
+  });
+
+  // Calcul dynamique de l'itinéraire routier réel (Mapbox avec replis automatiques)
+  useEffect(() => {
+    let active = true;
     const sLat = sellerCoords?.latitude ?? DALOA_CENTER.lat;
     const sLng = sellerCoords?.longitude ?? DALOA_CENTER.lng;
-    const dist = haversineDistance(
+
+    getDrivingRoute(
       { latitude: sLat, longitude: sLng },
       { latitude: currentLat, longitude: currentLng }
-    );
-    return Math.max(0.5, Math.round(dist * 10) / 10);
-  }, [sellerCoords, currentLat, currentLng]);
+    ).then((res) => {
+      if (active) {
+        setRouteInfo(res);
+        if (onDistanceChange) {
+          onDistanceChange(res.distanceKm);
+        }
+      }
+    });
 
-  useEffect(() => {
-    if (onDistanceChange) {
-      onDistanceChange(distanceKm);
-    }
-  }, [distanceKm, onDistanceChange]);
+    return () => {
+      active = false;
+    };
+  }, [sellerCoords, currentLat, currentLng, onDistanceChange]);
 
   const handleLocateMe = async () => {
     try {
@@ -56,8 +70,13 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     }
   };
 
-  // HTML autonome Leaflet pour Web et WebView
+  // HTML autonome Leaflet & Mapbox pour Web et WebView
   const mapHtml = useMemo(() => {
+    const sLat = sellerCoords?.latitude ?? null;
+    const sLng = sellerCoords?.longitude ?? null;
+    const hasSeller = sLat != null && sLng != null;
+    const leafletCoords = (routeInfo.coordinates || []).map(([lng, lat]) => [lat, lng]);
+
     return `
       <!DOCTYPE html>
       <html>
@@ -80,13 +99,34 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
           var map = L.map('map', { zoomControl: false }).setView([lat, lng], 14);
           L.control.zoom({ position: 'topright' }).addTo(map);
 
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          var mapboxUrl = 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${MAPBOX_PUBLIC_TOKEN}';
+          L.tileLayer(mapboxUrl, {
             maxZoom: 19,
-            attribution: '© OpenStreetMap'
+            attribution: '© Mapbox © OpenStreetMap',
+            tileSize: 512,
+            zoomOffset: -1
           }).addTo(map);
 
           var marker = L.marker([lat, lng], { draggable: true }).addTo(map);
           marker.bindPopup("<b>Lieu de livraison</b><br>Glissez pour ajuster").openPopup();
+
+          ${hasSeller ? `
+          var sellerMarker = L.circleMarker([${sLat}, ${sLng}], {
+            radius: 8,
+            fillColor: '#10B981',
+            color: '#FFFFFF',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+          }).addTo(map);
+          sellerMarker.bindPopup("<b>Boutique Vendeur</b>");
+          ` : ''}
+
+          var routeCoords = ${JSON.stringify(leafletCoords)};
+          if (routeCoords && routeCoords.length > 0) {
+            var polyline = L.polyline(routeCoords, { color: '${accent.DEFAULT}', weight: 4, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+            map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+          }
 
           function notifyParent(newLat, newLng) {
             if (window.parent) {
@@ -107,7 +147,7 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
       </body>
       </html>
     `;
-  }, [currentLat, currentLng]);
+  }, [currentLat, currentLng, sellerCoords, routeInfo.coordinates, accent.DEFAULT]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -188,10 +228,13 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
       <View style={styles.distanceBanner}>
         <Navigation size={14} color={accent.DEFAULT} />
         <AppText variant="caption" color={colors.text.body} style={styles.flex1}>
-          Distance estimée vendeur : <AppText variant="caption" style={styles.boldText}>{distanceKm} km</AppText>
+          Itinéraire routier : <AppText variant="caption" style={styles.boldText}>{routeInfo.distanceKm} km</AppText>
+          {routeInfo.durationMinutes ? ` · ~${routeInfo.durationMinutes} min` : ''}
         </AppText>
         <View style={styles.badgeLive}>
-          <AppText variant="overline" color={colors.status.successDark}>TARIF EN DIRECT</AppText>
+          <AppText variant="overline" color={colors.status.successDark}>
+            {routeInfo.isRoadNetwork ? 'ROUTE RÉELLE' : 'TARIF EN DIRECT'}
+          </AppText>
         </View>
       </View>
     </View>

@@ -12,6 +12,12 @@ export const DALOA_GEOFENCE_RADIUS_KM = 18;
 /** Distance maximale autorisée pour valider un OTP par GPS (100 mètres) */
 export const MAX_OTP_GPS_DISTANCE_METERS = 100;
 
+/** Token d'accès public Mapbox pour le rendu de carte et le routage */
+export const MAPBOX_PUBLIC_TOKEN =
+  process.env.EXPO_PUBLIC_MAPBOX_TOKEN ||
+  process.env.VITE_MAPBOX_TOKEN ||
+  '';
+
 /** Liste exhaustive des quartiers de Daloa */
 export const DALOA_DISTRICTS = [
   // Quartiers majeurs / très fréquentés

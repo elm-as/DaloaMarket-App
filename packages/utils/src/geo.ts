@@ -1,4 +1,4 @@
-import { DALOA_CENTER, DALOA_GEOFENCE_RADIUS_KM, MAX_OTP_GPS_DISTANCE_METERS } from '@daloa/config';
+import { DALOA_CENTER, DALOA_GEOFENCE_RADIUS_KM, MAX_OTP_GPS_DISTANCE_METERS, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
 import { Coordinates } from '@daloa/types';
 
 /**
@@ -62,5 +62,122 @@ export function isWithinOtpProximity(
   return {
     isWithin: distanceMeters <= maxDistanceMeters,
     distanceMeters,
+  };
+}
+
+export interface DrivingRouteResult {
+  /** Distance routière réelle en kilomètres (arrondie à 1 décimale) */
+  distanceKm: number;
+  /** Distance routière en mètres */
+  distanceMeters: number;
+  /** Durée estimée du trajet en minutes (en moto / circulation normale) */
+  durationMinutes: number;
+  /** Tableau de coordonnées [longitude, latitude] pour tracer la route sur la carte */
+  coordinates: [number, number][];
+  /** Vrai si l'itinéraire provient du réseau routier réel, faux si estimation */
+  isRoadNetwork: boolean;
+}
+
+/**
+ * Calcule l'itinéraire routier réel entre deux points GPS via Mapbox Directions API,
+ * avec bascule transparente de secours vers OpenStreetMap/OSRM puis Haversine.
+ */
+export async function getDrivingRoute(
+  origin: { lat?: number | null; latitude?: number | null; lng?: number | null; longitude?: number | null },
+  destination: { lat?: number | null; latitude?: number | null; lng?: number | null; longitude?: number | null },
+  customToken?: string
+): Promise<DrivingRouteResult> {
+  const lat1 = origin.lat ?? origin.latitude;
+  const lon1 = origin.lng ?? origin.longitude;
+  const lat2 = destination.lat ?? destination.latitude;
+  const lon2 = destination.lng ?? destination.longitude;
+
+  if (
+    lat1 == null ||
+    lon1 == null ||
+    lat2 == null ||
+    lon2 == null ||
+    !Number.isFinite(lat1) ||
+    !Number.isFinite(lon1) ||
+    !Number.isFinite(lat2) ||
+    !Number.isFinite(lon2)
+  ) {
+    return {
+      distanceKm: 2.5,
+      distanceMeters: 2500,
+      durationMinutes: 7,
+      coordinates: [],
+      isRoadNetwork: false,
+    };
+  }
+
+  const token = customToken || MAPBOX_PUBLIC_TOKEN;
+
+  // 1. Mapbox Directions API (haute précision, 100 000 requêtes gratuites/mois)
+  if (token) {
+    try {
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${lon1},${lat1};${lon2},${lat2}?geometries=geojson&overview=full&access_token=${token}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.routes && data.routes[0]) {
+          const r = data.routes[0];
+          const distKm = Math.round((r.distance / 1000) * 10) / 10;
+          return {
+            distanceKm: Math.max(0.5, distKm),
+            distanceMeters: Math.round(r.distance),
+            durationMinutes: Math.max(1, Math.round(r.duration / 60)),
+            coordinates: r.geometry.coordinates || [],
+            isRoadNetwork: true,
+          };
+        }
+      }
+    } catch {
+      // repli OSRM
+    }
+  }
+
+  // 2. Repli OpenStreetMap / OSRM public
+  try {
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(osrmUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.routes && data.routes[0]) {
+        const r = data.routes[0];
+        const distKm = Math.round((r.distance / 1000) * 10) / 10;
+        return {
+          distanceKm: Math.max(0.5, distKm),
+          distanceMeters: Math.round(r.distance),
+          durationMinutes: Math.max(1, Math.round(r.duration / 60)),
+          coordinates: r.geometry.coordinates || [],
+          isRoadNetwork: true,
+        };
+      }
+    }
+  } catch {
+    // repli Haversine
+  }
+
+  // 3. Repli de secours : distance à vol d'oiseau majorée de 30% (coefficient standard urbain Daloa)
+  const straightKm = haversineDistance(origin, destination);
+  const roadEstKm = Math.round(straightKm * 1.3 * 10) / 10;
+  return {
+    distanceKm: Math.max(0.5, roadEstKm),
+    distanceMeters: Math.round(roadEstKm * 1000),
+    durationMinutes: Math.max(2, Math.round(roadEstKm * 2.5)),
+    coordinates: [
+      [lon1, lat1],
+      [lon2, lat2],
+    ],
+    isRoadNetwork: false,
   };
 }
