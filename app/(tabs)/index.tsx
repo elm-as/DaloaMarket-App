@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, StyleSheet, RefreshControl, Image, ActivityIndicator, ScrollView } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
@@ -37,15 +37,21 @@ export default function HomeScreen() {
   const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
   const { gridColumns } = useResponsive();
 
+  const filters = useMemo(
+    () => (selectedCategory ? { category: selectedCategory } : {}),
+    [selectedCategory]
+  );
+
   const {
     data,
     isLoading,
+    isError,
     refetch,
     isRefetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfiniteListings({ category: selectedCategory || undefined });
+  } = useInfiniteListings(filters);
 
   const { data: favoriteListings } = useFavoriteListings(user?.id);
 
@@ -115,6 +121,22 @@ export default function HomeScreen() {
     ),
     [getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
   );
+
+  const isFetchingNextRef = useRef(false);
+
+  const handleEndReached = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage || isFetchingNextRef.current) return;
+    isFetchingNextRef.current = true;
+    fetchNextPage()
+      .catch((err) => {
+        console.warn('Erreur chargement page suivante:', err);
+      })
+      .finally(() => {
+        setTimeout(() => {
+          isFetchingNextRef.current = false;
+        }, 500);
+      });
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const ListHeader = (
     <View>
@@ -228,10 +250,8 @@ export default function HomeScreen() {
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary.DEFAULT} colors={[colors.primary.DEFAULT]} />
           }
-          onEndReached={() => {
-            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
-          }}
-          onEndReachedThreshold={0.5}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.2}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <AppText variant="bodyStrong" center>
@@ -246,6 +266,17 @@ export default function HomeScreen() {
             isFetchingNextPage ? (
               <View style={styles.footer}>
                 <ActivityIndicator color={colors.primary.DEFAULT} />
+                <AppText variant="caption" color={colors.text.subtle} style={styles.footerText}>
+                  Chargement de la suite...
+                </AppText>
+              </View>
+            ) : isError ? (
+              <View style={styles.footer}>
+                <AppPressable onPress={handleEndReached} style={styles.retryBtn}>
+                  <AppText variant="caption" color={colors.primary.DEFAULT}>
+                    Échec de chargement · Toucher pour réessayer
+                  </AppText>
+                </AppPressable>
               </View>
             ) : null
           }
@@ -394,5 +425,18 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingVertical: spacing[4],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    marginTop: spacing[1],
+  },
+  retryBtn: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    borderRadius: radii.full,
+    backgroundColor: colors.bg.subtle,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
   },
 });

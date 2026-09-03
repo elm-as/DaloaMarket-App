@@ -12,7 +12,7 @@ export const listingsService = {
   ): Promise<{ data: ListingFull[]; hasMore: boolean }> {
     let query = supabase
       .from('listings')
-      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at)', { count: 'exact' })
+      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at)')
       .eq('status', filters.status || 'active');
 
     if (filters.category) {
@@ -57,18 +57,34 @@ export const listingsService = {
     }
 
     const from = page * pageSize;
-    const to = from + pageSize - 1;
-    const { data, count, error } = await query.range(from, to);
+    // On charge pageSize + 1 éléments pour déterminer hasMore sans exécuter un lourd SELECT count(*)
+    const to = from + pageSize;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    let data: any[] | null = null;
+    let error: any = null;
+
+    try {
+      const res = await query.range(from, to).abortSignal(controller.signal);
+      data = res.data;
+      error = res.error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (error) throw error;
 
-    const formattedData: ListingFull[] = (data || []).map((item: any) => ({
+    const rawList = data || [];
+    const hasMore = rawList.length > pageSize;
+    const pageItems = hasMore ? rawList.slice(0, pageSize) : rawList;
+
+    const formattedData: ListingFull[] = pageItems.map((item: any) => ({
       ...item,
       seller: item.users || null,
       variants: Array.isArray(item.variants) ? item.variants : [],
     }));
-
-    const hasMore = count != null ? from + formattedData.length < count : formattedData.length === pageSize;
 
     return { data: formattedData, hasMore };
   },

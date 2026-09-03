@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchX } from 'lucide-react-native';
 import { useInfiniteListings, analyticsService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
-import { colors, radii, spacing, ListingCard, Skeleton, EmptyState, useResponsive } from '@daloa/ui';
+import { colors, radii, spacing, ListingCard, Skeleton, EmptyState, useResponsive, AppText, AppPressable } from '@daloa/ui';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { Haptics } from '@daloa/utils';
@@ -50,19 +50,25 @@ export default function SearchScreen() {
   const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
   const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
 
+  const searchFilters = useMemo(
+    () => ({
+      category: filters.category || undefined,
+      district: filters.district || undefined,
+      condition: filters.condition || undefined,
+      minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
+      maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
+    }),
+    [filters.category, filters.district, filters.condition, filters.minPrice, filters.maxPrice]
+  );
+
   const {
     data: listingsData,
     isLoading,
+    isError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfiniteListings({
-    category: filters.category || undefined,
-    district: filters.district || undefined,
-    condition: filters.condition || undefined,
-    minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
-    maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
-  });
+  } = useInfiniteListings(searchFilters);
 
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
 
@@ -171,6 +177,22 @@ export default function SearchScreen() {
     [getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
   );
 
+  const isFetchingNextRef = useRef(false);
+
+  const handleEndReached = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage || isFetchingNextRef.current) return;
+    isFetchingNextRef.current = true;
+    fetchNextPage()
+      .catch((err) => {
+        console.warn('Erreur chargement page suivante (recherche):', err);
+      })
+      .finally(() => {
+        setTimeout(() => {
+          isFetchingNextRef.current = false;
+        }, 500);
+      });
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* 1. Header & Filtres Rapides */}
@@ -205,14 +227,23 @@ export default function SearchScreen() {
           keyExtractor={(item: any) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          onEndReached={() => {
-            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
-          }}
-          onEndReachedThreshold={0.5}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.2}
           ListFooterComponent={
             isFetchingNextPage ? (
               <View style={styles.footer}>
                 <ActivityIndicator color={colors.primary.DEFAULT} />
+                <AppText variant="caption" color={colors.text.subtle} style={styles.footerText}>
+                  Chargement de la suite...
+                </AppText>
+              </View>
+            ) : isError ? (
+              <View style={styles.footer}>
+                <AppPressable onPress={handleEndReached} style={styles.retryBtn}>
+                  <AppText variant="caption" color={colors.primary.DEFAULT}>
+                    Échec de chargement · Toucher pour réessayer
+                  </AppText>
+                </AppPressable>
               </View>
             ) : null
           }
@@ -287,5 +318,18 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingVertical: spacing[4],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    marginTop: spacing[1],
+  },
+  retryBtn: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    borderRadius: radii.full,
+    backgroundColor: colors.bg.subtle,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
   },
 });
