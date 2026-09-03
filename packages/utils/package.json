@@ -1,0 +1,19 @@
+{
+  "name": "@daloa/utils",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@daloa/config": "file:../config",
+    "@daloa/types": "file:../types",
+    "expo-haptics": "~15.0.8",
+    "expo-secure-store": "~15.0.8",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

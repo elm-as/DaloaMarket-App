@@ -7,24 +7,26 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// 1. Regarder tous les dossiers du monorepo
-config.watchFolders = [workspaceRoot];
+const packagesDir = path.resolve(projectRoot, 'packages');
 
-// 2. Résolution stricte à instance unique (empêche le conflit Dual React et findNodeHandle)
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
+// 1. Regarder les packages locaux du projet
+config.watchFolders = [
+  path.resolve(packagesDir, 'ui'),
+  path.resolve(packagesDir, 'api'),
+  path.resolve(packagesDir, 'types'),
+  path.resolve(packagesDir, 'config'),
+  path.resolve(packagesDir, 'utils'),
 ];
 
-
+// 2. Extra node modules
 config.resolver.extraNodeModules = {
   react: path.resolve(projectRoot, 'node_modules/react'),
   'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
-  '@daloa/ui': path.resolve(workspaceRoot, 'packages/ui'),
-  '@daloa/api': path.resolve(workspaceRoot, 'packages/api'),
-  '@daloa/types': path.resolve(workspaceRoot, 'packages/types'),
-  '@daloa/config': path.resolve(workspaceRoot, 'packages/config'),
-  '@daloa/utils': path.resolve(workspaceRoot, 'packages/utils'),
+  '@daloa/ui': path.resolve(packagesDir, 'ui'),
+  '@daloa/api': path.resolve(packagesDir, 'api'),
+  '@daloa/types': path.resolve(packagesDir, 'types'),
+  '@daloa/config': path.resolve(packagesDir, 'config'),
+  '@daloa/utils': path.resolve(packagesDir, 'utils'),
 };
 
 // 3. Cache local isolé pour éviter les verrous Windows Temp
