@@ -133,7 +133,7 @@ export function CheckoutStepPayment({
       {/* Boutons de navigation */}
       <View style={styles.navRow}>
         <Button
-          title="Précédent"
+          title="Retour"
           variant="outline"
           size="lg"
           leftIcon={<ArrowLeft size={16} color={colors.text.body} />}

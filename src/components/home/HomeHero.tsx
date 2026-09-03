@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Sparkles, Plus, ShieldCheck, MapPin, Search, ArrowRight } from 'lucide-react-native';
+import { Sparkles, Plus, ShieldCheck, MapPin } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 export const HomeHero: React.FC = () => {
@@ -36,28 +36,12 @@ export const HomeHero: React.FC = () => {
           Achetez et vendez en toute confiance. Paiement séquestre garanti et livraison rapide.
         </AppText>
 
-        {/* Recherche */}
-        <AppPressable haptic="none" onPress={() => router.push('/(tabs)/search' as any)} style={styles.searchBar}>
-          <View style={[styles.searchIconBox, { backgroundColor: accent[50] }]}>
-            <Search size={14} color={accent[600]} />
-          </View>
-          <AppText variant="caption" color={colors.text.subtle} style={styles.searchFlex}>
-            Rechercher un produit, un quartier...
-          </AppText>
-          <View style={[styles.explorerBadge, { backgroundColor: accent[50] }]}>
-            <AppText variant="overline" color={accent[600]}>
-              Explorer
-            </AppText>
-            <ArrowRight size={11} color={accent[600]} />
-          </View>
-        </AppPressable>
-
         {/* Actions */}
         <View style={styles.buttonsRow}>
           <AppPressable onPress={() => router.push('/listing/create' as any)} style={styles.primaryBtn}>
             <Plus size={15} color={accent[600]} strokeWidth={3} />
-            <AppText variant="label" color={accent[600]}>
-              Publier une annonce
+            <AppText variant="label" color={accent[600]} numberOfLines={1}>
+              Publier
             </AppText>
           </AppPressable>
 
@@ -164,7 +148,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   primaryBtn: {
-    flex: 1.2,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

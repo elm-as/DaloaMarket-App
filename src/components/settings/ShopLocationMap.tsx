@@ -194,15 +194,12 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing[2],
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing[2],
   },
   warningBanner: {
     flexDirection: 'row',
@@ -219,17 +216,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titleWrap: {
-    flex: 1,
-    gap: 1,
+    gap: 2,
   },
   gpsQuickBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    justifyContent: 'center',
+    paddingHorizontal: spacing[2],
+    paddingVertical: 10,
     borderRadius: radii.lg,
     borderWidth: 1,
-    gap: 4,
+    gap: 6,
   },
   gpsBtnText: {
     fontWeight: '700',

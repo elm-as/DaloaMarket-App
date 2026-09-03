@@ -2,9 +2,104 @@ import { ENV_CONFIG } from '@daloa/config';
 import { PaymentIntentRequest, PaymentIntentResponse, PayoutRequest } from '@daloa/types';
 import { supabase } from '../supabase';
 
+export type PaymentType =
+  | 'seller_badge'
+  | 'listing_pack_10'
+  | 'order'
+  | 'credits_pack_5'
+  | 'credits_pack_12'
+  | 'credits_pack_30';
+
+export interface InitiatePaymentInput {
+  type: PaymentType;
+  amount: number;
+  userId: string;
+  customerName: string;
+  customerPhone: string;
+  metadata?: Record<string, unknown>;
+  orderInput?: Record<string, unknown>;
+  orderInputs?: Record<string, unknown>[];
+}
+
+export interface InitiatePaymentResult {
+  success: boolean;
+  paymentUrl: string;
+  token?: string;
+  transactionId?: string;
+  message?: string;
+}
+
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const paymentService = {
   /**
-   * Crée une intention de paiement Money Fusion (Wave, Orange, MTN, Moov)
+   * Initie un paiement Money Fusion via le serveur (badge Pro, packs, crédits…).
+   * Contrat aligné sur le serveur railway : POST /create-payment.
+   */
+  async initiatePayment(input: InitiatePaymentInput): Promise<InitiatePaymentResult> {
+    const token = await getAccessToken();
+    const response = await fetch(`${ENV_CONFIG.PAYMENT_API_URL}/create-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(input),
+    });
+
+    const data = await response.json().catch(() => ({} as any));
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || 'Échec de l’initialisation du paiement.');
+    }
+
+    // Non-order renvoie paymentUrl ; order renvoie payment_url.
+    const paymentUrl = data.paymentUrl || data.payment_url || '';
+    return {
+      success: true,
+      paymentUrl,
+      token: data.token,
+      transactionId: data.transactionId,
+    };
+  },
+
+  /**
+   * Vérifie un paiement par transactionId (escrow) auprès du serveur.
+   * Renvoie l'order_id une fois la commande créée côté serveur après paiement.
+   */
+  async checkPaymentByTransaction(
+    transactionId: string
+  ): Promise<{ status: string; isPaid: boolean; orderId: string | null }> {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(
+        `${ENV_CONFIG.PAYMENT_API_URL}/check-payment?transactionId=${encodeURIComponent(transactionId)}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          status: data.status || 'pending',
+          isPaid: data.status === 'paid',
+          orderId: data.order_id || null,
+        };
+      }
+    } catch (err) {
+      console.warn('Vérification paiement (transaction) échouée:', err);
+    }
+    return { status: 'pending', isPaid: false, orderId: null };
+  },
+
+  /**
+   * @deprecated Ancien contrat (/payment/create) non conforme au serveur.
+   * Conservé temporairement ; le tunnel commande doit migrer vers initiatePayment
+   * avec type:'order' (le serveur crée alors la commande lui-même).
    */
   async createPaymentIntent(payload: PaymentIntentRequest): Promise<PaymentIntentResponse> {
     try {

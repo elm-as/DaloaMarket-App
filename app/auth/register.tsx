@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Image, Platform, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
-import { supabase } from '@daloa/api';
+import { signInWithGoogle } from '../../src/lib/googleAuth';
 import {
   colors,
   radii,
@@ -67,26 +67,7 @@ export default function RegisterScreen() {
     try {
       setIsGoogleLoading(true);
       setErrorMsg(null);
-      const redirectUrl =
-        Platform.OS === 'web' && typeof window !== 'undefined'
-          ? `${window.location.origin}/`
-          : 'daloamarket://auth/callback';
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-
-      if (error) throw error;
-      if (data?.url) {
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.location.href = data.url;
-        } else {
-          await Linking.openURL(data.url);
-        }
-      }
+      await signInWithGoogle();
     } catch (err: any) {
       setErrorMsg(err.message || 'Impossible de s’inscrire avec Google.');
     } finally {

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { PRICING_CONFIG } from '@daloa/config';
+import { paymentService } from '@daloa/api';
 import { colors, radii, spacing, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
+import { useAuth } from '../../src/context/AuthContext';
 
 const PERKS = [
   { title: 'Badge PRO certifié', desc: 'Renforcez la confiance des acheteurs sur toutes vos annonces.' },
@@ -21,20 +24,54 @@ export default function BecomeProScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
+  const { user, profile, refreshProfile } = useAuth();
   const [billingPlan, setBillingPlan] = useState<'monthly' | 'annual'>('monthly');
   const [isUpgrading, setIsUpgrading] = useState(false);
 
+  const planPrice =
+    billingPlan === 'annual'
+      ? PRICING_CONFIG.proSubscription.annualPrice
+      : PRICING_CONFIG.proSubscription.monthlyPrice;
+
   const handleSubscribe = async () => {
+    if (!user?.id) {
+      router.push('/auth/login' as any);
+      return;
+    }
     Haptics.success();
     setIsUpgrading(true);
-    setTimeout(() => {
-      setIsUpgrading(false);
+    try {
+      const result = await paymentService.initiatePayment({
+        type: 'seller_badge',
+        amount: planPrice,
+        userId: user.id,
+        customerName: profile?.full_name || 'Vendeur DaloaMarket',
+        customerPhone: profile?.phone || '',
+        metadata: { plan: billingPlan },
+      });
+
+      if (!result.paymentUrl) {
+        throw new Error('Lien de paiement indisponible. Réessayez.');
+      }
+
+      // Ouvre le paiement Mobile Money dans un navigateur in-app.
+      // L'activation Pro est faite côté serveur (webhook → confirm_seller_badge).
+      await WebBrowser.openBrowserAsync(result.paymentUrl);
+
+      // Laisse un instant au webhook, puis resynchronise le profil.
+      await new Promise((r) => setTimeout(r, 1500));
+      await refreshProfile();
+
       Alert.alert(
-        'Félicitations !',
-        'Votre compte est désormais Vendeur Pro. Vos privilèges sont immédiatement actifs.',
-        [{ text: 'Super !', onPress: () => router.replace('/(tabs)/profile' as any) }]
+        'Paiement lancé ✅',
+        'Dès la confirmation Mobile Money, votre Pass Vendeur Pro s’active automatiquement. Votre profil se mettra à jour dans un instant.',
+        [{ text: 'Compris', onPress: () => router.replace('/(tabs)/profile' as any) }]
       );
-    }, 1200);
+    } catch (err: any) {
+      Alert.alert('Paiement impossible', err.message || 'Une erreur est survenue. Réessayez.');
+    } finally {
+      setIsUpgrading(false);
+    }
   };
 
   return (

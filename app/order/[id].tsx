@@ -339,6 +339,37 @@ export default function OrderTrackingScreen() {
           </View>
         )}
 
+        {/* ── Articles de la commande (multi-articles) ── */}
+        {Array.isArray((order as any).order_items) && (order as any).order_items.length > 1 && (
+          <View style={styles.itemsCard}>
+            <AppText variant="bodyStrong" style={styles.itemsTitle}>
+              Articles ({(order as any).order_items.length})
+            </AppText>
+            {(order as any).order_items.map((it: any) => (
+              <View key={it.id} style={styles.itemRow}>
+                <Image
+                  source={{ uri: it.listing?.photos?.[0] }}
+                  style={styles.itemThumb}
+                  contentFit="cover"
+                  transition={150}
+                />
+                <View style={styles.itemInfo}>
+                  <AppText variant="caption" numberOfLines={2}>
+                    {it.listing?.title || 'Article'}
+                    {it.variant_label ? ` · ${it.variant_label}` : ''}
+                  </AppText>
+                  <AppText variant="caption" color={colors.text.muted}>
+                    {formatFCFA(it.unit_price)} × {it.quantity}
+                  </AppText>
+                </View>
+                <AppText variant="bodyStrong" color={accent[600]}>
+                  {formatFCFA(it.product_amount)}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* ── Code OTP vendeur : ramassage ── */}
         {isSeller &&
           pickupOtp &&
@@ -653,6 +684,33 @@ const styles = StyleSheet.create({
   },
   codeCard: {
     marginBottom: spacing[3],
+  },
+  itemsCard: {
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    padding: spacing[3],
+    gap: spacing[2],
+    marginBottom: spacing[3],
+  },
+  itemsTitle: {
+    marginBottom: 2,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  itemThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.bg.subtle,
+  },
+  itemInfo: {
+    flex: 1,
+    gap: 1,
   },
   paymentPendingCard: {
     backgroundColor: colors.status.warningLight,

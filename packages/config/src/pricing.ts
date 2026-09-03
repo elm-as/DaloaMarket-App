@@ -36,11 +36,13 @@ export const PRICING_CONFIG = {
     { id: 'gold', name: 'Pack Or', credits: 30, price: 2000, popular: false },
   ],
 
-  // Feature Flags de Phase 0 vs Phase 1 (Actuellement Phase 1 active)
+  // Feature Flags de Phase 0 vs Phase 1 (Actuellement Phase 0 active — tests/lancement)
+  // Phase 0 : tout gratuit et débloqué (boutique, COD, 0 commission). Repasser
+  // isFreeModeActive à false pour réactiver la Phase 1 (monétisation).
   phase0: {
-    isFreeModeActive: false,
-    maxFreeListingsPerUser: 20,
-    disableListingPublishFees: false,
+    isFreeModeActive: true,
+    maxFreeListingsPerUser: 999999,
+    disableListingPublishFees: true,
   },
 };
 

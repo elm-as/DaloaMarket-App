@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, Image, StyleProp, ViewStyle } from 'react-native';
+import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { Image } from 'expo-image';
 import { MapPin, Heart, ShoppingCart, Plus, Minus, Zap } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../tokens';
 import { useAccent } from '../theme/ThemeProvider';
@@ -107,7 +108,14 @@ export const ListingCard: React.FC<ListingCardProps> = ({
     <AppPressable onPress={onPress} haptic="none" pressedOpacity={0.95} style={[styles.container, style]}>
       {/* 1. Visuel Produit (Ratio 4/3) */}
       <View style={styles.imageContainer}>
-        <Image source={{ uri: mainPhoto }} style={styles.image} resizeMode="cover" />
+        <Image
+          source={{ uri: mainPhoto }}
+          style={styles.image}
+          contentFit="cover"
+          transition={150}
+          cachePolicy="memory-disk"
+          recyclingKey={listing.id}
+        />
 
         {/* Badges superposés à gauche */}
         <View style={styles.badgesOverlay}>

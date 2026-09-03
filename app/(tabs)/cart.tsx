@@ -32,15 +32,8 @@ export default function CartScreen() {
   const handleCheckout = () => {
     if (items.length === 0) return;
     Haptics.success();
-    const firstItem = items[0];
-    router.push({
-      pathname: '/checkout' as any,
-      params: {
-        listingId: firstItem.listing.id,
-        variantId: firstItem.variant?.id || '',
-        quantity: firstItem.quantity.toString(),
-      },
-    });
+    // Mode panier : le checkout lit tous les articles depuis le CartContext.
+    router.push({ pathname: '/checkout' as any, params: { cart: '1' } });
   };
 
   return (
