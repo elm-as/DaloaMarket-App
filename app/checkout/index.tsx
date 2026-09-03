@@ -67,7 +67,10 @@ export default function CheckoutScreen() {
   const [isDistrictPickerOpen, setIsDistrictPickerOpen] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [buyerPhone, setBuyerPhone] = useState<string>(profile?.phone || '');
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('online');
+  const isPhase0 = settings?.phaseConfig?.phase === 0 || PRICING_CONFIG.phase0.isFreeModeActive;
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
+    settings?.phaseConfig?.default_payment_method === 'cod' || isPhase0 ? 'cod' : 'online'
+  );
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

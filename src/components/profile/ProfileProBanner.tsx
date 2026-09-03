@@ -3,6 +3,8 @@ import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { useSystemSettings } from '@daloa/api';
+import { PRICING_CONFIG } from '@daloa/config';
 
 interface ProfileProBannerProps {
   isPro: boolean;
@@ -14,9 +16,11 @@ export const ProfileProBanner: React.FC<ProfileProBannerProps> = ({
   onBecomePro,
 }) => {
   const accent = useAccent();
+  const { data: settings } = useSystemSettings();
+  const isPhase0 = settings?.phaseConfig?.phase === 0 || PRICING_CONFIG.phase0.isFreeModeActive;
 
-  // Si l'utilisateur est déjà Pro, on n'affiche pas la bannière d'abonnement
-  if (isPro) return null;
+  // Si l'utilisateur est déjà Pro ou si l'application est en Phase 0 (gratuit pour tous), masquer la bannière
+  if (isPro || isPhase0) return null;
 
   return (
     <View style={styles.container}>

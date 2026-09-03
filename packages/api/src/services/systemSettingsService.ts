@@ -53,16 +53,16 @@ export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
 };
 
 export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
-  phase: 1,
+  phase: 0,
   allow_cod_for_all: true,
   allow_pickup_for_all: true,
-  allow_affiliated_deliverers_for_all: false,
-  max_free_listings: 20,
+  allow_affiliated_deliverers_for_all: true,
+  max_free_listings: 999999,
   enable_boost: true,
   enable_bump: true,
-  enable_seller_badge: true,
+  enable_seller_badge: false,
   default_payment_method: 'cod',
-  seller_fee_override: null,
+  seller_fee_override: 0,
 };
 
 export const systemSettingsService = {
