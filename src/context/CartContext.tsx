@@ -59,9 +59,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     Haptics.success();
     analyticsService.logEvent({
-      eventName: 'update_cart_variants',
+      eventName: 'add_to_cart',
       listingId: listing.id,
-      props: { category: listing.category, count: selections.length },
+      props: { action: 'update_cart_variants', category: listing.category, count: selections.length },
     });
 
     setItems((prev) => {
