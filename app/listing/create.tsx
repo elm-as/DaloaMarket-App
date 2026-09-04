@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { listingsService } from '@daloa/api';
-import { colors, spacing, Button, KeyboardScreen } from '@daloa/ui';
+import { colors, spacing, Button, KeyboardScreen, ConfirmDialog } from '@daloa/ui';
 import { ArrowRight, Check, CreditCard, MapPin } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
@@ -12,6 +12,7 @@ import { RequirementGuardView } from '../../src/components/common/RequirementGua
 import { WizardHero } from '../../src/components/create-wizard/WizardHero';
 import { StepMediaTitle } from '../../src/components/create-wizard/StepMediaTitle';
 import { StepCategoryPricing } from '../../src/components/create-wizard/StepCategoryPricing';
+import { StepVariantsSection, DraftVariant } from '../../src/components/create-wizard/StepVariantsSection';
 import { StepLocationDelivery } from '../../src/components/create-wizard/StepLocationDelivery';
 import { StepSummaryPreview } from '../../src/components/create-wizard/StepSummaryPreview';
 
@@ -32,11 +33,15 @@ export default function ListingCreateScreen() {
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('fashion');
   const [selectedCondition, setSelectedCondition] = useState('like_new');
+  const [variants, setVariants] = useState<DraftVariant[]>([]);
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState(profile?.district || 'Centre-ville');
   const [stock, setStock] = useState(1);
   const [acceptsDelivery, setAcceptsDelivery] = useState(true);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [createdListingId, setCreatedListingId] = useState<string | null>(null);
+  const [errorDialog, setErrorDialog] = useState<string | null>(null);
 
   if (!isAuthenticated || !user) {
     return (
@@ -118,16 +123,30 @@ export default function ListingCreateScreen() {
         stock,
         accepts_delivery: acceptsDelivery,
         photos: photos.length > 0 ? photos : [FALLBACK_PHOTO],
+        variants: variants.map((v) => ({
+          label: v.title,
+          price: v.price || null,
+          stock: v.stock || 1,
+          active: true,
+        })),
       });
 
       Haptics.success();
-      Alert.alert('Annonce en ligne !', 'Votre article est maintenant visible par tous les acheteurs à Daloa.', [
-        { text: 'Voir l’annonce', onPress: () => router.replace(`/listing/${created.id}` as any) },
-      ]);
+      setCreatedListingId(created.id);
+      setShowSuccessDialog(true);
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || 'Échec de la publication de votre annonce');
+      setErrorDialog(err.message || 'Échec de la publication de votre annonce');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGoToCreatedListing = () => {
+    setShowSuccessDialog(false);
+    if (createdListingId) {
+      router.replace(`/listing/${createdListingId}` as any);
+    } else {
+      router.replace('/(tabs)' as any);
     }
   };
 
@@ -141,7 +160,11 @@ export default function ListingCreateScreen() {
           onBack={handlePrev}
         />
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
           {currentStep === 1 && (
             <StepMediaTitle
               photos={photos}
@@ -162,6 +185,8 @@ export default function ListingCreateScreen() {
               setPrice={setPrice}
               originalPrice={originalPrice}
               setOriginalPrice={setOriginalPrice}
+              variants={variants}
+              onVariantsChange={setVariants}
             />
           )}
           {currentStep === 3 && (
@@ -208,6 +233,32 @@ export default function ListingCreateScreen() {
             />
           )}
         </View>
+
+        {/* Dialogue de succès stylisé */}
+        <ConfirmDialog
+          visible={showSuccessDialog}
+          type="info"
+          title="Annonce en ligne !"
+          message="Votre article est maintenant visible par tous les acheteurs à Daloa."
+          confirmText="Voir l'annonce"
+          cancelText="Fermer"
+          onConfirm={handleGoToCreatedListing}
+          onCancel={() => {
+            setShowSuccessDialog(false);
+            router.replace('/(tabs)' as any);
+          }}
+        />
+
+        {/* Dialogue d'erreur stylisé */}
+        <ConfirmDialog
+          visible={Boolean(errorDialog)}
+          type="danger"
+          title="Erreur de publication"
+          message={errorDialog || ''}
+          confirmText="Compris"
+          onConfirm={() => setErrorDialog(null)}
+          onCancel={() => setErrorDialog(null)}
+        />
       </View>
     </KeyboardScreen>
   );
@@ -219,7 +270,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.surface,
   },
   scrollContent: {
-    paddingBottom: spacing[10],
+    paddingBottom: 260,
   },
   bottomBar: {
     flexDirection: 'row',

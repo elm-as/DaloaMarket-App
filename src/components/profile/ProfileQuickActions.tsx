@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { PlusCircle, Package, Truck, Store, Share2 } from 'lucide-react-native';
+import { PlusCircle, Package, Truck, Store, Share2, Tag } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 interface ProfileQuickActionsProps {
   onPublishListing: () => void;
+  onOpenMyListings: () => void;
   onOpenOrders: () => void;
   onOpenDeliverers: () => void;
   onOpenShop: () => void;
@@ -13,6 +14,7 @@ interface ProfileQuickActionsProps {
 
 export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
   onPublishListing,
+  onOpenMyListings,
   onOpenOrders,
   onOpenDeliverers,
   onOpenShop,
@@ -34,9 +36,28 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
         </AppText>
       </AppPressable>
 
-      {/* Grille 2x2 des raccourcis marchands */}
+      {/* Grille des raccourcis marchands */}
       <View style={styles.grid}>
-        {/* 1. Mes commandes */}
+        {/* 1. Mes Annonces */}
+        <AppPressable
+          onPress={onOpenMyListings}
+          style={styles.gridCard}
+          accessibilityLabel="Gérer mes annonces"
+        >
+          <View style={[styles.cardIconBox, { backgroundColor: '#FEF3C7' }]}>
+            <Tag size={18} color="#D97706" />
+          </View>
+          <View style={styles.cardTexts}>
+            <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
+              Mes Annonces
+            </AppText>
+            <AppText variant="caption" color={colors.text.subtle} style={styles.cardSubtitle}>
+              Gérer & vendre
+            </AppText>
+          </View>
+        </AppPressable>
+
+        {/* 2. Mes commandes */}
         <AppPressable
           onPress={onOpenOrders}
           style={styles.gridCard}

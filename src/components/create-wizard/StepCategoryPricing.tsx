@@ -4,6 +4,7 @@ import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Tag 
 import { MARKET_CATEGORIES, LISTING_CONDITIONS } from '@daloa/config';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { formatFCFA } from '@daloa/utils';
+import { StepVariantsSection, DraftVariant } from './StepVariantsSection';
 
 interface StepCategoryPricingProps {
   selectedCategory: string;
@@ -14,6 +15,8 @@ interface StepCategoryPricingProps {
   setPrice: (p: string) => void;
   originalPrice: string;
   setOriginalPrice: (p: string) => void;
+  variants: DraftVariant[];
+  onVariantsChange: (variants: DraftVariant[]) => void;
 }
 
 const ICON_MAP: Record<string, React.FC<any>> = {
@@ -24,6 +27,7 @@ const ICON_MAP: Record<string, React.FC<any>> = {
   UtensilsCrossed,
   Dumbbell,
   BookOpen,
+  Tag,
 };
 
 const CONDITION_COLORS: Record<string, string> = {
@@ -49,6 +53,8 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
   setPrice,
   originalPrice,
   setOriginalPrice,
+  variants,
+  onVariantsChange,
 }) => {
   const accent = useAccent();
   const numPrice = parseFloat(price) || 0;
@@ -109,7 +115,11 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
                 onPress={() => setSelectedCondition(cond.id)}
                 style={[
                   styles.condRow,
-                  isSelected && { borderColor: dotColor, backgroundColor: dotColor + '10' },
+                  {
+                    borderColor: isSelected ? dotColor : colors.border.DEFAULT,
+                    borderWidth: isSelected ? 2 : 1.5,
+                    backgroundColor: isSelected ? dotColor + '12' : colors.bg.surface,
+                  },
                 ]}
               >
                 <View style={[styles.condDot, { backgroundColor: dotColor }]} />
@@ -121,15 +131,25 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
                     {CONDITION_DESC[cond.id]}
                   </AppText>
                 </View>
-                <View style={[
-                  styles.condRadio,
-                  isSelected && { borderColor: dotColor, backgroundColor: dotColor },
-                ]} />
+                <View
+                  style={[
+                    styles.condRadio,
+                    {
+                      borderColor: isSelected ? dotColor : colors.border.DEFAULT,
+                      backgroundColor: isSelected ? dotColor : 'transparent',
+                    },
+                  ]}
+                >
+                  {isSelected && <View style={styles.condRadioInner} />}
+                </View>
               </AppPressable>
             );
           })}
         </View>
       </View>
+
+      {/* ── Variantes ── */}
+      <StepVariantsSection basePrice={price} variants={variants} onVariantsChange={onVariantsChange} />
 
       {/* ── Prix ── */}
       <View style={styles.section}>
@@ -264,7 +284,15 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     borderWidth: 2,
     borderColor: colors.border.DEFAULT,
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
+  },
+  condRadioInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
   },
   // ─── Prix ───
   priceInputWrapper: {

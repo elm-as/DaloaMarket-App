@@ -25,6 +25,7 @@ import { HomeHero } from '../../src/components/home/HomeHero';
 import { HomeDeliveryBanner } from '../../src/components/home/HomeDeliveryBanner';
 import { HomeRecommendations } from '../../src/components/home/HomeRecommendations';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
+import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
 import { getRecommendationsForUser } from '../../src/lib/recommendationEngine';
 
 export default function HomeScreen() {
@@ -35,6 +36,7 @@ export default function HomeScreen() {
   const { isFavorited, toggleFavorite } = useFavorites();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
+  const [managingListing, setManagingListing] = useState<any | null>(null);
   const { gridColumns } = useResponsive();
 
   const activeListingInitialQuantities = useMemo(() => {
@@ -106,32 +108,38 @@ export default function HomeScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: any }) => (
-      <View style={styles.cell}>
-        <ListingCard
-          listing={{
-            id: item.id,
-            title: item.title,
-            price: item.price,
-            originalPrice: item.original_price,
-            photos: item.photos || [],
-            district: item.district,
-            createdAt: item.created_at,
-            stock: item.stock,
-            boostedUntil: item.boosted_until,
-            cartQty: getCartQty(item.id),
-            isFavorite: isFavorited(item.id),
-            variants: item.variants || [],
-            hasVariants: Boolean(item.variants && item.variants.length > 0),
-          }}
-          onPress={() => router.push(`/listing/${item.id}` as any)}
-          onAddToCart={() => handleAddToCart(item.id)}
-          onUpdateCartQty={handleUpdateCartQty}
-          onToggleFavorite={() => toggleFavorite(item.id)}
-        />
-      </View>
-    ),
-    [getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
+    ({ item }: { item: any }) => {
+      const isOwner = Boolean(user?.id && item.user_id === user.id);
+      return (
+        <View style={styles.cell}>
+          <ListingCard
+            listing={{
+              id: item.id,
+              title: item.title,
+              price: item.price,
+              originalPrice: item.original_price,
+              photos: item.photos || [],
+              district: item.district,
+              createdAt: item.created_at,
+              stock: item.stock,
+              boostedUntil: item.boosted_until,
+              cartQty: getCartQty(item.id),
+              isFavorite: isFavorited(item.id),
+              variants: item.variants || [],
+              hasVariants: Boolean(item.variants && item.variants.length > 0),
+              isOwner,
+            }}
+            onPress={() => router.push(`/listing/${item.id}` as any)}
+            onAddToCart={() => handleAddToCart(item.id)}
+            onUpdateCartQty={handleUpdateCartQty}
+            onToggleFavorite={() => toggleFavorite(item.id)}
+            isOwner={isOwner}
+            onManage={() => setManagingListing(item)}
+          />
+        </View>
+      );
+    },
+    [user?.id, getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
   );
 
   const isFetchingNextRef = useRef(false);
@@ -313,6 +321,13 @@ export default function HomeScreen() {
           }}
         />
       )}
+
+      <OwnerActionSheet
+        visible={Boolean(managingListing)}
+        onClose={() => setManagingListing(null)}
+        listing={managingListing}
+        onListingUpdated={() => refetch()}
+      />
     </View>
   );
 }

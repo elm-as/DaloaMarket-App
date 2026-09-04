@@ -18,11 +18,13 @@ import { PRICING_CONFIG } from '@daloa/config';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { CartItemCard } from '../../src/components/cart/CartItemCard';
 import { CartSummaryCard } from '../../src/components/cart/CartSummaryCard';
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const accent = useAccent();
+  const { isAuthenticated } = useAuth();
   const { items, totalAmount, updateQuantity, removeFromCart, clearCart } = useCart();
 
   const buyerServiceFee = Math.round(totalAmount * PRICING_CONFIG.marketplace.buyerServiceFeeRate);
@@ -31,6 +33,11 @@ export default function CartScreen() {
 
   const handleCheckout = () => {
     if (items.length === 0) return;
+    if (!isAuthenticated) {
+      Haptics.warning();
+      router.push('/auth/login' as any);
+      return;
+    }
     Haptics.success();
     // Mode panier : le checkout lit tous les articles depuis le CartContext.
     router.push({ pathname: '/checkout' as any, params: { cart: '1' } });

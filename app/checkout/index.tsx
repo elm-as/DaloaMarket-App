@@ -13,6 +13,7 @@ import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCart } from '../../src/context/CartContext';
 import { DistrictPickerSheet } from '../../src/components/settings/DistrictPickerSheet';
+import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 import { CheckoutWizardBar } from '../../src/components/checkout/CheckoutWizardBar';
 import { CheckoutStepReception } from '../../src/components/checkout/CheckoutStepReception';
 import { CheckoutStepLocation } from '../../src/components/checkout/CheckoutStepLocation';
@@ -60,6 +61,16 @@ export default function CheckoutScreen() {
 
   const variant = listing?.variants?.find((v: any) => v.id === variantId);
   const activePrice = variant?.price ?? listing?.price ?? 0;
+
+  if (!isAuthenticated || !user) {
+    return (
+      <AuthGuardView
+        title="Connexion requise pour commander"
+        description="Connectez-vous à votre compte DaloaMarket pour finaliser votre commande et sécuriser votre achat."
+        fallbackRoute="/(tabs)/cart"
+      />
+    );
+  }
 
   // Log comportemental — entrée en tunnel d'achat
   useEffect(() => {

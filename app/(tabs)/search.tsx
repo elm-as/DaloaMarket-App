@@ -13,6 +13,8 @@ import { Haptics } from '@daloa/utils';
 import { SearchFilterModal, SearchFilterValues } from '../../src/components/search/SearchFilterModal';
 import { SearchTopBar } from '../../src/components/search/SearchTopBar';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
+import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
+import { filterAndRankListings } from '../../src/components/search/search-relevance';
 
 const EMPTY_FILTERS: SearchFilterValues = {
   category: null,
@@ -32,6 +34,7 @@ export default function SearchScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
+  const [managingListing, setManagingListing] = useState<any | null>(null);
 
   const activeListingInitialQuantities = useMemo(() => {
     if (!activeVariantListing) return undefined;
@@ -57,9 +60,19 @@ export default function SearchScreen() {
     }, 1200);
     return () => clearTimeout(t);
   }, [searchQuery, user?.id]);
+
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState<SearchFilterValues>(EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
+
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   const searchFilters = useMemo(
     () => ({
@@ -68,8 +81,9 @@ export default function SearchScreen() {
       condition: filters.condition || undefined,
       minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
       maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
+      searchQuery: debouncedQuery.trim() || undefined,
     }),
-    [filters.category, filters.district, filters.condition, filters.minPrice, filters.maxPrice]
+    [filters.category, filters.district, filters.condition, filters.minPrice, filters.maxPrice, debouncedQuery]
   );
 
   const {
@@ -79,38 +93,12 @@ export default function SearchScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    refetch,
   } = useInfiniteListings(searchFilters);
-
-  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 200);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
 
   const filteredListings = useMemo(() => {
     const rawList = listingsData?.pages.flatMap((p) => p.data) || [];
-    let list = [...rawList];
-
-    if (debouncedQuery.trim().length > 0) {
-      const q = debouncedQuery.toLowerCase().trim();
-      list = list.filter(
-        (l: any) =>
-          l.title.toLowerCase().includes(q) ||
-          (l.description && l.description.toLowerCase().includes(q)) ||
-          (l.district && l.district.toLowerCase().includes(q))
-      );
-    }
-
-    if (sortBy === 'price_asc') {
-      list.sort((a: any, b: any) => a.price - b.price);
-    } else if (sortBy === 'price_desc') {
-      list.sort((a: any, b: any) => b.price - a.price);
-    }
-
-    return list;
+    return filterAndRankListings(rawList, debouncedQuery, sortBy);
   }, [listingsData, debouncedQuery, sortBy]);
 
   const activeFiltersCount = useMemo(() => {
@@ -161,32 +149,38 @@ export default function SearchScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: any }) => (
-      <View style={styles.cell}>
-        <ListingCard
-          listing={{
-            id: item.id,
-            title: item.title,
-            price: item.price,
-            originalPrice: item.original_price,
-            photos: item.photos || [],
-            district: item.district,
-            createdAt: item.created_at,
-            stock: item.stock,
-            boostedUntil: item.boosted_until,
-            cartQty: getCartQty(item.id),
-            isFavorite: isFavorited(item.id),
-            variants: item.variants || [],
-            hasVariants: Boolean(item.variants && item.variants.length > 0),
-          }}
-          onPress={() => router.push(`/listing/${item.id}` as any)}
-          onAddToCart={() => handleAddToCart(item)}
-          onUpdateCartQty={handleUpdateCartQty}
-          onToggleFavorite={() => toggleFavorite(item.id)}
-        />
-      </View>
-    ),
-    [getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
+    ({ item }: { item: any }) => {
+      const isOwner = Boolean(user?.id && item.user_id === user.id);
+      return (
+        <View style={styles.cell}>
+          <ListingCard
+            listing={{
+              id: item.id,
+              title: item.title,
+              price: item.price,
+              originalPrice: item.original_price,
+              photos: item.photos || [],
+              district: item.district,
+              createdAt: item.created_at,
+              stock: item.stock,
+              boostedUntil: item.boosted_until,
+              cartQty: getCartQty(item.id),
+              isFavorite: isFavorited(item.id),
+              variants: item.variants || [],
+              hasVariants: Boolean(item.variants && item.variants.length > 0),
+              isOwner,
+            }}
+            onPress={() => router.push(`/listing/${item.id}` as any)}
+            onAddToCart={() => handleAddToCart(item)}
+            onUpdateCartQty={handleUpdateCartQty}
+            onToggleFavorite={() => toggleFavorite(item.id)}
+            isOwner={isOwner}
+            onManage={() => setManagingListing(item)}
+          />
+        </View>
+      );
+    },
+    [user?.id, getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
   );
 
   const isFetchingNextRef = useRef(false);
@@ -298,6 +292,13 @@ export default function SearchScreen() {
           }}
         />
       )}
+
+      <OwnerActionSheet
+        visible={Boolean(managingListing)}
+        onClose={() => setManagingListing(null)}
+        listing={managingListing}
+        onListingUpdated={() => refetch()}
+      />
     </View>
   );
 }

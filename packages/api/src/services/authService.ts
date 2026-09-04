@@ -157,7 +157,11 @@ export const authService = {
    * Déconnexion
    */
   async logout(): Promise<void> {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn('Erreur lors de supabase.auth.signOut:', err);
+    }
   },
 
   /**

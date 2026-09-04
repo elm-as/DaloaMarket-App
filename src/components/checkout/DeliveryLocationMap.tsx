@@ -28,14 +28,19 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
   const currentLng = longitude ?? DALOA_CENTER.lng;
   const [isLocating, setIsLocating] = useState(false);
 
-  const mapboxStaticUrl = useMemo(() => {
-    if (!MAPBOX_PUBLIC_TOKEN) return null;
+  const staticMapUrl = useMemo(() => {
     const sLat = sellerCoords?.latitude;
     const sLng = sellerCoords?.longitude;
-    if (sLat != null && sLng != null) {
-      return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
+    if (MAPBOX_PUBLIC_TOKEN) {
+      if (sLat != null && sLng != null) {
+        return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
+      }
+      return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
     }
-    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
+    const markers = sLat != null && sLng != null
+      ? `${sLat.toFixed(5)},${sLng.toFixed(5)},lightblue|${currentLat.toFixed(5)},${currentLng.toFixed(5)},ol-marker`
+      : `${currentLat.toFixed(5)},${currentLng.toFixed(5)},ol-marker`;
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${currentLat.toFixed(5)},${currentLng.toFixed(5)}&zoom=${zoom}&size=640x360&maptype=mapnik&markers=${markers}`;
   }, [currentLat, currentLng, sellerCoords, zoom]);
 
   const [routeInfo, setRouteInfo] = useState<DrivingRouteResult>({
@@ -58,16 +63,14 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     ).then((res) => {
       if (active) {
         setRouteInfo(res);
-        if (onDistanceChange) {
-          onDistanceChange(res.distanceKm);
-        }
+        onDistanceChange?.(res.distanceKm);
       }
     });
 
     return () => {
       active = false;
     };
-  }, [sellerCoords, currentLat, currentLng, onDistanceChange]);
+  }, [currentLat, currentLng, sellerCoords?.latitude, sellerCoords?.longitude, onDistanceChange]);
 
   const handleLocateMe = async () => {
     try {
@@ -75,8 +78,10 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      Haptics.selection();
       onChangeLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      Haptics.success();
+    } catch (err) {
+      console.warn('Erreur localisation GPS:', err);
     } finally {
       setIsLocating(false);
     }
@@ -88,79 +93,10 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     const sLng = sellerCoords?.longitude ?? null;
     const hasSeller = sLat != null && sLng != null;
     const leafletCoords = (routeInfo.coordinates || []).map(([lng, lat]) => [lat, lng]);
+    const sellerSnippet = hasSeller ? `var sM=L.circleMarker([${sLat},${sLng}],{radius:8,fillColor:'#10B981',color:'#fff',weight:2,fillOpacity:0.9}).addTo(map);sM.bindPopup('<b>Boutique Vendeur</b>');` : '';
+    const routeSnippet = leafletCoords.length > 0 ? `var poly=L.polyline(${JSON.stringify(leafletCoords)},{color:'${accent.DEFAULT}',weight:4,opacity:0.85}).addTo(map);map.fitBounds(poly.getBounds(),{padding:[30,30]});` : '';
 
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body, html, #map { width: 100%; height: 100%; background: #e5e7eb; }
-          .leaflet-control-attribution { font-size: 8px !important; }
-        </style>
-      </head>
-      <body>
-        <div id="map"></div>
-        <script>
-          var lat = ${currentLat};
-          var lng = ${currentLng};
-          var map = L.map('map', { zoomControl: false }).setView([lat, lng], 14);
-          L.control.zoom({ position: 'topright' }).addTo(map);
-
-          var mapboxToken = '${MAPBOX_PUBLIC_TOKEN}';
-          var tileUrl = mapboxToken
-            ? 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxToken
-            : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png';
-
-          L.tileLayer(tileUrl, {
-            maxZoom: 20,
-            attribution: '© Mapbox © CARTO © OpenStreetMap'
-          }).addTo(map);
-
-          var marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-          marker.bindPopup("<b>Lieu de livraison</b><br>Glissez pour ajuster").openPopup();
-
-          ${hasSeller ? `
-          var sellerMarker = L.circleMarker([${sLat}, ${sLng}], {
-            radius: 8,
-            fillColor: '#10B981',
-            color: '#FFFFFF',
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.9
-          }).addTo(map);
-          sellerMarker.bindPopup("<b>Boutique Vendeur</b>");
-          ` : ''}
-
-          var routeCoords = ${JSON.stringify(leafletCoords)};
-          if (routeCoords && routeCoords.length > 0) {
-            var polyline = L.polyline(routeCoords, { color: '${accent.DEFAULT}', weight: 4, opacity: 0.85, lineJoin: 'round' }).addTo(map);
-            map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
-          }
-
-          function notifyParent(newLat, newLng) {
-            if (window.parent) {
-              window.parent.postMessage(JSON.stringify({ type: 'DELIVERY_COORDS', latitude: newLat, longitude: newLng }), '*');
-            }
-          }
-
-          marker.on('dragend', function(e) {
-            var pos = marker.getLatLng();
-            notifyParent(pos.lat, pos.lng);
-          });
-
-          map.on('click', function(e) {
-            marker.setLatLng(e.latlng);
-            notifyParent(e.latlng.lat, e.latlng.lng);
-          });
-        </script>
-      </body>
-      </html>
-    `;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup('<b>Lieu de livraison</b>').openPopup();${sellerSnippet}${routeSnippet}function notify(nLat,nLng){if(window.parent){window.parent.postMessage(JSON.stringify({type:'DELIVERY_COORDS',latitude:nLat,longitude:nLng}),'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notify(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notify(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
   }, [currentLat, currentLng, sellerCoords, routeInfo.coordinates, accent.DEFAULT]);
 
   useEffect(() => {
@@ -228,10 +164,10 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
             style={styles.iframe}
             title="Carte de livraison à Daloa"
           />
-        ) : mapboxStaticUrl ? (
+        ) : (
           <View style={styles.nativeMapContainer}>
             <Image
-              source={{ uri: mapboxStaticUrl }}
+              source={{ uri: staticMapUrl }}
               style={styles.staticMapImage}
               contentFit="cover"
               transition={150}
@@ -256,13 +192,6 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
                 <Minus size={14} color={colors.text.DEFAULT} strokeWidth={2.5} />
               </AppPressable>
             </View>
-          </View>
-        ) : (
-          <View style={styles.nativeFallback}>
-            <MapPin size={24} color={accent.DEFAULT} />
-            <AppText variant="bodyStrong">
-              {currentLat.toFixed(4)}, {currentLng.toFixed(4)}
-            </AppText>
           </View>
         )}
       </View>

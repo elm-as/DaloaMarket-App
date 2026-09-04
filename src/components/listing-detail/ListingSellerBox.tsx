@@ -3,7 +3,8 @@ import { View, StyleSheet, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Avatar, AppText, AppPressable, Button, colors, radii, spacing, useAccent, WhatsAppIcon } from '@daloa/ui';
 import { MessageCircle, Store, Star, Sparkles } from 'lucide-react-native';
-import { formatDate, formatWhatsAppPhone } from '@daloa/utils';
+import { formatDate, formatWhatsAppPhone, Haptics } from '@daloa/utils';
+import { useAuth } from '../../context/AuthContext';
 
 interface ListingSellerBoxProps {
   seller: any;
@@ -13,6 +14,7 @@ interface ListingSellerBoxProps {
 export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPro }) => {
   const router = useRouter();
   const accent = useAccent();
+  const { isAuthenticated } = useAuth();
 
   const shopName = seller?.shop_name || seller?.full_name || 'Boutique Partenaire';
   const memberSince = seller?.created_at ? formatDate(seller.created_at) : null;
@@ -23,6 +25,11 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
 
   const handleMessage = () => {
     if (!seller?.id) return;
+    if (!isAuthenticated) {
+      Haptics.warning();
+      router.push('/auth/login' as any);
+      return;
+    }
     router.push({
       pathname: `/chat/${seller.id}` as any,
       params: {

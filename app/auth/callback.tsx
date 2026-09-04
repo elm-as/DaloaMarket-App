@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { supabase } from '@daloa/api';
@@ -32,8 +32,9 @@ export default function AuthCallbackScreen() {
 
     (async () => {
       try {
-        // Extraction erreurs éventuelles en query
-        const webSearch = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        // Extraction erreurs éventuelles en query (sécurisé pour natif et web)
+        const isWeb = Platform.OS === 'web' && typeof window !== 'undefined' && Boolean(window.location);
+        const webSearch = isWeb ? new URLSearchParams(window.location.search) : null;
         const errDesc = params.error_description || webSearch?.get('error_description') || webSearch?.get('error');
         if (errDesc) throw new Error(String(errDesc));
 
@@ -46,7 +47,7 @@ export default function AuthCallbackScreen() {
         } else {
           // 2. Flux implicite : access_token / refresh_token dans le fragment (#...).
           let frag: string | null = null;
-          if (typeof window !== 'undefined' && window.location.hash) {
+          if (isWeb && window.location.hash) {
             frag = window.location.hash.startsWith('#')
               ? window.location.hash.substring(1)
               : window.location.hash;

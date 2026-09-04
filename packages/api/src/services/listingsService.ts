@@ -41,7 +41,12 @@ export const listingsService = {
     }
     if (filters.searchQuery && filters.searchQuery.trim().length > 0) {
       const term = filters.searchQuery.trim();
-      query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%,district.ilike.%${term}%`);
+      if (term.length <= 3) {
+        // Pour les termes courts (ex: TV, PC), on privilégie le titre pour éliminer le bruit en description
+        query = query.or(`title.ilike.%${term}%,district.ilike.%${term}%`);
+      } else {
+        query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%,district.ilike.%${term}%`);
+      }
     }
 
     // Tri
@@ -247,12 +252,24 @@ export const listingsService = {
   },
 
   /**
-   * Bump une annonce en tête de liste
+   * Marque une annonce comme vendue
    */
-  async bumpListing(listingId: string): Promise<void> {
+  async markListingAsSold(listingId: string): Promise<void> {
     const { error } = await supabase
       .from('listings')
-      .update({ created_at: new Date().toISOString() })
+      .update({ status: 'sold' })
+      .eq('id', listingId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Remet en vente une annonce précédemment vendue
+   */
+  async markListingAsActive(listingId: string): Promise<void> {
+    const { error } = await supabase
+      .from('listings')
+      .update({ status: 'active' })
       .eq('id', listingId);
 
     if (error) throw error;

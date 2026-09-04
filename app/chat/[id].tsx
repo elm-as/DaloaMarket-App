@@ -19,6 +19,7 @@ import {
 } from '@daloa/ui';
 import { Send, ArrowLeft } from 'lucide-react-native';
 import { formatDate } from '@daloa/utils';
+import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 
 export default function ChatRoomScreen() {
   const {
@@ -29,20 +30,23 @@ export default function ChatRoomScreen() {
     listingTitle,
     listingPhoto,
     listingPrice,
-  } = useLocalSearchParams<{
-    id: string;
-    partnerName?: string;
-    partnerAvatar?: string;
-    listingId?: string;
-    listingTitle?: string;
-    listingPhoto?: string;
-    listingPrice?: string;
-  }>();
+  } = useLocalSearchParams<{ id: string; partnerName?: string; partnerAvatar?: string; listingId?: string; listingTitle?: string; listingPhoto?: string; listingPrice?: string }>();
 
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <AuthGuardView
+        title="Connexion requise"
+        description="Connectez-vous pour échanger directement avec vos correspondants."
+        fallbackRoute="/(tabs)"
+      />
+    );
+  }
+
   const scrollViewRef = useRef<ScrollView>(null);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);

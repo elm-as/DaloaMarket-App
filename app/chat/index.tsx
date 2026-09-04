@@ -19,12 +19,24 @@ import {
 } from '@daloa/ui';
 import { MessageSquare, ArrowLeft, Package } from 'lucide-react-native';
 import { formatRelativeTime } from '@daloa/utils';
+import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 
 export default function ChatListScreen({ isTab = false }: { isTab?: boolean }) {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <AuthGuardView
+        title="Messagerie sécurisée"
+        description="Connectez-vous pour consulter vos conversations et échanger avec les vendeurs et acheteurs de Daloa."
+        fallbackRoute="/(tabs)"
+      />
+    );
+  }
+
   const { data: conversations, isLoading, refetch, isRefetching } = useConversations(user?.id);
 
   const list = conversations || [];

@@ -14,6 +14,8 @@ interface ListingStickyFooterProps {
   onRemoveFromCart: (itemId: string) => void;
   onBuyNow: () => void;
   isOwner?: boolean;
+  onEditListing?: () => void;
+  onManageListing?: () => void;
 }
 
 export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
@@ -26,6 +28,8 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
   onRemoveFromCart,
   onBuyNow,
   isOwner = false,
+  onEditListing,
+  onManageListing,
 }) => {
   const insets = useSafeAreaInsets();
   const accent = useAccent();
@@ -44,11 +48,31 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
   if (isOwner) {
     return (
       <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing[3]) }]}>
-        <View style={[styles.ownerBanner, { backgroundColor: accent[50], borderColor: accent[100] }]}>
-          <Edit3 size={13} color={accent[700]} />
-          <AppText variant="caption" color={accent[700]}>
-            Vous êtes le vendeur de cette annonce
-          </AppText>
+        <View style={styles.ownerActionsRow}>
+          <AppPressable
+            haptic="light"
+            onPress={onManageListing}
+            style={[styles.ownerManageBtn, { borderColor: colors.border.DEFAULT }]}
+            accessibilityRole="button"
+            accessibilityLabel="Gérer le statut de l'annonce"
+          >
+            <AppText variant="label" color={colors.text.body}>
+              Gérer le statut
+            </AppText>
+          </AppPressable>
+
+          <AppPressable
+            haptic="medium"
+            onPress={onEditListing}
+            style={[styles.ownerEditBtn, { backgroundColor: accent.DEFAULT }]}
+            accessibilityRole="button"
+            accessibilityLabel="Modifier l'annonce"
+          >
+            <Edit3 size={15} color={colors.text.inverse} />
+            <AppText variant="label" color={colors.text.inverse}>
+              Modifier
+            </AppText>
+          </AppPressable>
         </View>
       </View>
     );
@@ -239,15 +263,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
   },
   // ─── Owner ───
-  ownerBanner: {
+  ownerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  ownerManageBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg.surface,
+  },
+  ownerEditBtn: {
+    flex: 1.2,
+    height: 48,
+    borderRadius: radii.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[3],
+    gap: 8,
   },
   // ─── Variante en cart ───
   variantFooterBtn: {

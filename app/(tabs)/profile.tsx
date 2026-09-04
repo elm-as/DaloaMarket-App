@@ -152,6 +152,8 @@ export default function ProfileScreen() {
           soldCount={stats.soldCount}
           reviewCount={stats.reviewCount}
           rating={profile?.rating}
+          onPressActive={() => router.push('/seller/my-listings' as any)}
+          onPressSold={() => router.push('/seller/my-listings' as any)}
         />
 
         {/* 3. Alertes proactives (GPS ou Payout manquant) */}
@@ -172,6 +174,7 @@ export default function ProfileScreen() {
         {/* 5. Grille des actions rapides marchandes */}
         <ProfileQuickActions
           onPublishListing={() => router.push('/listing/create' as any)}
+          onOpenMyListings={() => router.push('/seller/my-listings' as any)}
           onOpenOrders={() => router.push('/(tabs)/orders' as any)}
           onOpenDeliverers={() => router.push('/affiliations' as any)}
           onOpenShop={() => router.push('/settings/shop' as any)}

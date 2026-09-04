@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Package, CheckCircle, Star } from 'lucide-react-native';
-import { colors, spacing, radii, AppText, useAccent } from '@daloa/ui';
+import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 interface ProfileStatsStripProps {
   activeCount: number;
   soldCount: number;
   reviewCount: number;
   rating?: number | null;
+  onPressActive?: () => void;
+  onPressSold?: () => void;
 }
 
 export const ProfileStatsStrip: React.FC<ProfileStatsStripProps> = ({
@@ -15,13 +17,20 @@ export const ProfileStatsStrip: React.FC<ProfileStatsStripProps> = ({
   soldCount,
   reviewCount,
   rating,
+  onPressActive,
+  onPressSold,
 }) => {
   const accent = useAccent();
 
   return (
     <View style={styles.container}>
       {/* 1. Annonces en vente */}
-      <View style={styles.statCard}>
+      <AppPressable
+        haptic="selection"
+        onPress={onPressActive}
+        style={styles.statCard}
+        accessibilityLabel={`Voir les ${activeCount} annonces en vente`}
+      >
         <View style={[styles.iconCircle, { backgroundColor: accent[50] }]}>
           <Package size={14} color={accent[600]} />
         </View>
@@ -31,10 +40,15 @@ export const ProfileStatsStrip: React.FC<ProfileStatsStripProps> = ({
         <AppText variant="caption" color={colors.text.subtle} style={styles.statLabel}>
           En vente
         </AppText>
-      </View>
+      </AppPressable>
 
       {/* 2. Ventes terminées */}
-      <View style={styles.statCard}>
+      <AppPressable
+        haptic="selection"
+        onPress={onPressSold}
+        style={styles.statCard}
+        accessibilityLabel={`Voir les ${soldCount} annonces vendues`}
+      >
         <View style={[styles.iconCircle, { backgroundColor: colors.status.successLight }]}>
           <CheckCircle size={14} color={colors.status.successDark} />
         </View>
@@ -44,7 +58,7 @@ export const ProfileStatsStrip: React.FC<ProfileStatsStripProps> = ({
         <AppText variant="caption" color={colors.text.subtle} style={styles.statLabel}>
           Vendues
         </AppText>
-      </View>
+      </AppPressable>
 
       {/* 3. Avis clients */}
       <View style={styles.statCard}>

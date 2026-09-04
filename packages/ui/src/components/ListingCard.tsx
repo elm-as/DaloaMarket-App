@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { MapPin, Heart, ShoppingCart, Plus, Minus, Zap, Check } from 'lucide-react-native';
+import { MapPin, Heart, ShoppingCart, Plus, Minus, Zap, Check, SlidersHorizontal } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../tokens';
 import { useAccent } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
@@ -20,6 +20,7 @@ export interface ListingCardItem {
   boostedUntil?: string | null;
   isBoosted?: boolean;
   isPro?: boolean;
+  isOwner?: boolean;
   acceptsDelivery?: boolean;
   stock?: number;
   isFavorite?: boolean;
@@ -37,6 +38,8 @@ export interface ListingCardProps {
   onToggleFavorite?: (id: string) => void;
   onAddToCart?: (id: string) => void;
   onUpdateCartQty?: (id: string, qty: number) => void;
+  isOwner?: boolean;
+  onManage?: (id: string) => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -49,6 +52,8 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
   onToggleFavorite,
   onAddToCart,
   onUpdateCartQty,
+  isOwner = false,
+  onManage,
   style,
 }) => {
   const accent = useAccent();
@@ -215,8 +220,24 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
           )}
         </View>
 
-        {/* 3. Action Panier Rapide — toujours rendu pour hauteur uniforme */}
-        {(onAddToCart || onUpdateCartQty) && (
+        {/* 3. Action Panier Rapide ou Gestion Propriétaire — toujours rendu pour hauteur uniforme */}
+        {isOwner || listing.isOwner ? (
+          <View style={styles.cartActionContainer}>
+            <AppPressable
+              haptic="light"
+              onPress={() => onManage?.(listing.id)}
+              rippleColor="rgba(0,0,0,0.06)"
+              style={[styles.addToCartBtn, styles.manageBtn]}
+              accessibilityRole="button"
+              accessibilityLabel="Gérer mon annonce"
+            >
+              <SlidersHorizontal size={13} color={colors.text.body} strokeWidth={2.2} />
+              <AppText variant="label" color={colors.text.body}>
+                Gérer
+              </AppText>
+            </AppPressable>
+          </View>
+        ) : (onAddToCart || onUpdateCartQty) ? (
           <View style={styles.cartActionContainer}>
             {isOutOfStock ? (
               <View style={[styles.addToCartBtn, styles.outOfStockBtn]}>
@@ -289,7 +310,7 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
               </AppPressable>
             )}
           </View>
-        )}
+        ) : null}
       </View>
     </AppPressable>
   );
@@ -443,6 +464,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.subtle,
   },
+  manageBtn: {
+    backgroundColor: colors.grey[100],
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+  },
   stepperBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -471,6 +497,8 @@ const styles = StyleSheet.create({
 export const ListingCard = React.memo<ListingCardProps>(ListingCardComponent, (prev, next) => {
   return (
     prev.listing.id === next.listing.id &&
+    prev.isOwner === next.isOwner &&
+    prev.listing.isOwner === next.listing.isOwner &&
     prev.listing.isFavorite === next.listing.isFavorite &&
     prev.listing.cartQty === next.listing.cartQty &&
     prev.listing.price === next.listing.price &&

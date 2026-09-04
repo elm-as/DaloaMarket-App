@@ -27,6 +27,7 @@ import { ListingStickyFooter } from '../../src/components/listing-detail/Listing
 import { ListingTrustBadges } from '../../src/components/listing-detail/ListingTrustBadges';
 import { ListingReviewsSection } from '../../src/components/listing-detail/ListingReviewsSection';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
+import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -60,10 +61,11 @@ export default function ListingDetailScreen() {
   const [selectedVariant, setSelectedVariant] = useState<ListingVariant | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [showVariantPicker, setShowVariantPicker] = useState(false);
+  const [showOwnerSheet, setShowOwnerSheet] = useState(false);
 
   const isFavorite = id ? isFavorited(id) : false;
 
-  const { data: listing, isLoading } = useListingDetail(id);
+  const { data: listing, isLoading, refetch } = useListingDetail(id);
   const { data: similarCandidates } = useSimilarListings(listing?.category, id);
   const { data: reviews = [] } = useReviews('seller', listing?.seller?.id);
 
@@ -228,6 +230,11 @@ export default function ListingDetailScreen() {
   };
 
   const handleBuyNow = () => {
+    if (!isAuthenticated) {
+      Haptics.warning();
+      router.push('/auth/login' as any);
+      return;
+    }
     if (hasVariants && totalListingCartQty === 0 && !selectedVariant) {
       setShowVariantPicker(true);
       return;
@@ -244,10 +251,7 @@ export default function ListingDetailScreen() {
   };
 
   const handleMarkSold = () => {
-    Alert.alert('Marquer comme vendu', 'Cette annonce sera retirée du catalogue.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Marquer vendu', style: 'destructive', onPress: () => Haptics.success() },
-    ]);
+    setShowOwnerSheet(true);
   };
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -492,7 +496,19 @@ export default function ListingDetailScreen() {
         onRemoveFromCart={removeFromCart}
         onBuyNow={handleBuyNow}
         isOwner={isOwner}
+        onEditListing={() => router.push(`/listing/create?id=${listing.id}` as any)}
+        onManageListing={() => setShowOwnerSheet(true)}
       />
+
+      {/* Feuille d'actions rapides propriétaire */}
+      {isOwner && (
+        <OwnerActionSheet
+          visible={showOwnerSheet}
+          onClose={() => setShowOwnerSheet(false)}
+          listing={listing}
+          onListingUpdated={() => refetch()}
+        />
+      )}
     </SafeAreaView>
   );
 }
