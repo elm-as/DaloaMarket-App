@@ -24,7 +24,7 @@ function parseFragment(fragment?: string | null): Record<string, string> {
 export default function AuthCallbackScreen() {
   const router = useRouter();
   const accent = useAccent();
-  const params = useLocalSearchParams<{ code?: string; error_description?: string }>();
+  const params = useLocalSearchParams<{ code?: string; error_description?: string; returnTo?: string }>();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,17 +32,34 @@ export default function AuthCallbackScreen() {
 
     (async () => {
       try {
-        if (params.error_description) throw new Error(String(params.error_description));
+        // Extraction erreurs éventuelles en query
+        const webSearch = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const errDesc = params.error_description || webSearch?.get('error_description') || webSearch?.get('error');
+        if (errDesc) throw new Error(String(errDesc));
 
-        // Flux PKCE : code d'autorisation en paramètre de requête.
-        if (params.code) {
-          const { error: exErr } = await supabase.auth.exchangeCodeForSession(String(params.code));
+        const code = params.code || webSearch?.get('code');
+
+        // 1. Flux PKCE : code d'autorisation en paramètre de requête.
+        if (code) {
+          const { error: exErr } = await supabase.auth.exchangeCodeForSession(String(code));
           if (exErr) throw exErr;
         } else {
-          // Flux implicite : access_token / refresh_token dans le fragment (#...).
-          const initialUrl = await Linking.getInitialURL();
-          const frag = initialUrl?.includes('#') ? initialUrl.split('#')[1] : null;
+          // 2. Flux implicite : access_token / refresh_token dans le fragment (#...).
+          let frag: string | null = null;
+          if (typeof window !== 'undefined' && window.location.hash) {
+            frag = window.location.hash.startsWith('#')
+              ? window.location.hash.substring(1)
+              : window.location.hash;
+          } else {
+            const initialUrl = await Linking.getInitialURL();
+            frag = initialUrl?.includes('#') ? initialUrl.split('#')[1] : null;
+          }
+
           const tokens = parseFragment(frag);
+          if (tokens.error_description || tokens.error) {
+            throw new Error(tokens.error_description || tokens.error);
+          }
+
           if (tokens.access_token && tokens.refresh_token) {
             const { error: sessErr } = await supabase.auth.setSession({
               access_token: tokens.access_token,
@@ -50,11 +67,18 @@ export default function AuthCallbackScreen() {
             });
             if (sessErr) throw sessErr;
           } else {
-            throw new Error('Session introuvable dans le retour de connexion.');
+            // Vérification si la session a déjà été détectée
+            const { data: currentSession } = await supabase.auth.getSession();
+            if (!currentSession?.session) {
+              throw new Error('Session introuvable dans le retour de connexion.');
+            }
           }
         }
 
-        if (!cancelled) router.replace('/(tabs)' as any);
+        if (!cancelled) {
+          const target = params.returnTo || '/(tabs)/profile';
+          router.replace(target as any);
+        }
       } catch (e: any) {
         if (cancelled) return;
         setError(e.message || 'Échec de la connexion. Veuillez réessayer.');

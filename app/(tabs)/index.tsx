@@ -31,11 +31,22 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  const { itemCount, addToCart, updateQuantity, items } = useCart();
+  const { itemCount, addToCart, updateQuantity, setListingVariants, items } = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
   const { gridColumns } = useResponsive();
+
+  const activeListingInitialQuantities = useMemo(() => {
+    if (!activeVariantListing) return undefined;
+    const map: Record<string, number> = {};
+    items
+      .filter((i) => i.listing.id === activeVariantListing.id && i.variant?.id)
+      .forEach((i) => {
+        if (i.variant?.id) map[i.variant.id] = i.quantity;
+      });
+    return map;
+  }, [items, activeVariantListing]);
 
   const filters = useMemo(
     () => (selectedCategory ? { category: selectedCategory } : {}),
@@ -66,8 +77,9 @@ export default function HomeScreen() {
 
   const getCartQty = useCallback(
     (listingId: string) => {
-      const item = items.find((i) => i.listing.id === listingId);
-      return item ? item.quantity : 0;
+      return items
+        .filter((i) => i.listing.id === listingId)
+        .reduce((sum, i) => sum + i.quantity, 0);
     },
     [items]
   );
@@ -150,6 +162,7 @@ export default function HomeScreen() {
         onAddToCart={(item) => handleAddToCart(item.id)}
         onToggleFavorite={(id) => toggleFavorite(id)}
         isFavorited={(id) => isFavorited(id)}
+        getCartQty={getCartQty}
       />
 
       <View style={styles.sectionHeader}>
@@ -293,10 +306,9 @@ export default function HomeScreen() {
           listingTitle={activeVariantListing.title}
           listingPhoto={activeVariantListing.photos?.[0]}
           basePrice={activeVariantListing.price}
+          initialQuantities={activeListingInitialQuantities}
           onConfirmQuantities={(selections) => {
-            selections.forEach(({ variant, quantity }) => {
-              addToCart(activeVariantListing, variant, quantity);
-            });
+            setListingVariants(activeVariantListing, selections);
             setActiveVariantListing(null);
           }}
         />

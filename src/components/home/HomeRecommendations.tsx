@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { Sparkles, MapPin, Heart, Plus, Zap, TrendingUp, Star, Tag } from 'lucide-react-native';
+import { Sparkles, MapPin, Heart, Plus, Zap, TrendingUp, Star, Tag, Check } from 'lucide-react-native';
 import {
   colors,
   radii,
@@ -19,6 +19,7 @@ interface HomeRecommendationsProps {
   onAddToCart: (item: any) => void;
   onToggleFavorite: (itemId: string) => void;
   isFavorited: (itemId: string) => boolean;
+  getCartQty?: (itemId: string) => number;
 }
 
 function renderReasonIcon(reason: string) {
@@ -36,6 +37,7 @@ export const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
   onAddToCart,
   onToggleFavorite,
   isFavorited,
+  getCartQty,
 }) => {
   const accent = useAccent();
 
@@ -80,6 +82,7 @@ export const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
       >
         {displayItems.map(({ item, matchReason }) => {
           const favorited = isFavorited(item.id);
+          const itemCartQty = getCartQty ? getCartQty(item.id) : 0;
           const priceInfo = getListingPriceRange(item.price, item.variants);
           const photo = item.photos && item.photos.length > 0 ? item.photos[0] : null;
 
@@ -157,10 +160,24 @@ export const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
                       e?.stopPropagation?.();
                       onAddToCart(item);
                     }}
-                    style={[styles.addCartBtn, { backgroundColor: accent[50], borderColor: accent[200] }]}
-                    accessibilityLabel="Ajouter au panier"
+                    style={[
+                      styles.addCartBtn,
+                      itemCartQty > 0
+                        ? { backgroundColor: accent.DEFAULT, borderColor: accent.DEFAULT, width: 'auto', paddingHorizontal: 6 }
+                        : { backgroundColor: accent[50], borderColor: accent[200] },
+                    ]}
+                    accessibilityLabel={itemCartQty > 0 ? `${itemCartQty} au panier` : 'Ajouter au panier'}
                   >
-                    <Plus size={13} color={accent[600]} />
+                    {itemCartQty > 0 ? (
+                      <View style={styles.cartQtyWrap}>
+                        <Check size={11} color={colors.text.inverse} strokeWidth={3} />
+                        <AppText variant="caption" color={colors.text.inverse} style={styles.cartQtyText}>
+                          {itemCartQty}
+                        </AppText>
+                      </View>
+                    ) : (
+                      <Plus size={13} color={accent[600]} />
+                    )}
                   </AppPressable>
                 </View>
               </View>
@@ -299,11 +316,21 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   addCartBtn: {
-    width: 24,
+    minWidth: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cartQtyWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  cartQtyText: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
 });

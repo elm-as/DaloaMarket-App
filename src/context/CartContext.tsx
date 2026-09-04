@@ -17,6 +17,7 @@ interface CartContextType {
   addToCart: (listing: ListingFull, variant?: ListingVariant | null, quantity?: number) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
+  setListingVariants: (listing: ListingFull, selections: { variant: ListingVariant; quantity: number }[]) => void;
   clearCart: () => void;
 }
 
@@ -52,6 +53,35 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const setListingVariants = (
+    listing: ListingFull,
+    selections: { variant: ListingVariant; quantity: number }[]
+  ) => {
+    Haptics.success();
+    analyticsService.logEvent({
+      eventName: 'update_cart_variants',
+      listingId: listing.id,
+      props: { category: listing.category, count: selections.length },
+    });
+
+    setItems((prev) => {
+      // Retirer les variantes existantes de cette annonce
+      const withoutThisListing = prev.filter((i) => i.listing.id !== listing.id);
+
+      // Ajouter les variantes sélectionnées ayant quantity > 0
+      const newItems: CartItem[] = selections
+        .filter((s) => s.quantity > 0)
+        .map(({ variant, quantity }) => ({
+          id: `${listing.id}_${variant.id}`,
+          listing,
+          variant,
+          quantity,
+        }));
+
+      return [...withoutThisListing, ...newItems];
+    });
+  };
+
   const removeFromCart = (itemId: string) => {
     Haptics.lightImpact();
     setItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -81,6 +111,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addToCart,
         removeFromCart,
         updateQuantity,
+        setListingVariants,
         clearCart,
       }}
     >

@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile, RegisterInput, LoginInput } from '@daloa/types';
 import { authService, supabase } from '@daloa/api';
+import { SecureStorageAdapter } from '@daloa/utils';
+
+const CACHED_PROFILE_KEY = '@daloa_cached_user_profile';
 
 interface AuthContextType {
   user: any | null;
@@ -40,10 +43,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchSession = async () => {
     try {
-      setIsLoading(true);
+      // 1. Hydratation immédiate depuis le stockage persistant
+      const cached = await SecureStorageAdapter.getItem(CACHED_PROFILE_KEY);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === 'object') {
+            setProfile(parsed);
+          }
+        } catch {}
+      }
+
       const sessionData = await authService.getCurrentSession();
       setUser(sessionData.user);
-      setProfile(sessionData.profile);
+      if (sessionData.profile) {
+        setProfile(sessionData.profile);
+        void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(sessionData.profile));
+      }
     } catch (err) {
       console.warn('Erreur chargement session:', err);
     } finally {
@@ -63,10 +79,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .select('*')
           .eq('id', session.user.id)
           .maybeSingle();
-        setProfile(p ? { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) } : null);
+        if (p) {
+          const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) };
+          setProfile(prof);
+          void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(prof));
+        }
       } else {
         setUser(null);
         setProfile(null);
+        void SecureStorageAdapter.removeItem(CACHED_PROFILE_KEY);
       }
       setIsLoading(false);
     });
@@ -79,19 +100,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (input: LoginInput) => {
     const result = await authService.login(input);
     setUser(result.user);
-    setProfile(result.profile);
+    if (result.profile) {
+      setProfile(result.profile);
+      void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(result.profile));
+    }
   };
 
   const register = async (input: RegisterInput) => {
     const result = await authService.register(input);
     setUser(result.user);
-    setProfile(result.profile);
+    if (result.profile) {
+      setProfile(result.profile);
+      void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(result.profile));
+    }
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
-    setProfile(null);
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.warn('Erreur déconnexion authService:', err);
+    } finally {
+      setUser(null);
+      setProfile(null);
+      await SecureStorageAdapter.removeItem(CACHED_PROFILE_KEY);
+    }
   };
 
   const refreshProfile = async () => {

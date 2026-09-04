@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { MapPin, Heart, ShoppingCart, Plus, Minus, Zap } from 'lucide-react-native';
+import { MapPin, Heart, ShoppingCart, Plus, Minus, Zap, Check } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../tokens';
 import { useAccent } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
@@ -224,6 +224,23 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
                   Épuisé
                 </AppText>
               </View>
+            ) : listing.hasVariants && cartQty > 0 ? (
+              <AppPressable
+                haptic="light"
+                onPress={handleAdd}
+                rippleColor="rgba(255,255,255,0.24)"
+                style={[
+                  styles.addToCartBtn,
+                  { backgroundColor: accent[50], borderWidth: 1, borderColor: accent[200] }
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${cartQty} au panier, modifier les options`}
+              >
+                <Check size={13} color={accent[700]} strokeWidth={2.5} />
+                <AppText variant="label" color={accent[700]} numberOfLines={1}>
+                  {cartQty} · Options
+                </AppText>
+              </AppPressable>
             ) : cartQty > 0 ? (
               <View style={[styles.stepperBox, { backgroundColor: accent[50], borderColor: accent[100] }]}>
                 <AppPressable
@@ -350,15 +367,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    padding: 10,
-    height: 156, // Hauteur strictement identique pour aligner 100% des cartes
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 8,
+    height: 166,
     justifyContent: 'space-between',
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 5,
-    height: 22,
+    height: 20,
     overflow: 'hidden',
   },
   priceText: {
@@ -380,7 +399,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   title: {
-    marginTop: 3,
+    marginTop: 2,
     lineHeight: 18,
     height: 36, // Strictement 2 lignes fixes
     overflow: 'hidden',
@@ -389,7 +408,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
     height: 18,
     overflow: 'hidden',
   },
@@ -403,11 +422,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 3,
   },
   cartActionContainer: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
-    height: 44,
+    height: 42,
     justifyContent: 'center',
   },
   addToCartBtn: {
@@ -416,8 +435,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: 34,
     borderRadius: radii.lg,
-    gap: 5,
-    overflow: 'hidden',
+    gap: 6,
+    paddingHorizontal: 8,
   },
   outOfStockBtn: {
     backgroundColor: colors.bg.subtle,

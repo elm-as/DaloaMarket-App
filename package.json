@@ -9,7 +9,7 @@
     "start:tunnel": "expo start --tunnel",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
+    "web": "expo start --web --offline",
     "typecheck": "tsc --noEmit",
     "build": "expo export",
     "build:preview": "eas build --profile preview --platform android",

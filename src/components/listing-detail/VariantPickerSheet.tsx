@@ -30,6 +30,8 @@ interface VariantPickerSheetProps {
   listingTitle: string;
   listingPhoto?: string;
   basePrice: number;
+  /** Quantités déjà au panier pour pré-remplissage { variantId: qty } */
+  initialQuantities?: Record<string, number>;
   /** Sélection multi-options avec quantités individuelles */
   onConfirmQuantities: (selections: VariantSelection[]) => void;
   /** Compatibilité ascendante : sélection d'une seule variante */
@@ -43,6 +45,7 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
   listingTitle,
   listingPhoto,
   basePrice,
+  initialQuantities,
   onConfirmQuantities,
   onConfirm,
 }) => {
@@ -53,15 +56,22 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
   // Dictionnaire { variantId: quantité choisie }
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
+  const hasInitialInCart = Boolean(
+    initialQuantities && Object.values(initialQuantities).some((q) => q > 0)
+  );
+
   useEffect(() => {
     if (visible) {
-      // Par défaut : 1 unité sur la 1ère variante en stock s'il n'y a pas encore de sélection
-      const initial: Record<string, number> = {};
-      const firstInStock = variants.find((v) => (v.stock ?? 1) > 0);
-      if (firstInStock?.id) {
-        initial[firstInStock.id] = 1;
+      if (initialQuantities && Object.keys(initialQuantities).length > 0) {
+        setQuantities({ ...initialQuantities });
+      } else {
+        const initial: Record<string, number> = {};
+        const firstInStock = variants.find((v) => (v.stock ?? 1) > 0);
+        if (firstInStock?.id) {
+          initial[firstInStock.id] = 1;
+        }
+        setQuantities(initial);
       }
-      setQuantities(initial);
 
       Animated.spring(slideY, {
         toValue: 0,
@@ -76,7 +86,7 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
         useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
-  }, [visible, variants]);
+  }, [visible, variants, initialQuantities]);
 
   const handleIncrement = (variantId: string, maxStock: number) => {
     const current = quantities[variantId] || 0;
@@ -115,7 +125,7 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
   }, [variants, quantities, basePrice]);
 
   const handleConfirm = () => {
-    if (summary.totalQty === 0) return;
+    if (summary.totalQty === 0 && !hasInitialInCart) return;
     Haptics.success();
     if (onConfirmQuantities) {
       onConfirmQuantities(summary.selectedList);
@@ -283,22 +293,36 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
           <AppPressable
             haptic="success"
             onPress={handleConfirm}
-            disabled={summary.totalQty === 0}
+            disabled={summary.totalQty === 0 && !hasInitialInCart}
             rippleColor="rgba(255,255,255,0.24)"
             style={[
               styles.ctaBtn,
               summary.totalQty > 0
                 ? { backgroundColor: accent.DEFAULT }
+                : hasInitialInCart
+                ? { backgroundColor: colors.status.error }
                 : { backgroundColor: colors.grey[300] },
             ]}
-            accessibilityLabel="Ajouter au panier"
+            accessibilityLabel={summary.totalQty > 0 ? 'Valider les options' : 'Retirer du panier'}
           >
-            <ShoppingCart size={18} color={colors.text.inverse} strokeWidth={2.2} />
-            <AppText variant="label" color={colors.text.inverse} style={styles.ctaText}>
-              {summary.totalQty > 0
-                ? `Ajouter ${summary.totalQty} article${summary.totalQty > 1 ? 's' : ''} — ${formatFCFA(summary.totalPrice)}`
-                : 'Sélectionnez au moins une option'}
-            </AppText>
+            {summary.totalQty > 0 ? (
+              <>
+                <ShoppingCart size={18} color={colors.text.inverse} strokeWidth={2.2} />
+                <AppText variant="label" color={colors.text.inverse} style={styles.ctaText}>
+                  {hasInitialInCart
+                    ? `Enregistrer (${summary.totalQty}) — ${formatFCFA(summary.totalPrice)}`
+                    : `Ajouter ${summary.totalQty} article${summary.totalQty > 1 ? 's' : ''} — ${formatFCFA(summary.totalPrice)}`}
+                </AppText>
+              </>
+            ) : hasInitialInCart ? (
+              <AppText variant="label" color={colors.text.inverse} style={styles.ctaText}>
+                Retirer du panier (0 sélectionné)
+              </AppText>
+            ) : (
+              <AppText variant="label" color={colors.text.subtle} style={styles.ctaText}>
+                Sélectionnez au moins une option
+              </AppText>
+            )}
           </AppPressable>
         </View>
       </Animated.View>

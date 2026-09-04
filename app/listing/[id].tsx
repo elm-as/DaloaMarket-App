@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -19,7 +19,7 @@ import {
   useAccent,
   useResponsive,
 } from '@daloa/ui';
-import { Tag, MapPin, Truck } from 'lucide-react-native';
+import { Tag, MapPin, Truck, Check, Home, ChevronLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics, getListingPriceRange } from '@daloa/utils';
 import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
 import { ListingSellerBox } from '../../src/components/listing-detail/ListingSellerBox';
@@ -52,7 +52,7 @@ export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const accent = useAccent();
-  const { addToCart, updateQuantity, removeFromCart, items } = useCart();
+  const { addToCart, updateQuantity, removeFromCart, setListingVariants, items } = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
   const { user, isAuthenticated } = useAuth();
   const { width: screenWidth } = useResponsive();
@@ -84,6 +84,53 @@ export default function ListingDetailScreen() {
     });
   }, [listing?.id, user?.id]);
 
+  const variants = listing?.variants || [];
+  const priceInfo = useMemo(
+    () => (listing ? getListingPriceRange(listing.price, variants) : { min: 0, max: 0, hasRange: false, label: '' }),
+    [listing?.price, variants]
+  );
+
+  const hasVariants = variants.length > 0;
+  const listingCartItems = useMemo(
+    () => (listing?.id ? items.filter((i) => i.listing.id === listing.id) : []),
+    [items, listing?.id]
+  );
+  const totalListingCartQty = useMemo(
+    () => listingCartItems.reduce((sum, i) => sum + i.quantity, 0),
+    [listingCartItems]
+  );
+
+  const initialVariantQuantities = useMemo(() => {
+    const map: Record<string, number> = {};
+    listingCartItems.forEach((i) => {
+      if (i.variant?.id) {
+        map[i.variant.id] = i.quantity;
+      }
+    });
+    return map;
+  }, [listingCartItems]);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Remonter en haut de page dès qu'on navigue vers une autre annonce
+  useEffect(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+  }, [id]);
+
+  const handleBack = () => {
+    Haptics.lightImpact();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  };
+
+  const handleGoHome = () => {
+    Haptics.lightImpact();
+    router.replace('/(tabs)' as any);
+  };
+
   const avgRating =
     reviews.length > 0
       ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
@@ -94,10 +141,15 @@ export default function ListingDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.skeletonHeader}>
-          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.iconBtn}>
-            <AppText variant="body">←</AppText>
-          </AppPressable>
-          <Skeleton width={160} height={18} borderRadius={6} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <AppPressable onPress={handleBack} rippleBorderless style={styles.iconBtn} accessibilityLabel="Retour">
+              <ChevronLeft size={20} color={colors.text.body} />
+            </AppPressable>
+            <AppPressable onPress={handleGoHome} rippleBorderless style={styles.iconBtn} accessibilityLabel="Accueil">
+              <Home size={17} color={colors.text.body} />
+            </AppPressable>
+          </View>
+          <Skeleton width={140} height={18} borderRadius={6} />
           <View style={styles.iconBtn} />
         </View>
         <ScrollView contentContainerStyle={styles.skeletonScroll}>
@@ -115,11 +167,6 @@ export default function ListingDetailScreen() {
   const photos = listing.photos && listing.photos.length > 0 ? listing.photos : [FALLBACK_PHOTO];
   const seller = listing.seller;
   const isPro = Boolean(seller?.pro_until && new Date(seller.pro_until) > new Date());
-  const variants = listing.variants || [];
-  const priceInfo = React.useMemo(
-    () => getListingPriceRange(listing.price, variants),
-    [listing.price, variants]
-  );
   const activePrice = selectedVariant?.price ?? listing.price;
   const activePriceDisplay = selectedVariant
     ? formatFCFA(selectedVariant.price ?? listing.price)
@@ -159,8 +206,7 @@ export default function ListingDetailScreen() {
   };
 
   const handleAddToCart = () => {
-    if (variants.length > 0) {
-      // Ouvrir le picker de variantes
+    if (hasVariants) {
       setShowVariantPicker(true);
       return;
     }
@@ -171,9 +217,7 @@ export default function ListingDetailScreen() {
   const handleVariantsQuantitiesConfirm = (selections: { variant: ListingVariant; quantity: number }[]) => {
     setShowVariantPicker(false);
     Haptics.success();
-    selections.forEach(({ variant, quantity }) => {
-      addToCart(listing, variant, quantity);
-    });
+    setListingVariants(listing, selections);
   };
 
   const handleVariantConfirm = (variant: ListingVariant) => {
@@ -182,9 +226,21 @@ export default function ListingDetailScreen() {
     Haptics.success();
     addToCart(listing, variant, 1);
   };
+
   const handleBuyNow = () => {
+    if (hasVariants && totalListingCartQty === 0 && !selectedVariant) {
+      setShowVariantPicker(true);
+      return;
+    }
     Haptics.success();
-    router.push({ pathname: '/checkout' as any, params: { listingId: listing.id, variantId: selectedVariant?.id || '', quantity: '1' } });
+    router.push({
+      pathname: '/checkout' as any,
+      params: {
+        listingId: listing.id,
+        variantId: selectedVariant?.id || '',
+        quantity: totalListingCartQty > 0 ? String(totalListingCartQty) : '1',
+      },
+    });
   };
 
   const handleMarkSold = () => {
@@ -198,14 +254,15 @@ export default function ListingDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* ① Galerie avec nav flottante intégrée */}
         <ListingPhotosGallery
           photos={photos}
           screenWidth={screenWidth}
           isFavorite={isFavorite}
-          onBack={() => router.back()}
+          onBack={handleBack}
+          onGoHome={handleGoHome}
           onShare={handleShare}
           onToggleFavorite={() => id && toggleFavorite(id)}
           onReport={handleReport}
@@ -265,23 +322,41 @@ export default function ListingDetailScreen() {
           </View>
 
           {/* Variantes — signal visuel si options dispo */}
-          {variants.length > 0 && (
+          {hasVariants && (
             <AppPressable
               haptic="selection"
               onPress={() => setShowVariantPicker(true)}
-              style={[styles.variantBanner, { borderColor: accent[200], backgroundColor: accent[50] }]}
-              accessibilityLabel="Choisir une option"
+              style={[
+                styles.variantBanner,
+                {
+                  borderColor: totalListingCartQty > 0 ? accent[300] : accent[200],
+                  backgroundColor: totalListingCartQty > 0 ? accent[50] : colors.bg.surface,
+                },
+              ]}
+              accessibilityLabel="Choisir ou modifier les options"
             >
               <View style={styles.variantBannerLeft}>
-                <AppText variant="label" color={accent[700]}>
-                  {selectedVariant ? `Option : ${selectedVariant.label}` : 'Choisir une option'}
-                </AppText>
-                {selectedVariant?.price != null && (
+                <View style={styles.variantTitleRow}>
+                  {totalListingCartQty > 0 && (
+                    <Check size={14} color={accent[700]} strokeWidth={2.5} />
+                  )}
+                  <AppText variant="label" color={accent[700]}>
+                    {totalListingCartQty > 0
+                      ? `${totalListingCartQty} au panier`
+                      : selectedVariant
+                      ? `Option : ${selectedVariant.label}`
+                      : 'Choisir une option'}
+                  </AppText>
+                </View>
+                {totalListingCartQty > 0 ? (
+                  <AppText variant="caption" color={colors.text.subtle} numberOfLines={1}>
+                    {listingCartItems.map((i) => `${i.quantity}x ${i.variant?.label || 'Option'}`).join(' · ')}
+                  </AppText>
+                ) : selectedVariant?.price != null ? (
                   <AppText variant="caption" color={accent[600]}>
                     {formatFCFA(selectedVariant.price)}
                   </AppText>
-                )}
-                {!selectedVariant && (
+                ) : (
                   <AppText variant="caption" color={accent[500] ?? accent[600]}>
                     {variants.length} option{variants.length > 1 ? 's' : ''} disponible{variants.length > 1 ? 's' : ''}
                   </AppText>
@@ -289,7 +364,7 @@ export default function ListingDetailScreen() {
               </View>
               <View style={[styles.variantBannerBadge, { backgroundColor: accent.DEFAULT }]}>
                 <AppText variant="overline" color={colors.text.inverse}>
-                  {selectedVariant ? 'Modifier' : 'Choisir'}
+                  {totalListingCartQty > 0 || selectedVariant ? 'Modifier' : 'Choisir'}
                 </AppText>
               </View>
             </AppPressable>
@@ -380,7 +455,7 @@ export default function ListingDetailScreen() {
                         district: simItem.district,
                         createdAt: simItem.created_at,
                       }}
-                      onPress={() => router.push(`/listing/${simItem.id}` as any)}
+                      onPress={() => router.replace(`/listing/${simItem.id}` as any)}
                     />
                   </View>
                 ))}
@@ -393,7 +468,7 @@ export default function ListingDetailScreen() {
       </ScrollView>
 
       {/* Picker variantes */}
-      {variants.length > 0 && (
+      {hasVariants && (
         <VariantPickerSheet
           visible={showVariantPicker}
           onClose={() => setShowVariantPicker(false)}
@@ -402,14 +477,17 @@ export default function ListingDetailScreen() {
           listingTitle={listing.title}
           listingPhoto={photos[0]}
           basePrice={listing.price}
+          initialQuantities={initialVariantQuantities}
         />
       )}
 
       {/* Sticky footer */}
       <ListingStickyFooter
-        cartQty={cartQty}
+        cartQty={hasVariants ? totalListingCartQty : cartQty}
         cartItemId={cartItemId}
+        hasVariants={hasVariants}
         onAddToCart={handleAddToCart}
+        onOpenOptions={() => setShowVariantPicker(true)}
         onUpdateQty={updateQuantity}
         onRemoveFromCart={removeFromCart}
         onBuyNow={handleBuyNow}
@@ -523,6 +601,11 @@ const styles = StyleSheet.create({
   variantBannerLeft: {
     flex: 1,
     gap: 2,
+  },
+  variantTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   variantBannerBadge: {
     paddingHorizontal: spacing[3],

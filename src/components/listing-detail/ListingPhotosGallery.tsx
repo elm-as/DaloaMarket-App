@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Image } from 'expo-image';
-import { ChevronLeft, Share2, Heart, Flag } from 'lucide-react-native';
+import { ChevronLeft, Share2, Heart, Flag, Home } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable } from '@daloa/ui';
 
 interface ListingPhotosGalleryProps {
@@ -9,12 +9,12 @@ interface ListingPhotosGalleryProps {
   screenWidth: number;
   isFavorite: boolean;
   onBack: () => void;
+  onGoHome?: () => void;
   onShare: () => void;
   onToggleFavorite: () => void;
   onReport: () => void;
 }
 
-const BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
 const FALLBACK = 'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=600';
 
 export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
@@ -22,6 +22,7 @@ export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
   screenWidth,
   isFavorite,
   onBack,
+  onGoHome,
   onShare,
   onToggleFavorite,
   onReport,
@@ -48,23 +49,37 @@ export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
             style={[styles.galleryImage, { width: screenWidth || '100%' }]}
             contentFit="cover"
             transition={Platform.OS === 'web' ? 0 : 220}
-            placeholder={Platform.OS === 'web' ? undefined : { blurhash: BLURHASH }}
             cachePolicy="memory-disk"
           />
         ))}
       </ScrollView>
 
-      {/* Floating top-left: back button */}
-      <AppPressable
-        onPress={onBack}
-        rippleBorderless
-        haptic="light"
-        style={styles.floatBack}
-        accessibilityRole="button"
-        accessibilityLabel="Retour"
-      >
-        <ChevronLeft size={20} color={colors.text.inverse} />
-      </AppPressable>
+      {/* Floating top-left: back and home buttons */}
+      <View style={styles.floatLeft}>
+        <AppPressable
+          onPress={onBack}
+          rippleBorderless
+          haptic="light"
+          style={styles.floatBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <ChevronLeft size={20} color={colors.text.inverse} />
+        </AppPressable>
+
+        {onGoHome && (
+          <AppPressable
+            onPress={onGoHome}
+            rippleBorderless
+            haptic="light"
+            style={styles.floatBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Retour à l'accueil"
+          >
+            <Home size={17} color={colors.text.inverse} />
+          </AppPressable>
+        )}
+      </View>
 
       {/* Floating top-right: share, heart, report */}
       <View style={styles.floatRight}>
@@ -140,18 +155,14 @@ const styles = StyleSheet.create({
   galleryImage: {
     height: 320,
   },
-  floatBack: {
+  floatLeft: {
     position: 'absolute',
     top: spacing[3],
     left: spacing[3],
-    width: 38,
-    height: 38,
-    borderRadius: radii.xl,
-    backgroundColor: FROSTED,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
     zIndex: 10,
-    overflow: 'hidden',
   },
   floatRight: {
     position: 'absolute',

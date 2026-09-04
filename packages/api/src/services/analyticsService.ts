@@ -43,11 +43,11 @@ export const analyticsService = {
         props: props ?? {},
       })
       .then(({ error }) => {
-        if (error && __DEV__) {
+        if (error && typeof __DEV__ !== 'undefined' && __DEV__) {
           console.warn('[analytics] logEvent échoué:', eventName, error.message);
         }
       });
   },
 };
 
-declare const __DEV__: boolean;
+declare const __DEV__: boolean | undefined;

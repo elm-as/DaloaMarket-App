@@ -28,3 +28,4 @@ export * from './components/DeliveryCodeCard';
 export * from './components/CategoryGrid';
 export * from './components/WhatsAppIcon';
 export * from './components/GoogleIcon';
+export * from './components/ConfirmDialog';

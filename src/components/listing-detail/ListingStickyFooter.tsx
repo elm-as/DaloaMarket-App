@@ -7,7 +7,9 @@ import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa
 interface ListingStickyFooterProps {
   cartQty: number;
   cartItemId?: string;
+  hasVariants?: boolean;
   onAddToCart: () => void;
+  onOpenOptions?: () => void;
   onUpdateQty: (itemId: string, qty: number) => void;
   onRemoveFromCart: (itemId: string) => void;
   onBuyNow: () => void;
@@ -17,7 +19,9 @@ interface ListingStickyFooterProps {
 export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
   cartQty,
   cartItemId,
+  hasVariants = false,
   onAddToCart,
+  onOpenOptions,
   onUpdateQty,
   onRemoveFromCart,
   onBuyNow,
@@ -52,9 +56,48 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing[3]) }]}>
-      {/* Ligne 1 : stepper / Ajouter au panier */}
+      {/* Ligne 1 : stepper ou bouton options / Ajouter au panier */}
       <View style={styles.row}>
-        {cartQty > 0 ? (
+        {hasVariants ? (
+          cartQty > 0 ? (
+            <AppPressable
+              haptic="light"
+              onPress={onOpenOptions || onAddToCart}
+              style={[
+                styles.variantFooterBtn,
+                { backgroundColor: accent[50], borderColor: accent[300] },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Gérer les ${cartQty} articles au panier`}
+            >
+              <View style={styles.variantFooterLeft}>
+                <Check size={16} color={accent[700]} strokeWidth={2.5} />
+                <AppText variant="bodyStrong" color={accent[800] ?? accent[700]}>
+                  {cartQty} au panier
+                </AppText>
+              </View>
+              <View style={[styles.variantFooterPill, { backgroundColor: accent.DEFAULT }]}>
+                <Edit3 size={13} color={colors.text.inverse} />
+                <AppText variant="label" color={colors.text.inverse}>
+                  Modifier les options
+                </AppText>
+              </View>
+            </AppPressable>
+          ) : (
+            <AppPressable
+              haptic="light"
+              onPress={onOpenOptions || onAddToCart}
+              style={[styles.addBtn, { backgroundColor: accent.DEFAULT }]}
+              accessibilityRole="button"
+              accessibilityLabel="Choisir les options du produit"
+            >
+              <ShoppingCart size={16} color={colors.text.inverse} strokeWidth={2} />
+              <AppText variant="label" color={colors.text.inverse}>
+                Choisir les options
+              </AppText>
+            </AppPressable>
+          )
+        ) : cartQty > 0 ? (
           <>
             <View style={[styles.stepper, { borderColor: accent[200], backgroundColor: accent[50] }]}>
               <AppPressable
@@ -94,6 +137,7 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
             haptic="light"
             onPress={onAddToCart}
             style={[styles.addBtn, { backgroundColor: accent.DEFAULT }]}
+            accessibilityRole="button"
             accessibilityLabel="Ajouter au panier"
           >
             <ShoppingCart size={16} color={colors.text.inverse} strokeWidth={2} />
@@ -204,5 +248,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
+  },
+  // ─── Variante en cart ───
+  variantFooterBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 48,
+    borderRadius: radii.xl,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing[3],
+    overflow: 'hidden',
+  },
+  variantFooterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  variantFooterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing[3],
+    paddingVertical: 6,
+    borderRadius: radii.full,
   },
 });

@@ -129,7 +129,7 @@ export const AppText: React.FC<AppTextProps> = ({
   children,
   ...rest
 }) => {
-  const spec = VARIANTS[variant];
+  const spec = VARIANTS[variant] || VARIANTS.body;
 
   const resolved: TextStyle = {
     fontSize: spec.size,

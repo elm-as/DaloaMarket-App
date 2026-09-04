@@ -130,20 +130,8 @@ export function CheckoutStepPayment({
         </AppText>
       </View>
 
-      {/* Boutons de navigation */}
+      {/* Boutons d'action pleine largeur */}
       <View style={styles.navRow}>
-        <Button
-          title="Retour"
-          variant="outline"
-          size="lg"
-          leftIcon={<ArrowLeft size={16} color={colors.text.body} />}
-          onPress={() => {
-            Haptics.lightImpact();
-            onBack();
-          }}
-          disabled={isSubmitting}
-          style={styles.backBtn}
-        />
         <Button
           title={isSubmitting ? 'Traitement en cours...' : actionLabel}
           variant="primary"
@@ -153,7 +141,20 @@ export function CheckoutStepPayment({
             onSubmit();
           }}
           disabled={isSubmitting}
-          style={styles.confirmBtn}
+          fullWidth
+        />
+        <Button
+          title="Modifier l'adresse ou la livraison"
+          variant="outline"
+          size="md"
+          leftIcon={<ArrowLeft size={16} color={colors.text.body} />}
+          onPress={() => {
+            Haptics.lightImpact();
+            onBack();
+          }}
+          disabled={isSubmitting}
+          fullWidth
+          style={styles.backBtn}
         />
       </View>
     </View>
@@ -207,15 +208,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
   },
   navRow: {
-    flexDirection: 'row',
     gap: spacing[2],
     marginTop: spacing[2],
   },
   backBtn: {
-    flex: 1,
-  },
-  confirmBtn: {
-    flex: 2,
+    marginTop: 2,
   },
   flex1: {
     flex: 1,

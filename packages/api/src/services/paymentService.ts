@@ -59,8 +59,15 @@ export const paymentService = {
       throw new Error(data?.message || 'Échec de l’initialisation du paiement.');
     }
 
-    // Non-order renvoie paymentUrl ; order renvoie payment_url.
-    const paymentUrl = data.paymentUrl || data.payment_url || '';
+    // Récupération de l'URL de paiement avec repli exhaustif (paymentUrl, payment_url, url directe, token)
+    const paymentUrl =
+      data.paymentUrl ||
+      data.payment_url ||
+      data.url ||
+      (data.token
+        ? `https://payin.moneyfusion.net/payment/${data.token}/${input.amount || ''}/${encodeURIComponent(input.customerName || 'Client')}`
+        : '');
+
     return {
       success: true,
       paymentUrl,

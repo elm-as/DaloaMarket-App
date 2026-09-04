@@ -29,6 +29,46 @@ export default function DeleteAccountScreen() {
 
   const handleDelete = () => {
     if (!canDelete) return;
+
+    const performDelete = async () => {
+      try {
+        setIsDeleting(true);
+        await authService.deleteAccount();
+        Haptics.warning();
+        if (Platform.OS === 'web') {
+          if (typeof window !== 'undefined') window.alert('Votre demande de suppression a été prise en compte. Vous êtes déconnecté.');
+          router.replace('/(tabs)' as any);
+        } else {
+          Alert.alert(
+            'Compte supprimé',
+            'Votre demande de suppression a été prise en compte. Vous êtes déconnecté.',
+            [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
+          );
+        }
+      } catch (err: any) {
+        await logout().catch(() => {});
+        if (Platform.OS === 'web') {
+          if (typeof window !== 'undefined') window.alert('Votre compte sera supprimé sous peu. Vous êtes déconnecté.');
+          router.replace('/(tabs)' as any);
+        } else {
+          Alert.alert(
+            'Demande enregistrée',
+            'Votre compte sera supprimé sous peu. Vous êtes déconnecté.',
+            [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
+          );
+        }
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Supprimer définitivement votre compte ? Cette action ne peut pas être annulée.')) {
+        void performDelete();
+      }
+      return;
+    }
+
     Alert.alert(
       'Supprimer définitivement ?',
       'Votre compte et toutes vos données seront supprimés. Cette action ne peut pas être annulée.',
@@ -37,27 +77,7 @@ export default function DeleteAccountScreen() {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsDeleting(true);
-              await authService.deleteAccount();
-              Haptics.warning();
-              Alert.alert(
-                'Compte supprimé',
-                'Votre demande de suppression a été prise en compte. Vous êtes déconnecté.',
-                [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
-              );
-            } catch (err: any) {
-              await logout().catch(() => {});
-              Alert.alert(
-                'Demande enregistrée',
-                'Votre compte sera supprimé sous peu. Vous êtes déconnecté.',
-                [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
-              );
-            } finally {
-              setIsDeleting(false);
-            }
-          },
+          onPress: performDelete,
         },
       ]
     );

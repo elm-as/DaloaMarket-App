@@ -1,9 +1,10 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import * as Location from 'expo-location';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
-import { MapPin, Navigation, LocateFixed } from 'lucide-react-native';
+import { MapPin, Navigation, LocateFixed, Plus, Minus } from 'lucide-react-native';
 import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics } from '@daloa/utils';
 
 interface DeliveryLocationMapProps {
@@ -22,9 +23,20 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
   onDistanceChange,
 }) => {
   const accent = useAccent();
+  const [zoom, setZoom] = useState(14);
   const currentLat = latitude ?? DALOA_CENTER.lat;
   const currentLng = longitude ?? DALOA_CENTER.lng;
   const [isLocating, setIsLocating] = useState(false);
+
+  const mapboxStaticUrl = useMemo(() => {
+    if (!MAPBOX_PUBLIC_TOKEN) return null;
+    const sLat = sellerCoords?.latitude;
+    const sLng = sellerCoords?.longitude;
+    if (sLat != null && sLng != null) {
+      return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
+    }
+    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
+  }, [currentLat, currentLng, sellerCoords, zoom]);
 
   const [routeInfo, setRouteInfo] = useState<DrivingRouteResult>({
     distanceKm: 2.5,
@@ -216,6 +228,35 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
             style={styles.iframe}
             title="Carte de livraison à Daloa"
           />
+        ) : mapboxStaticUrl ? (
+          <View style={styles.nativeMapContainer}>
+            <Image
+              source={{ uri: mapboxStaticUrl }}
+              style={styles.staticMapImage}
+              contentFit="cover"
+              transition={150}
+              cachePolicy="memory-disk"
+            />
+            <View style={styles.zoomButtons}>
+              <AppPressable
+                haptic="light"
+                onPress={() => setZoom((z) => Math.min(18, z + 1))}
+                style={styles.zoomBtn}
+                accessibilityLabel="Zoom avant"
+              >
+                <Plus size={14} color={colors.text.DEFAULT} strokeWidth={2.5} />
+              </AppPressable>
+              <View style={styles.zoomDivider} />
+              <AppPressable
+                haptic="light"
+                onPress={() => setZoom((z) => Math.max(11, z - 1))}
+                style={styles.zoomBtn}
+                accessibilityLabel="Zoom arrière"
+              >
+                <Minus size={14} color={colors.text.DEFAULT} strokeWidth={2.5} />
+              </AppPressable>
+            </View>
+          </View>
         ) : (
           <View style={styles.nativeFallback}>
             <MapPin size={24} color={accent.DEFAULT} />
@@ -292,6 +333,39 @@ const styles = StyleSheet.create({
     height: '100%',
     border: 'none',
   } as any,
+  nativeMapContainer: {
+    ...StyleSheet.absoluteFillObject,
+    position: 'relative',
+  },
+  staticMapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  zoomButtons: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    overflow: 'hidden',
+  },
+  zoomBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomDivider: {
+    height: 1,
+    backgroundColor: colors.border.subtle,
+  },
   nativeFallback: {
     flex: 1,
     alignItems: 'center',

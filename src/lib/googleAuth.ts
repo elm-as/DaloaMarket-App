@@ -30,7 +30,7 @@ function extractParam(url: string, key: string): string | null {
 export async function signInWithGoogle(): Promise<void> {
   const redirectTo =
     Platform.OS === 'web' && typeof window !== 'undefined'
-      ? `${window.location.origin}/`
+      ? `${window.location.origin}/auth/callback`
       : Linking.createURL('auth/callback'); // -> daloamarket://auth/callback en build
 
   const { data, error } = await supabase.auth.signInWithOAuth({

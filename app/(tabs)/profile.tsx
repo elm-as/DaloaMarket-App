@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Share, Alert, Linking, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, Share, Alert, Linking, RefreshControl, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '@daloa/api';
-import { colors } from '@daloa/ui';
+import { colors, useAccent, ConfirmDialog } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { ProfileGuestView } from '../../src/components/profile/ProfileGuestView';
 import { ProfileHero } from '../../src/components/profile/ProfileHero';
@@ -15,7 +15,8 @@ import { ProfileMenuSections } from '../../src/components/profile/ProfileMenuSec
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, profile, logout, isAuthenticated } = useAuth();
+  const accent = useAccent();
+  const { user, profile, logout, isAuthenticated, isLoading } = useAuth();
 
   const [stats, setStats] = useState({
     activeCount: 0,
@@ -23,6 +24,8 @@ export default function ProfileScreen() {
     reviewCount: 0,
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const isPro = Boolean(profile?.pro_until && new Date(profile.pro_until) > new Date());
   const hasShopGps = Boolean(
@@ -85,26 +88,43 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter de DaloaMarket ?', [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Déconnexion',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          Haptics.lightImpact();
-          router.replace('/(tabs)' as any);
-        },
-      },
-    ]);
+    setShowLogoutDialog(true);
   };
+
+  const handleConfirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      Haptics.lightImpact();
+      setShowLogoutDialog(false);
+      router.replace('/(tabs)' as any);
+    } catch (err) {
+      console.warn('Erreur lors de la déconnexion:', err);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingCenter]}>
+        <ActivityIndicator size="large" color={accent.DEFAULT} />
+      </View>
+    );
+  }
 
   if (!isAuthenticated || !user) {
     return <ProfileGuestView />;
   }
 
-  const displayName = profile?.shop_name || profile?.full_name || 'Commerçant Daloa';
-  const displayPhone = profile?.phone || '';
+  const displayName =
+    profile?.shop_name ||
+    profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    (user?.email && !user.email.includes('@daloamarket.ci') ? user.email.split('@')[0] : '') ||
+    'Commerçant Daloa';
+  const displayPhone = profile?.phone || user?.user_metadata?.phone || '';
+  const displayAvatar = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
   return (
     <View style={styles.container}>
@@ -112,13 +132,13 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#EA580C" />
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={accent.DEFAULT} />
         }
       >
         {/* 1. Hero identity banner */}
         <ProfileHero
           displayName={displayName}
-          avatarUrl={profile?.avatar_url}
+          avatarUrl={displayAvatar}
           phone={displayPhone}
           district={profile?.district}
           rating={profile?.rating}
@@ -177,6 +197,19 @@ export default function ProfileScreen() {
           onLogout={handleLogout}
         />
       </ScrollView>
+
+      {/* Dialogue de confirmation de déconnexion stylisé */}
+      <ConfirmDialog
+        visible={showLogoutDialog}
+        type="danger"
+        title="Déconnexion"
+        message="Voulez-vous vraiment vous déconnecter de votre compte DaloaMarket ?"
+        confirmText="Déconnexion"
+        cancelText="Annuler"
+        isLoading={isLoggingOut}
+        onCancel={() => setShowLogoutDialog(false)}
+        onConfirm={handleConfirmLogout}
+      />
     </View>
   );
 }
@@ -185,6 +218,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg.DEFAULT,
+  },
+  loadingCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     paddingBottom: 40,

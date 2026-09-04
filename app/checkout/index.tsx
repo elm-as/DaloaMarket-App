@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, ActivityIndicator, Platform, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,14 +19,27 @@ import { CheckoutStepLocation } from '../../src/components/checkout/CheckoutStep
 import { CheckoutStepPayment } from '../../src/components/checkout/CheckoutStepPayment';
 import { PaymentMode, MobileMoneyOperator } from '../../src/components/checkout/PaymentMethodSelector';
 
+async function openPaymentGateway(paymentUrl: string) {
+  if (Platform.OS === 'web') {
+    window.location.href = paymentUrl;
+    return;
+  }
+  try {
+    await WebBrowser.openBrowserAsync(paymentUrl);
+  } catch (err) {
+    console.warn('[Checkout] WebBrowser a échoué, repli sur Linking:', err);
+    await Linking.openURL(paymentUrl);
+  }
+}
+
 const FALLBACK_PHOTO = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
-  const { listingId, variantId, qty, cart } = useLocalSearchParams<{ listingId?: string; variantId?: string; qty?: string; cart?: string }>();
-  const quantity = Math.max(1, parseInt(qty || '1', 10));
+  const { listingId, variantId, qty, quantity: qtyParam, cart } = useLocalSearchParams<{ listingId?: string; variantId?: string; qty?: string; quantity?: string; cart?: string }>();
+  const quantity = Math.max(1, parseInt(qty || qtyParam || '1', 10));
   const isCartMode = cart === '1';
 
   const { user, profile, isAuthenticated } = useAuth();
@@ -201,11 +214,8 @@ export default function CheckoutScreen() {
 
           Haptics.success();
           clearCart();
-          if (Platform.OS === 'web') {
-            window.location.href = result.paymentUrl;
-            return;
-          }
-          await WebBrowser.openBrowserAsync(result.paymentUrl);
+          await openPaymentGateway(result.paymentUrl);
+          if (Platform.OS === 'web') return;
 
           let orderId: string | null = null;
           if (result.transactionId) {
@@ -281,11 +291,8 @@ export default function CheckoutScreen() {
         });
 
         Haptics.success();
-        if (Platform.OS === 'web') {
-          window.location.href = result.paymentUrl;
-          return;
-        }
-        await WebBrowser.openBrowserAsync(result.paymentUrl);
+        await openPaymentGateway(result.paymentUrl);
+        if (Platform.OS === 'web') return;
 
         // Résout la commande créée côté serveur après paiement (quelques essais).
         let orderId: string | null = null;

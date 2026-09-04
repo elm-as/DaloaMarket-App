@@ -47,7 +47,7 @@ export const HomeHero: React.FC = () => {
 
           <AppPressable onPress={() => router.push('/legal/how-it-works' as any)} style={styles.secondaryBtn}>
             <AppText variant="label" color={colors.text.inverse} numberOfLines={1}>
-              Comment ça marche ?
+              Guide d'achat
             </AppText>
           </AppPressable>
         </View>
@@ -59,7 +59,7 @@ export const HomeHero: React.FC = () => {
         <View style={styles.trustDivider} />
         <TrustItem tint={accent[50]} icon={<MapPin size={14} color={accent.DEFAULT} />} title="Daloa" sub="Certifiés" />
         <View style={styles.trustDivider} />
-        <TrustItem tint={colors.status.infoLight} icon={<Sparkles size={14} color={colors.status.infoDark} />} title="0 Frais" sub="Sans frais" />
+        <TrustItem tint={colors.status.infoLight} icon={<Sparkles size={14} color={colors.status.infoDark} />} title="0 Frais" sub="Garantis" />
       </View>
     </View>
   );

@@ -25,12 +25,24 @@ const EMPTY_FILTERS: SearchFilterValues = {
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { items, addToCart, updateQuantity } = useCart();
+  const { items, addToCart, updateQuantity, setListingVariants } = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
   const { gridColumns } = useResponsive();
   const { user } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
+
+  const activeListingInitialQuantities = useMemo(() => {
+    if (!activeVariantListing) return undefined;
+    const map: Record<string, number> = {};
+    items
+      .filter((i) => i.listing.id === activeVariantListing.id && i.variant?.id)
+      .forEach((i) => {
+        if (i.variant?.id) map[i.variant.id] = i.quantity;
+      });
+    return map;
+  }, [items, activeVariantListing]);
 
   // Log de recherche débouncé (évite un event par frappe) — graine pour le ML
   useEffect(() => {
@@ -48,7 +60,6 @@ export default function SearchScreen() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState<SearchFilterValues>(EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
-  const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
 
   const searchFilters = useMemo(
     () => ({
@@ -118,8 +129,9 @@ export default function SearchScreen() {
 
   const getCartQty = useCallback(
     (listingId: string) => {
-      const it = items.find((i) => i.listing.id === listingId);
-      return it ? it.quantity : 0;
+      return items
+        .filter((i) => i.listing.id === listingId)
+        .reduce((sum, i) => sum + i.quantity, 0);
     },
     [items]
   );
@@ -279,10 +291,9 @@ export default function SearchScreen() {
           listingTitle={activeVariantListing.title}
           listingPhoto={activeVariantListing.photos?.[0]}
           basePrice={activeVariantListing.price}
+          initialQuantities={activeListingInitialQuantities}
           onConfirmQuantities={(selections) => {
-            selections.forEach(({ variant, quantity }) => {
-              addToCart(activeVariantListing, variant, quantity);
-            });
+            setListingVariants(activeVariantListing, selections);
             setActiveVariantListing(null);
           }}
         />

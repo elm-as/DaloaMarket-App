@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
-import { MapPin, Navigation, LocateFixed, AlertTriangle } from 'lucide-react-native';
+import { MapPin, Navigation, LocateFixed, AlertTriangle, Plus, Minus } from 'lucide-react-native';
 
 interface ShopLocationMapProps {
   latitude: number | null;
@@ -20,9 +21,15 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
   isLocating = false,
 }) => {
   const accent = useAccent();
+  const [zoom, setZoom] = useState(14);
   const currentLat = latitude ?? DALOA_CENTER.lat;
   const currentLng = longitude ?? DALOA_CENTER.lng;
   const hasCustomCoords = latitude != null && longitude != null;
+
+  const mapboxStaticUrl = useMemo(() => {
+    if (!MAPBOX_PUBLIC_TOKEN) return null;
+    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
+  }, [currentLat, currentLng, zoom]);
 
   // HTML interactif Leaflet OpenStreetMap autonome
   const mapHtml = useMemo(() => {
@@ -167,6 +174,36 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
             style={styles.iframe}
             title="Carte d'emplacement de boutique à Daloa"
           />
+        ) : mapboxStaticUrl ? (
+          <View style={styles.nativeMapContainer}>
+            <Image
+              source={{ uri: mapboxStaticUrl }}
+              style={styles.staticMapImage}
+              contentFit="cover"
+              transition={150}
+              cachePolicy="memory-disk"
+            />
+            {/* Boutons de zoom natifs */}
+            <View style={styles.zoomButtons}>
+              <AppPressable
+                haptic="light"
+                onPress={() => setZoom((z) => Math.min(18, z + 1))}
+                style={styles.zoomBtn}
+                accessibilityLabel="Zoom avant"
+              >
+                <Plus size={15} color={colors.text.DEFAULT} strokeWidth={2.5} />
+              </AppPressable>
+              <View style={styles.zoomDivider} />
+              <AppPressable
+                haptic="light"
+                onPress={() => setZoom((z) => Math.max(11, z - 1))}
+                style={styles.zoomBtn}
+                accessibilityLabel="Zoom arrière"
+              >
+                <Minus size={15} color={colors.text.DEFAULT} strokeWidth={2.5} />
+              </AppPressable>
+            </View>
+          </View>
         ) : (
           <View style={styles.nativeFallback}>
             <MapPin size={28} color={accent.DEFAULT} />
@@ -250,6 +287,39 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderWidth: 0,
+  },
+  nativeMapContainer: {
+    ...StyleSheet.absoluteFillObject,
+    position: 'relative',
+  },
+  staticMapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  zoomButtons: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    overflow: 'hidden',
+  },
+  zoomBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomDivider: {
+    height: 1,
+    backgroundColor: colors.border.subtle,
   },
   nativeFallback: {
     flex: 1,
