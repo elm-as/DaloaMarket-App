@@ -166,7 +166,7 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
           >
             <ShoppingCart size={16} color={colors.text.inverse} strokeWidth={2} />
             <AppText variant="label" color={colors.text.inverse}>
-              + Ajouter au panier
+              Ajouter au panier
             </AppText>
           </AppPressable>
         )}
@@ -177,11 +177,11 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
         haptic="success"
         onPress={onBuyNow}
         style={[styles.buyBtn, { borderColor: accent[300] }]}
-        accessibilityLabel="Commander avec paiement séquestre"
+        accessibilityLabel="Acheter maintenant"
       >
         <CreditCard size={15} color={accent[700]} strokeWidth={2} />
         <AppText variant="label" color={accent[700]}>
-          Commander directement (Paiement sécurisé)
+          Acheter maintenant
         </AppText>
         <Lock size={13} color={accent[500] ?? accent[400]} />
       </AppPressable>

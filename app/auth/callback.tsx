@@ -30,9 +30,16 @@ export default function AuthCallbackScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    // 1. Écoute immédiate si la session s'établit en parallèle
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && !cancelled) {
+        const target = params.returnTo || '/(tabs)/profile';
+        router.replace(target as any);
+      }
+    });
+
+    const processAuth = async (incomingUrl?: string | null) => {
       try {
-        // Extraction erreurs éventuelles en query (sécurisé pour natif et web)
         const isWeb = Platform.OS === 'web' && typeof window !== 'undefined' && Boolean(window.location);
         const webSearch = isWeb ? new URLSearchParams(window.location.search) : null;
         const errDesc = params.error_description || webSearch?.get('error_description') || webSearch?.get('error');
@@ -40,20 +47,20 @@ export default function AuthCallbackScreen() {
 
         const code = params.code || webSearch?.get('code');
 
-        // 1. Flux PKCE : code d'autorisation en paramètre de requête.
+        // 1. Flux PKCE
         if (code) {
           const { error: exErr } = await supabase.auth.exchangeCodeForSession(String(code));
           if (exErr) throw exErr;
         } else {
-          // 2. Flux implicite : access_token / refresh_token dans le fragment (#...).
+          // 2. Flux implicite / tokens dans le fragment
           let frag: string | null = null;
           if (isWeb && window.location.hash) {
             frag = window.location.hash.startsWith('#')
               ? window.location.hash.substring(1)
               : window.location.hash;
           } else {
-            const initialUrl = await Linking.getInitialURL();
-            frag = initialUrl?.includes('#') ? initialUrl.split('#')[1] : null;
+            const rawUrl = incomingUrl || (await Linking.getInitialURL());
+            frag = rawUrl?.includes('#') ? rawUrl.split('#')[1] : null;
           }
 
           const tokens = parseFragment(frag);
@@ -68,10 +75,10 @@ export default function AuthCallbackScreen() {
             });
             if (sessErr) throw sessErr;
           } else {
-            // Vérification si la session a déjà été détectée
             const { data: currentSession } = await supabase.auth.getSession();
             if (!currentSession?.session) {
-              throw new Error('Session introuvable dans le retour de connexion.');
+              // Attendre brièvement la session
+              return;
             }
           }
         }
@@ -85,12 +92,33 @@ export default function AuthCallbackScreen() {
         setError(e.message || 'Échec de la connexion. Veuillez réessayer.');
         setTimeout(() => router.replace('/auth/login' as any), 2500);
       }
-    })();
+    };
+
+    void processAuth();
+
+    // Écoute des liens entrants (warm app state)
+    const urlSub = Linking.addEventListener('url', ({ url }) => {
+      void processAuth(url);
+    });
+
+    // Garde-fou anti-blocage : après 3s, si la session est active on redirige, sinon repli login
+    const safetyTimer = setTimeout(async () => {
+      if (cancelled) return;
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        router.replace((params.returnTo || '/(tabs)/profile') as any);
+      } else {
+        router.replace('/auth/login' as any);
+      }
+    }, 3500);
 
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
+      urlSub.remove();
+      clearTimeout(safetyTimer);
     };
-  }, [params.code]);
+  }, [params.code, params.returnTo, router]);
 
   return (
     <View style={styles.container}>

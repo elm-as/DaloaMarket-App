@@ -82,10 +82,20 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
     return getListingPriceRange(listing.price, listing.variants);
   }, [listing.price, listing.variants, listing.minPrice, listing.maxPrice]);
 
-  const mainPhoto =
-    listing.photos && listing.photos.length > 0 && listing.photos[0]
+  const initialPhoto =
+    Array.isArray(listing.photos) && listing.photos.length > 0 && typeof listing.photos[0] === 'string' && listing.photos[0].startsWith('http')
       ? listing.photos[0]
       : FALLBACK_PHOTO;
+
+  const [photoUri, setPhotoUri] = React.useState(initialPhoto);
+
+  React.useEffect(() => {
+    const next =
+      Array.isArray(listing.photos) && listing.photos.length > 0 && typeof listing.photos[0] === 'string' && listing.photos[0].startsWith('http')
+        ? listing.photos[0]
+        : FALLBACK_PHOTO;
+    setPhotoUri(next);
+  }, [listing.photos]);
 
   const cartQty = listing.cartQty || 0;
   const maxStock = listing.stock ?? 1;
@@ -114,14 +124,13 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
       {/* 1. Visuel Produit (Ratio 4/3) */}
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: mainPhoto }}
+          source={{ uri: photoUri }}
           style={styles.image}
           contentFit="cover"
-          transition={150}
+          transition={120}
           cachePolicy="memory-disk"
-          recyclingKey={listing.id}
           allowDownscaling={true}
-          priority="low"
+          onError={() => setPhotoUri(FALLBACK_PHOTO)}
         />
 
         {/* Badges superposés à gauche */}

@@ -58,8 +58,7 @@ export const CartSummaryCard: React.FC<CartSummaryCardProps> = ({
         <View style={styles.escrowBanner}>
           <ShieldCheck size={16} color={colors.status.successDark} />
           <AppText variant="caption" color={colors.status.successDark} style={styles.escrowText}>
-            Paiement 100% protégé par séquestre. Le vendeur n'est crédité qu'après confirmation de votre
-            code OTP à la livraison.
+            Paiement protégé par séquestre et libéré après confirmation OTP.
           </AppText>
         </View>
 
@@ -70,11 +69,11 @@ export const CartSummaryCard: React.FC<CartSummaryCardProps> = ({
           rippleColor="rgba(255,255,255,0.24)"
           style={[styles.checkoutBtn, { backgroundColor: accent.DEFAULT }]}
           accessibilityRole="button"
-          accessibilityLabel="Commander via séquestre"
+          accessibilityLabel="Valider la commande"
         >
           <Lock size={15} color={colors.text.inverse} />
           <AppText variant="label" color={colors.text.inverse}>
-            Commander via Séquestre
+            Valider la commande
           </AppText>
           <ArrowRight size={15} color={colors.text.inverse} />
         </AppPressable>

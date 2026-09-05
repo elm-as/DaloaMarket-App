@@ -33,12 +33,11 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
     Linking.openURL(url).catch(() => {});
   };
 
+  const activeToken = MAPBOX_PUBLIC_TOKEN;
+
   const staticMapUrl = useMemo(() => {
-    if (MAPBOX_PUBLIC_TOKEN) {
-      return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`;
-    }
-    return `https://staticmap.openstreetmap.de/staticmap.php?center=${currentLat.toFixed(5)},${currentLng.toFixed(5)}&zoom=${zoom}&size=640x360&maptype=mapnik&markers=${currentLat.toFixed(5)},${currentLng.toFixed(5)},ol-marker`;
-  }, [currentLat, currentLng, zoom]);
+    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
+  }, [currentLat, currentLng, zoom, activeToken]);
 
   // HTML interactif Leaflet OpenStreetMap autonome
   const mapHtml = useMemo(() => {

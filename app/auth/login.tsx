@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { signInWithGoogle } from '../../src/lib/googleAuth';
+import { supabase } from '@daloa/api';
 import {
   colors,
   radii,
@@ -25,13 +26,19 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const accent = useAccent();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
 
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)/profile' as any);
+    }
+  }, [isAuthenticated, router]);
 
   const handleLogin = async () => {
     if (!emailOrPhone.trim()) {
@@ -62,6 +69,11 @@ export default function LoginScreen() {
       setIsGoogleLoading(true);
       setErrorMsg(null);
       await signInWithGoogle();
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        Haptics.success();
+        router.replace('/(tabs)/profile' as any);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Impossible de se connecter avec Google.');
     } finally {

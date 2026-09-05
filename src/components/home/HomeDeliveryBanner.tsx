@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bike, ChevronRight } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
@@ -8,10 +8,25 @@ export const HomeDeliveryBanner: React.FC = () => {
   const router = useRouter();
   const accent = useAccent();
 
+  const handlePress = async () => {
+    const deepLink = 'daloadelivery://(tabs)/annuaire';
+    const webLink = 'https://delivery.daloamarket.com/annuaire';
+    try {
+      const canOpen = await Linking.canOpenURL(deepLink);
+      if (canOpen) {
+        await Linking.openURL(deepLink);
+      } else {
+        await Linking.openURL(webLink);
+      }
+    } catch {
+      await Linking.openURL(webLink).catch(() => {});
+    }
+  };
+
   return (
     <View style={styles.container}>
       <AppPressable
-        onPress={() => router.push('/affiliations' as any)}
+        onPress={handlePress}
         style={[styles.banner, { backgroundColor: accent[50], borderColor: accent[100] }]}
         accessibilityLabel="Découvrir DaloaDelivery"
       >

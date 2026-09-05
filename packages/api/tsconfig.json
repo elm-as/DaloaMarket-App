@@ -8,7 +8,13 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@daloa/types": ["../types/src/index.ts"],
+      "@daloa/config": ["../config/src/index.ts"],
+      "@daloa/utils": ["../utils/src/index.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

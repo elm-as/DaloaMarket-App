@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Alert, ActivityIndicator, Platform, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,6 +36,7 @@ async function openPaymentGateway(paymentUrl: string) {
 const FALLBACK_PHOTO = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
 export default function CheckoutScreen() {
+  const scrollRef = useRef<ScrollView>(null);
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
@@ -140,6 +141,11 @@ export default function CheckoutScreen() {
       setPaymentMode(deliveryMode === 'pickup' ? 'cash_at_shop' : 'cod');
     }
   }, [onlineDisabled, paymentMode, deliveryMode]);
+
+  // Réinitialise le défilement en haut à chaque changement d'étape
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
 
   const handleDeliveryModeChange = (mode: 'delivery' | 'pickup') => {
     setDeliveryMode(mode);
@@ -415,6 +421,7 @@ export default function CheckoutScreen() {
         <CheckoutWizardBar currentStep={step} totalSteps={3} />
 
         <ScrollView
+          ref={scrollRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"

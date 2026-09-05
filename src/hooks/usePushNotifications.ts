@@ -55,15 +55,19 @@ export function usePushNotifications() {
 
         const projectId =
           (Constants.expoConfig?.extra as any)?.eas?.projectId ||
-          (Constants as any)?.easConfig?.projectId;
+          (Constants as any)?.easConfig?.projectId ||
+          '343876f7-071a-474b-bc8c-ac2df326911c';
 
         const tokenData = await Notifications.getExpoPushTokenAsync(
           projectId ? { projectId } : undefined
         );
 
-        await notificationsService.registerPushToken(user.id, tokenData.data, 'market');
+        if (tokenData?.data) {
+          await notificationsService.registerPushToken(user.id, tokenData.data, 'market');
+          console.log('[usePushNotifications] Token Expo enregistré:', tokenData.data);
+        }
       } catch (err) {
-        console.warn('Enregistrement push échoué:', err);
+        console.warn('[usePushNotifications] Échec obtention token push:', err);
       }
     })();
   }, [user?.id]);

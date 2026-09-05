@@ -10,7 +10,6 @@ import {
   radii,
   spacing,
   Skeleton,
-  Button,
   EmptyState,
   AppText,
   AppPressable,
@@ -20,9 +19,8 @@ import {
   Package,
   ShoppingBag,
   Store,
-  ClipboardList,
-  ShieldCheck,
 } from 'lucide-react-native';
+import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 import { UserOrderCard } from '../../src/components/orders/UserOrderCard';
 
 const STATUS_FILTERS = [
@@ -51,48 +49,11 @@ export default function OrdersScreen() {
   /* ── Guest ── */
   if (!isAuthenticated || !user) {
     return (
-      <View style={[styles.container, { paddingTop: 0 }]}>
-        <LinearGradient
-          colors={[accent[400], accent[600], accent[700]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.guestHero, { paddingTop: insets.top + spacing[4] }]}
-        >
-          <View style={styles.heroIconCircle}>
-            <Package size={22} color={accent[700]} strokeWidth={2} />
-          </View>
-          <AppText variant="overline" color={accent[100]}>MES COMMANDES</AppText>
-          <AppText variant="h2" color={colors.text.inverse}>Achats & ventes</AppText>
-          <AppText variant="caption" color={accent[100]}>
-            Livraisons sécurisées par séquestre
-          </AppText>
-        </LinearGradient>
-
-        <View style={styles.guestCard}>
-          <View style={styles.guestIconRow}>
-            <View style={[styles.guestFeatureIcon, { backgroundColor: accent[50] }]}>
-              <ClipboardList size={20} color={accent[600]} />
-            </View>
-            <View style={[styles.guestFeatureIcon, { backgroundColor: colors.status.successLight }]}>
-              <ShieldCheck size={20} color={colors.status.successDark} />
-            </View>
-            <View style={[styles.guestFeatureIcon, { backgroundColor: accent[50] }]}>
-              <ShoppingBag size={20} color={accent[600]} />
-            </View>
-          </View>
-          <AppText variant="h2" center>Suivez vos commandes en direct</AppText>
-          <AppText variant="body" color={colors.text.muted} center style={styles.guestSub}>
-            Consultez l'historique de vos achats, vos codes OTP de réception et gérez vos ventes à Daloa.
-          </AppText>
-          <Button
-            title="Se connecter à mon compte"
-            variant="market"
-            size="lg"
-            onPress={() => router.push('/auth/login' as any)}
-            style={styles.guestBtn}
-          />
-        </View>
-      </View>
+      <AuthGuardView
+        title="Suivez vos commandes en direct"
+        description="Consultez l'historique de vos achats, vos codes OTP de réception et gérez vos ventes à Daloa."
+        fallbackRoute="/(tabs)/orders"
+      />
     );
   }
 
@@ -124,16 +85,20 @@ export default function OrdersScreen() {
           <AppPressable
             haptic="selection"
             onPress={() => setActiveTab('buyer')}
-            style={[styles.roleBtn, activeTab === 'buyer' && styles.roleBtnActive]}
+            style={[
+              styles.roleBtn,
+              activeTab === 'buyer' ? styles.roleBtnActive : styles.roleBtnInactive,
+            ]}
           >
             <ShoppingBag
               size={13}
-              color={activeTab === 'buyer' ? accent[600] : 'rgba(255,255,255,0.75)'}
+              color={activeTab === 'buyer' ? accent[700] : '#FFFFFF'}
               strokeWidth={2}
             />
             <AppText
               variant="label"
-              color={activeTab === 'buyer' ? accent[600] : 'rgba(255,255,255,0.85)'}
+              color={activeTab === 'buyer' ? accent[700] : '#FFFFFF'}
+              style={activeTab === 'buyer' ? styles.boldLabel : styles.semiBoldLabel}
             >
               Mes achats
             </AppText>
@@ -142,16 +107,20 @@ export default function OrdersScreen() {
           <AppPressable
             haptic="selection"
             onPress={() => setActiveTab('seller')}
-            style={[styles.roleBtn, activeTab === 'seller' && styles.roleBtnActive]}
+            style={[
+              styles.roleBtn,
+              activeTab === 'seller' ? styles.roleBtnActive : styles.roleBtnInactive,
+            ]}
           >
             <Store
               size={13}
-              color={activeTab === 'seller' ? accent[600] : 'rgba(255,255,255,0.75)'}
+              color={activeTab === 'seller' ? accent[700] : '#FFFFFF'}
               strokeWidth={2}
             />
             <AppText
               variant="label"
-              color={activeTab === 'seller' ? accent[600] : 'rgba(255,255,255,0.85)'}
+              color={activeTab === 'seller' ? accent[700] : '#FFFFFF'}
+              style={activeTab === 'seller' ? styles.boldLabel : styles.semiBoldLabel}
             >
               Mes ventes
             </AppText>
@@ -279,6 +248,9 @@ const styles = StyleSheet.create({
     gap: 6,
     overflow: 'hidden',
   },
+  roleBtnInactive: {
+    backgroundColor: 'transparent',
+  },
   roleBtnActive: {
     backgroundColor: colors.bg.surface,
     shadowColor: '#000',
@@ -286,6 +258,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
+  },
+  boldLabel: {
+    fontWeight: '700',
+  },
+  semiBoldLabel: {
+    fontWeight: '600',
   },
   // ── Status bar ──
   statusBar: {
@@ -317,48 +295,5 @@ const styles = StyleSheet.create({
   },
   orderList: {
     gap: spacing[3],
-  },
-  // ── Guest ──
-  guestHero: {
-    paddingHorizontal: spacing[4],
-    paddingBottom: spacing[12],
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
-    alignItems: 'center',
-    gap: 6,
-  },
-  guestCard: {
-    backgroundColor: colors.bg.surface,
-    marginHorizontal: spacing[4],
-    marginTop: -spacing[8],
-    borderRadius: radii['2xl'],
-    padding: spacing[5],
-    alignItems: 'center',
-    gap: spacing[3],
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  guestIconRow: {
-    flexDirection: 'row',
-    gap: spacing[3],
-  },
-  guestFeatureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guestSub: {
-    marginTop: 4,
-  },
-  guestBtn: {
-    alignSelf: 'stretch',
-    marginTop: spacing[2],
   },
 });

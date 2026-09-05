@@ -111,13 +111,41 @@ export default function OrderTrackingScreen() {
   const accent = useAccent();
   const { user } = useAuth();
 
-  const { data: order, isLoading, refetch } = useOrderDetail(id);
+  const { data: order, isLoading, isError, refetch } = useOrderDetail(id);
   const [isDisputeOpen, setIsDisputeOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSellerActing, setIsSellerActing] = useState(false);
   const [enteredPickupOtp, setEnteredPickupOtp] = useState('');
+
+  const handleCancelOrder = () => {
+    if (!order) return;
+    Alert.alert(
+      'Annuler cette commande ?',
+      "Le coursier n'a pas encore récupéré le colis. Souhaitez-vous vraiment annuler votre commande ?",
+      [
+        { text: 'Non, conserver', style: 'cancel' },
+        {
+          text: 'Oui, annuler',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsSubmitting(true);
+              await ordersService.cancelOrder(order.id, "Annulation demandée par l'acheteur");
+              Haptics.success();
+              await refetch();
+              Alert.alert('Commande annulée', 'Votre commande a été annulée avec succès.');
+            } catch (err: any) {
+              Alert.alert('Erreur', err.message || "Impossible d'annuler cette commande.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -221,6 +249,49 @@ export default function OrderTrackingScreen() {
       setIsSellerActing(false);
     }
   };
+
+  /* État d'erreur / commande introuvable */
+  if (isError || (!isLoading && !order)) {
+    return (
+      <View style={[styles.container, { paddingTop: 0 }]}>
+        <LinearGradient
+          colors={[accent[400], accent[600], accent[700]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + spacing[2] }]}
+        >
+          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn}>
+            <ArrowLeft size={20} color={colors.text.inverse} />
+          </AppPressable>
+          <AppText variant="overline" color={accent[100]}>COMMANDE</AppText>
+          <AppText variant="h2" color={colors.text.inverse}>Suivi de commande</AppText>
+        </LinearGradient>
+        <View style={styles.errorBox}>
+          <AlertTriangle size={36} color={colors.status.error} />
+          <AppText variant="bodyStrong" color={colors.text.body} center style={{ marginTop: spacing[2] }}>
+            Impossible de charger le suivi de cette commande.
+          </AppText>
+          <AppText variant="caption" color={colors.text.muted} center style={{ marginTop: spacing[1] }}>
+            Vérifiez votre connexion internet ou réessayez dans un instant.
+          </AppText>
+          <Button
+            title="Réessayer"
+            variant="market"
+            onPress={() => refetch()}
+            style={{ marginTop: spacing[4], minWidth: 160 }}
+          />
+          <AppPressable
+            onPress={() => router.replace('/(tabs)/orders' as any)}
+            style={{ marginTop: spacing[3], padding: spacing[2] }}
+          >
+            <AppText variant="label" color={accent.DEFAULT}>
+              Voir mes commandes
+            </AppText>
+          </AppPressable>
+        </View>
+      </View>
+    );
+  }
 
   /* Loading skeleton */
   if (isLoading || !order) {
@@ -698,6 +769,22 @@ export default function OrderTrackingScreen() {
           </View>
         </View>
 
+        {/* ── Annulation acheteur (si le colis n'est pas encore ramassé) ── */}
+        {!isSeller &&
+          ['pending', 'pending_payment', 'awaiting_pickup', 'paid_escrow'].includes(order.status) &&
+          !['picked_up', 'in_transit', 'delivered'].includes(assignment?.status ?? '') && (
+            <AppPressable
+              onPress={handleCancelOrder}
+              disabled={isSubmitting}
+              style={styles.cancelOrderBtn}
+              accessibilityLabel="Annuler la commande"
+            >
+              <AppText variant="body" color={colors.status.errorDark} style={styles.cancelOrderText}>
+                Annuler ma commande
+              </AppText>
+            </AppPressable>
+          )}
+
         {/* ── Litige ── */}
         {order.status !== 'cancelled' && order.status !== 'delivered' && (
           <AppPressable
@@ -1037,11 +1124,33 @@ const styles = StyleSheet.create({
   disputeSubmit: {
     marginTop: spacing[1],
   },
-  // ── Loading ──
+  // ── Annulation ──
+  cancelOrderBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    borderRadius: radii.xl,
+    backgroundColor: colors.status.errorLight,
+    borderWidth: 1,
+    borderColor: colors.status.errorBorder,
+    marginBottom: spacing[2],
+  },
+  cancelOrderText: {
+    fontWeight: '700',
+  },
+  // ── Loading & Erreur ──
   loadingBox: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing[3],
+  },
+  errorBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing[6],
+    gap: spacing[2],
   },
 });

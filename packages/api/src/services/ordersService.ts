@@ -320,23 +320,35 @@ export const ordersService = {
    * Récupère le détail complet d'une commande
    */
   async getOrderById(orderId: string): Promise<OrderWithDetails> {
+    let rawData: any = null;
     const { data, error } = await supabase
       .from('orders')
       .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, phone, avatar_url), delivery_assignments(*), order_items(*, listings:listing_id(id, title, photos, price))')
       .eq('id', orderId)
       .single();
 
-    if (error) throw error;
-    if (!data) throw new Error('Commande introuvable');
+    if (error || !data) {
+      // Repli sans jointure imbriquée order_items si un problème de relation survient
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('orders')
+        .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, phone, avatar_url), delivery_assignments(*)')
+        .eq('id', orderId)
+        .single();
+
+      if (fallbackErr || !fallbackData) throw fallbackErr || error || new Error('Commande introuvable');
+      rawData = fallbackData;
+    } else {
+      rawData = data;
+    }
 
     // Normalise les lignes d'articles (multi-articles par vendeur).
-    const orderItems = Array.isArray((data as any).order_items)
-      ? (data as any).order_items.map((it: any) => ({ ...it, listing: it.listings || null }))
+    const orderItems = Array.isArray((rawData as any).order_items)
+      ? (rawData as any).order_items.map((it: any) => ({ ...it, listing: it.listings || null }))
       : [];
 
-    const assignment = Array.isArray(data.delivery_assignments)
-      ? data.delivery_assignments[0]
-      : data.delivery_assignments;
+    const assignment = Array.isArray(rawData.delivery_assignments)
+      ? rawData.delivery_assignments[0]
+      : rawData.delivery_assignments;
 
     let deliveryPerson = null;
     if (assignment?.delivery_person_id) {
@@ -349,10 +361,10 @@ export const ordersService = {
     }
 
     return {
-      ...data,
-      listing: data.listings || null,
-      seller: data.seller || null,
-      buyer: data.buyer || null,
+      ...rawData,
+      listing: rawData.listings || null,
+      seller: rawData.seller || null,
+      buyer: rawData.buyer || null,
       delivery_assignment: assignment || null,
       delivery_person: deliveryPerson || null,
       order_items: orderItems,

@@ -17,11 +17,7 @@ import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActio
 import { filterAndRankListings } from '../../src/components/search/search-relevance';
 
 const EMPTY_FILTERS: SearchFilterValues = {
-  category: null,
-  district: null,
-  condition: null,
-  minPrice: '',
-  maxPrice: '',
+  category: null, district: null, condition: null, minPrice: '', maxPrice: '',
 };
 
 export default function SearchScreen() {
@@ -39,11 +35,9 @@ export default function SearchScreen() {
   const activeListingInitialQuantities = useMemo(() => {
     if (!activeVariantListing) return undefined;
     const map: Record<string, number> = {};
-    items
-      .filter((i) => i.listing.id === activeVariantListing.id && i.variant?.id)
-      .forEach((i) => {
-        if (i.variant?.id) map[i.variant.id] = i.quantity;
-      });
+    items.forEach((i) => {
+      if (i.listing.id === activeVariantListing.id && i.variant?.id) map[i.variant.id] = i.quantity;
+    });
     return map;
   }, [items, activeVariantListing]);
 
@@ -74,17 +68,15 @@ export default function SearchScreen() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const searchFilters = useMemo(
-    () => ({
-      category: filters.category || undefined,
-      district: filters.district || undefined,
-      condition: filters.condition || undefined,
-      minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
-      maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
-      searchQuery: debouncedQuery.trim() || undefined,
-    }),
-    [filters.category, filters.district, filters.condition, filters.minPrice, filters.maxPrice, debouncedQuery]
-  );
+  const searchFilters = useMemo(() => ({
+    category: filters.category || undefined,
+    district: filters.district || undefined,
+    condition: filters.condition || undefined,
+    minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
+    maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
+    searchQuery: debouncedQuery.trim() || undefined,
+    sortBy: sortBy === 'recent' ? undefined : sortBy,
+  }), [filters.category, filters.district, filters.condition, filters.minPrice, filters.maxPrice, debouncedQuery, sortBy]);
 
   const {
     data: listingsData,
@@ -101,13 +93,19 @@ export default function SearchScreen() {
     return filterAndRankListings(rawList, debouncedQuery, sortBy);
   }, [listingsData, debouncedQuery, sortBy]);
 
+  const resultCount = useMemo(() => {
+    const serverCount = listingsData?.pages?.[0]?.totalCount;
+    if (typeof serverCount === 'number') {
+      if (!hasNextPage && filteredListings.length <= serverCount) {
+        return filteredListings.length;
+      }
+      return serverCount;
+    }
+    return filteredListings.length;
+  }, [listingsData?.pages, hasNextPage, filteredListings.length]);
+
   const activeFiltersCount = useMemo(() => {
-    let count = 0;
-    if (filters.category) count++;
-    if (filters.district) count++;
-    if (filters.condition) count++;
-    if (filters.minPrice || filters.maxPrice) count++;
-    return count;
+    return [filters.category, filters.district, filters.condition, filters.minPrice || filters.maxPrice].filter(Boolean).length;
   }, [filters]);
 
   const toggleSort = useCallback(() => {
@@ -193,9 +191,7 @@ export default function SearchScreen() {
         console.warn('Erreur chargement page suivante (recherche):', err);
       })
       .finally(() => {
-        setTimeout(() => {
-          isFetchingNextRef.current = false;
-        }, 500);
+        setTimeout(() => { isFetchingNextRef.current = false; }, 500);
       });
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
@@ -212,7 +208,8 @@ export default function SearchScreen() {
         }}
         sortBy={sortBy}
         onToggleSort={toggleSort}
-        resultCount={filteredListings.length}
+        resultCount={resultCount}
+        isLoading={isLoading}
         filters={filters}
         setFilters={setFilters}
       />

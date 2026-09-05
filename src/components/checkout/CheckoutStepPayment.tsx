@@ -93,15 +93,6 @@ export function CheckoutStepPayment({
           </AppText>
         </View>
 
-        <View style={styles.breakRow}>
-          <AppText variant="caption" color={colors.status.successDark}>
-            Frais de service acheteur (0%)
-          </AppText>
-          <AppText variant="body" color={colors.status.successDark} style={styles.boldNum}>
-            0 FCFA
-          </AppText>
-        </View>
-
         <View style={styles.divider} />
 
         <View style={styles.totalRow}>
@@ -124,9 +115,9 @@ export function CheckoutStepPayment({
       {/* Garantie double OTP */}
       <View style={styles.otpNoticeBox}>
         <ShieldCheck size={16} color={accent[700]} />
-        <AppText variant="caption" color={colors.text.body} style={styles.flex1}>
-          <AppText variant="caption" style={styles.boldNum}>Double code OTP : </AppText>
-          Ne transmettez votre code de confirmation au livreur qu'après avoir déballé et vérifié l'article.
+        <AppText variant="caption" color={colors.text.body} style={styles.flex1} numberOfLines={2}>
+          <AppText variant="caption" style={styles.boldNum}>Code OTP : </AppText>
+          Transmettez votre code au livreur seulement après avoir inspecté l'article.
         </AppText>
       </View>
 

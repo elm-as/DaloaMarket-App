@@ -113,26 +113,21 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
             </AppText>
           </View>
         </AppPressable>
-
-        {/* 4. Partager sur WhatsApp */}
-        <AppPressable
-          onPress={onShareShopWhatsApp}
-          style={styles.gridCard}
-          accessibilityLabel="Partager ma boutique sur WhatsApp"
-        >
-          <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8' }]}>
-            <Share2 size={18} color="#DB2777" />
-          </View>
-          <View style={styles.cardTexts}>
-            <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
-              Partager
-            </AppText>
-            <AppText variant="caption" color={colors.text.subtle} style={styles.cardSubtitle}>
-              Lien WhatsApp
-            </AppText>
-          </View>
-        </AppPressable>
       </View>
+
+      {/* 5. Partager sur WhatsApp (Centré pleine largeur) */}
+      <AppPressable
+        onPress={onShareShopWhatsApp}
+        style={styles.shareCard}
+        accessibilityLabel="Partager ma boutique sur WhatsApp"
+      >
+        <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8' }]}>
+          <Share2 size={16} color="#DB2777" />
+        </View>
+        <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
+          Partager boutique (WhatsApp)
+        </AppText>
+      </AppPressable>
     </View>
   );
 };
@@ -195,5 +190,17 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 10,
     color: colors.text.subtle,
+  },
+  shareCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg.surface,
+    padding: spacing[3],
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    gap: spacing[2],
+    marginTop: spacing[2],
   },
 });

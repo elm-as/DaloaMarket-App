@@ -18,6 +18,7 @@ interface SearchTopBarProps {
   sortBy: 'recent' | 'price_asc' | 'price_desc';
   onToggleSort: () => void;
   resultCount: number;
+  isLoading?: boolean;
   filters: SearchFilterValues;
   setFilters: React.Dispatch<React.SetStateAction<SearchFilterValues>>;
 }
@@ -36,6 +37,7 @@ export const SearchTopBar: React.FC<SearchTopBarProps> = ({
   sortBy,
   onToggleSort,
   resultCount,
+  isLoading,
   filters,
   setFilters,
 }) => {
@@ -142,7 +144,7 @@ export const SearchTopBar: React.FC<SearchTopBarProps> = ({
         </AppPressable>
 
         <AppText variant="caption" color={colors.text.subtle} style={styles.countText}>
-          {resultCount} annonce{resultCount !== 1 ? 's' : ''}
+          {isLoading ? '...' : `${resultCount} annonce${resultCount > 1 ? 's' : ''}`}
         </AppText>
       </View>
     </View>
@@ -222,5 +224,6 @@ const styles = StyleSheet.create({
   },
   countText: {
     marginLeft: 'auto',
+    fontVariant: ['tabular-nums'],
   },
 });
