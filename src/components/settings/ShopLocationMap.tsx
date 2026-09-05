@@ -34,10 +34,14 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
   };
 
   const activeToken = MAPBOX_PUBLIC_TOKEN;
+  const [mapError, setMapError] = useState(false);
 
   const staticMapUrl = useMemo(() => {
+    if (mapError || !activeToken) {
+      return `https://staticmap.openstreetmap.de/staticmap.php?center=${currentLat.toFixed(5)},${currentLng.toFixed(5)}&zoom=${zoom}&size=640x360&maptype=mapnik`;
+    }
     return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
-  }, [currentLat, currentLng, zoom, activeToken]);
+  }, [currentLat, currentLng, zoom, activeToken, mapError]);
 
   // HTML interactif Leaflet OpenStreetMap autonome
   const mapHtml = useMemo(() => {
@@ -137,6 +141,7 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
               contentFit="cover"
               transition={150}
               cachePolicy="memory-disk"
+              onError={() => setMapError(true)}
             />
             {/* Boutons de zoom natifs */}
             <View style={styles.zoomButtons}>

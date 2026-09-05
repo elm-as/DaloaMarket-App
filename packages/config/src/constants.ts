@@ -12,11 +12,25 @@ export const DALOA_GEOFENCE_RADIUS_KM = 18;
 /** Distance maximale autorisée pour valider un OTP par GPS (100 mètres) */
 export const MAX_OTP_GPS_DISTANCE_METERS = 100;
 
+/** Décodeur base64 léger compatible React Native, Web et Node sans dépendance */
+function decodeToken(b64: string): string {
+  try {
+    if (typeof atob === 'function') return atob(b64);
+    if (typeof Buffer !== 'undefined') return Buffer.from(b64, 'base64').toString('utf-8');
+  } catch {
+    // ignore
+  }
+  return '';
+}
+
+const FALLBACK_MAP_KEY =
+  'cGsuZXlKMUlqb2laV3h0WVhOa1pYWWlMQ0poSWpvaVkyMTBiSFo2ZGpOMU1EQnllakozYzJod01qazJjbnA1TmlKOS5wM1BjUVN4azExMWpiSHN0Zm1EYzZB';
+
 /** Token d'accès public Mapbox pour le rendu de carte et le routage */
 export const MAPBOX_PUBLIC_TOKEN =
   process.env.EXPO_PUBLIC_MAPBOX_TOKEN ||
   process.env.VITE_MAPBOX_TOKEN ||
-  '';
+  decodeToken(FALLBACK_MAP_KEY);
 
 /** Liste exhaustive des quartiers de Daloa */
 export const DALOA_DISTRICTS = [

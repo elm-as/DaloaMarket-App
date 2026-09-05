@@ -29,15 +29,19 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
   const [isLocating, setIsLocating] = useState(false);
 
   const activeToken = MAPBOX_PUBLIC_TOKEN;
+  const [mapError, setMapError] = useState(false);
 
   const staticMapUrl = useMemo(() => {
+    if (mapError || !activeToken) {
+      return `https://staticmap.openstreetmap.de/staticmap.php?center=${currentLat.toFixed(5)},${currentLng.toFixed(5)}&zoom=${zoom}&size=640x360&maptype=mapnik`;
+    }
     const sLat = sellerCoords?.latitude;
     const sLng = sellerCoords?.longitude;
     if (sLat != null && sLng != null) {
       return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
     }
     return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
-  }, [currentLat, currentLng, sellerCoords, zoom, activeToken]);
+  }, [currentLat, currentLng, sellerCoords, zoom, activeToken, mapError]);
 
   const [routeInfo, setRouteInfo] = useState<DrivingRouteResult>({
     distanceKm: 2.5,
@@ -168,6 +172,7 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
               contentFit="cover"
               transition={150}
               cachePolicy="memory-disk"
+              onError={() => setMapError(true)}
             />
             <View style={styles.zoomButtons}>
               <AppPressable
