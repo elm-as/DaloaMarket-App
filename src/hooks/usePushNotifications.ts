@@ -75,13 +75,69 @@ export function usePushNotifications() {
   // 2. Tap sur une notification → navigation contextuelle (iOS / Android uniquement).
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    responseSub.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as any;
-      if (data?.orderId) {
-        router.push(`/order/${data.orderId}` as any);
-      } else if (data?.chatPartnerId) {
-        router.push(`/chat/${data.chatPartnerId}` as any);
+
+    const handleNotificationData = (data: any) => {
+      if (!data) return;
+
+      // 1. Redirection commande
+      if (data.orderId) {
+        const cleanOrderId = String(data.orderId).split('/').filter(Boolean)[0];
+        if (cleanOrderId) {
+          router.push(`/order/${cleanOrderId}` as any);
+          return;
+        }
       }
+
+      // 2. Redirection conversation chat
+      if (data.chatPartnerId) {
+        // En cas de segments multiples (ex: listingId/partnerId), extraire le partnerId (dernier segment)
+        const parts = String(data.chatPartnerId).split('/').filter(Boolean);
+        const partnerId = parts.length >= 2 ? parts[1] : parts[0];
+        const listingId = data.listingId || (parts.length >= 2 ? parts[0] : undefined);
+        if (partnerId) {
+          router.push({
+            pathname: '/chat/[id]',
+            params: listingId ? { id: partnerId, listingId: String(listingId) } : { id: partnerId },
+          } as any);
+          return;
+        }
+      }
+
+      // 3. Redirection fallback par URL
+      if (typeof data.url === 'string') {
+        if (data.url.includes('/messages/')) {
+          const parts = data.url.split('/messages/')[1].split('/').filter(Boolean);
+          const partnerId = parts.length >= 2 ? parts[1] : parts[0];
+          const listingId = parts.length >= 2 ? parts[0] : undefined;
+          if (partnerId) {
+            router.push({
+              pathname: '/chat/[id]',
+              params: listingId ? { id: partnerId, listingId } : { id: partnerId },
+            } as any);
+            return;
+          }
+        } else if (data.url.includes('/suivi/')) {
+          const ordId = data.url.split('/suivi/')[1].split('/').filter(Boolean)[0];
+          if (ordId) router.push(`/order/${ordId}` as any);
+          return;
+        } else if (data.url.includes('/order/')) {
+          const ordId = data.url.split('/order/')[1].split('/').filter(Boolean)[0];
+          if (ordId) router.push(`/order/${ordId}` as any);
+          return;
+        }
+      }
+    };
+
+    // A. Cold start : l'application était fermée quand l'utilisateur a cliqué sur la notification
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        handleNotificationData(response.notification.request.content.data);
+      }
+    });
+
+    // B. App en arrière-plan ou ouverte
+    responseSub.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleNotificationData(response.notification.request.content.data);
     });
 
     return () => {
