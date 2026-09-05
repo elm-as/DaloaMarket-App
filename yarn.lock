@@ -781,9 +781,9 @@
 "@daloa/api@file:./packages/api":
   version "1.0.0"
   dependencies:
-    "@daloa/config" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-api-1.0.0-63523c8c-6164-4458-986d-41763763019e-1788553338566/node_modules/@daloa/config"
-    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-api-1.0.0-63523c8c-6164-4458-986d-41763763019e-1788553338566/node_modules/@daloa/types"
-    "@daloa/utils" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-api-1.0.0-63523c8c-6164-4458-986d-41763763019e-1788553338566/node_modules/@daloa/utils"
+    "@daloa/config" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-api-1.0.0-b153b48a-f177-4c68-9648-e3d486bf0d6d-1788599355655/node_modules/@daloa/config"
+    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-api-1.0.0-b153b48a-f177-4c68-9648-e3d486bf0d6d-1788599355655/node_modules/@daloa/types"
+    "@daloa/utils" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-api-1.0.0-b153b48a-f177-4c68-9648-e3d486bf0d6d-1788599355655/node_modules/@daloa/utils"
     "@supabase/supabase-js" "^2.49.1"
     "@tanstack/react-query" "^5.67.1"
     zustand "^5.0.3"
@@ -791,7 +791,7 @@
 "@daloa/config@file:./packages/config", "@daloa/config@file:packages/config":
   version "1.0.0"
   dependencies:
-    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-config-1.0.0-8d3936b8-e223-4d7c-b1dc-8a2297401b10-1788553338732/node_modules/@daloa/types"
+    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-config-1.0.0-ebbf9638-6363-4332-b079-becb4581a1fe-1788599355662/node_modules/@daloa/types"
 
 "@daloa/types@file:./packages/types", "@daloa/types@file:packages/types":
   version "1.0.0"
@@ -800,9 +800,9 @@
   version "1.0.0"
   dependencies:
     "@babel/runtime" "^7.26.0"
-    "@daloa/config" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-ui-1.0.0-77da8469-db6f-4878-a9ad-f2ed62ef9c5b-1788553341251/node_modules/@daloa/config"
-    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-ui-1.0.0-77da8469-db6f-4878-a9ad-f2ed62ef9c5b-1788553341251/node_modules/@daloa/types"
-    "@daloa/utils" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-ui-1.0.0-77da8469-db6f-4878-a9ad-f2ed62ef9c5b-1788553341251/node_modules/@daloa/utils"
+    "@daloa/config" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-ui-1.0.0-dc15a9d1-d9ac-4eca-9ffc-6377bcb9b7f2-1788599355666/node_modules/@daloa/config"
+    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-ui-1.0.0-dc15a9d1-d9ac-4eca-9ffc-6377bcb9b7f2-1788599355666/node_modules/@daloa/types"
+    "@daloa/utils" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-ui-1.0.0-dc15a9d1-d9ac-4eca-9ffc-6377bcb9b7f2-1788599355666/node_modules/@daloa/utils"
     expo-image "~3.0.11"
     lucide-react-native "^0.475.0"
     react-native-qrcode-svg "^6.3.21"
@@ -811,8 +811,8 @@
 "@daloa/utils@file:./packages/utils", "@daloa/utils@file:packages/utils":
   version "1.0.0"
   dependencies:
-    "@daloa/config" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-utils-1.0.0-7d31223a-6dcd-4711-9672-7997c90411fb-1788553338740/node_modules/@daloa/config"
-    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-utils-1.0.0-7d31223a-6dcd-4711-9672-7997c90411fb-1788553338740/node_modules/@daloa/types"
+    "@daloa/config" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-utils-1.0.0-4772441c-42d7-43ed-9478-d78593dc05e6-1788599355662/node_modules/@daloa/config"
+    "@daloa/types" "file:../../../../AppData/Local/Yarn/Cache/v6/npm-@daloa-utils-1.0.0-4772441c-42d7-43ed-9478-d78593dc05e6-1788599355662/node_modules/@daloa/types"
     expo-haptics "~15.0.8"
     expo-secure-store "~15.0.8"
     zod "^3.24.1"
@@ -1712,10 +1712,12 @@
   dependencies:
     nanoid "^3.3.11"
 
-"@shopify/flash-list@^2.0.2":
-  version "2.3.2"
-  resolved "https://registry.npmjs.org/@shopify/flash-list/-/flash-list-2.3.2.tgz#d96a00f2195629b070117f1eaabc12f8b25be8f1"
-  integrity sha512-vQnd0y0Ag11yzS30llaeCrtIU3xYTMe7KEOP3dveLImnVjQEUw6BEg1+Ztja6aODlVNz1BpvxtlQ5eZGxiLwKw==
+"@shopify/flash-list@2.0.2":
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/@shopify/flash-list/-/flash-list-2.0.2.tgz#644748f883fccf8cf2e0ca251e0ef88673b89120"
+  integrity sha512-zhlrhA9eiuEzja4wxVvotgXHtqd3qsYbXkQ3rsBfOgbFA9BVeErpDE/yEwtlIviRGEqpuFj/oU5owD6ByaNX+w==
+  dependencies:
+    tslib "2.8.1"
 
 "@sinclair/typebox@^0.27.8":
   version "0.27.12"
