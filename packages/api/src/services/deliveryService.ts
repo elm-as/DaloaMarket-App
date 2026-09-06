@@ -300,7 +300,7 @@ export const deliveryService = {
    */
   async getDeliverersDirectory(vehicleType?: string, zone?: string): Promise<DeliveryPersonRow[]> {
     let query = supabase
-      .from('delivery_persons')
+      .from('delivery_persons_directory')
       .select('*')
       .order('rating', { ascending: false });
 
@@ -308,9 +308,15 @@ export const deliveryService = {
       query = query.eq('vehicle_type', vehicleType);
     }
 
+    if (zone && zone !== 'all') {
+      query = query.contains('coverage_zones', [zone]);
+    }
+
     const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+    return ((data as DeliveryPersonRow[]) || []).filter(
+      (d) => Boolean(d.name && d.name.trim().length > 0 && d.phone && d.phone.trim().length > 0)
+    );
   },
 
   /**

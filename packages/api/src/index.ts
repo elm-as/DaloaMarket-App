@@ -14,4 +14,5 @@ export * from './services/analyticsService';
 export * from './services/systemSettingsService';
 export * from './services/reviewsService';
 export * from './services/favoritesService';
+export * from './services/deliveryPersonService';
 export * from './queries/index';

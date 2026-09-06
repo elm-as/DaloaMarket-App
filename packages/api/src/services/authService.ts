@@ -27,7 +27,7 @@ export const authService = {
 
     // Si rôle livreur, récupérer aussi le profil delivery_person
     let deliveryProfile: DeliveryPersonRow | null = null;
-    if (profile?.role === 'delivery') {
+    if (profile?.role === 'delivery' || profile?.role === 'livreur') {
       const { data: dProfile } = await supabase
         .from('delivery_persons')
         .select('*')
