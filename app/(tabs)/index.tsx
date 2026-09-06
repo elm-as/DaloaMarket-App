@@ -250,7 +250,18 @@ export default function HomeScreen() {
 
       {/* Contenu */}
       {isLoading ? (
-        <View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.primary.DEFAULT}
+              colors={[colors.primary.DEFAULT]}
+            />
+          }
+        >
           {ListHeader}
           <View style={styles.gridPad}>
             {[1, 2, 3, 4].map((n) => (
@@ -259,7 +270,7 @@ export default function HomeScreen() {
               </View>
             ))}
           </View>
-        </View>
+        </ScrollView>
       ) : (
         <FlashList
           data={listingsList}

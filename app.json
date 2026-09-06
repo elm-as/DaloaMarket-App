@@ -16,7 +16,11 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.daloamarket.app"
+      "bundleIdentifier": "com.daloamarket.app",
+      "associatedDomains": [
+        "applinks:daloamarket.com",
+        "applinks:www.daloamarket.com"
+      ]
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
@@ -26,6 +30,26 @@
       },
       "package": "com.daloamarket.app",
       "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "daloamarket.com"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.POST_NOTIFICATIONS",

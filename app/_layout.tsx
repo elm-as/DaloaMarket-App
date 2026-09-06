@@ -3,7 +3,9 @@ import React, { useEffect } from 'react';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { supabase } from '@daloa/api';
 import { PhaseProvider } from '../src/context/PhaseContext';
 import { AuthProvider } from '../src/context/AuthContext';
 import { CartProvider } from '../src/context/CartContext';
@@ -11,6 +13,17 @@ import { FavoritesProvider } from '../src/context/FavoritesContext';
 import { AppGate } from '../src/components/system/AppGate';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { ThemeProvider, colors } from '@daloa/ui';
+
+function onAppStateChange(status: any) {
+  if (Platform.OS !== 'web') {
+    focusManager.setFocused(status === 'active');
+  }
+  if (status === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
+}
 
 /** Enregistre les push et gère les taps ; monté dans l'arbre Auth. */
 function PushRegistrar() {
@@ -32,7 +45,8 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      retry: 1,
+      networkMode: 'offlineFirst',
       staleTime: 1000 * 60 * 3,
     },
   },
@@ -47,6 +61,11 @@ export default function RootLayout() {
     Inter_800ExtraBold,
     Inter_900Black,
   });
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', onAppStateChange);
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

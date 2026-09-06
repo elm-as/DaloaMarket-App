@@ -9,9 +9,15 @@ import { useAuth } from '../../context/AuthContext';
 interface ListingSellerBoxProps {
   seller: any;
   isPro: boolean;
+  listing?: {
+    id: string;
+    title: string;
+    price?: number;
+    photos?: string[];
+  } | null;
 }
 
-export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPro }) => {
+export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPro, listing }) => {
   const router = useRouter();
   const accent = useAccent();
   const { isAuthenticated } = useAuth();
@@ -35,6 +41,10 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
       params: {
         partnerName: shopName,
         partnerAvatar: seller?.avatar_url || '',
+        listingId: listing?.id || '',
+        listingTitle: listing?.title || '',
+        listingPhoto: listing?.photos?.[0] || '',
+        listingPrice: listing?.price != null ? String(listing.price) : '',
       },
     } as any);
   };

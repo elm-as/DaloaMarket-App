@@ -47,6 +47,21 @@ export function usePushNotifications() {
         if (!granted) return;
 
         if (Platform.OS === 'android') {
+          // Canal messages : importance HIGH → bannière + son en premier plan
+          await Notifications.setNotificationChannelAsync('chat', {
+            name: 'Messages',
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: 'default',
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF8C00',
+          });
+          // Canal commandes
+          await Notifications.setNotificationChannelAsync('orders', {
+            name: 'Commandes',
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: 'default',
+          });
+          // Canal général (fallback)
           await Notifications.setNotificationChannelAsync('default', {
             name: 'Général',
             importance: Notifications.AndroidImportance.DEFAULT,

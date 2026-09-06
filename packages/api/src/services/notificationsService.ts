@@ -9,6 +9,14 @@ export const notificationsService = {
     if (!expoPushToken || !userId) return;
 
     try {
+      // Déduplication mono-appareil : un appareil physique ne doit être actif que
+      // pour le compte actuellement connecté. Les anciens comptes sur cet appareil sont désactivés.
+      await supabase
+        .from('push_subscriptions')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('expo_push_token', expoPushToken)
+        .neq('user_id', userId);
+
       const { data: existing } = await supabase
         .from('push_subscriptions')
         .select('id')
@@ -36,6 +44,25 @@ export const notificationsService = {
       }
     } catch (err) {
       console.warn('[notificationsService] Erreur registerPushToken:', err);
+    }
+  },
+
+  /**
+   * Désactive les notifications push de l'appareil lors de la déconnexion
+   */
+  async deactivatePushToken(userId: string, expoPushToken?: string): Promise<void> {
+    if (!userId) return;
+    try {
+      let query = supabase
+        .from('push_subscriptions')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+      if (expoPushToken) {
+        query = query.eq('expo_push_token', expoPushToken);
+      }
+      await query;
+    } catch (err) {
+      console.warn('[notificationsService] Erreur deactivatePushToken:', err);
     }
   },
 

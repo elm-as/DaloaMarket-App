@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { useChatMessages, chatService } from '@daloa/api';
+import { useChatMessages, chatService, notificationsService } from '@daloa/api';
 import {
   colors,
   radii,
@@ -80,8 +80,25 @@ export default function ChatRoomScreen() {
         listingId: listingId || undefined,
       });
       refetch();
+
+      const senderName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Un utilisateur';
+      notificationsService
+        .sendPushNotification({
+          userIds: [partnerId],
+          title: `💬 Nouveau message de ${senderName}`,
+          body: textToSend.length > 80 ? `${textToSend.slice(0, 77)}...` : textToSend,
+          data: {
+            chatPartnerId: user.id,
+            listingId: listingId || undefined,
+            url: `/messages/${listingId || 'inbox'}/${user.id}`,
+          },
+          appType: 'market',
+        })
+        .catch((e) => console.warn('[Push Chat Notification Warning]:', e));
     } catch (err) {
       console.warn('Erreur envoi message:', err);
+      setInputText(textToSend);
+      Alert.alert('Envoi impossible', 'Le message n\'a pas pu être envoyé. Vérifiez votre connexion.');
     } finally {
       setIsSending(false);
     }
@@ -219,14 +236,8 @@ export default function ChatRoomScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg.DEFAULT,
-  },
-  flex1: {
-    flex: 1,
-  },
-  // ─── Header ───
+  container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
+  flex1: { flex: 1 },
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,16 +257,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-  },
-  headerInfo: {
-    flex: 1,
-    gap: 1,
-  },
+  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  headerInfo: { flex: 1, gap: 1 },
   priceChip: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: spacing[2],
@@ -264,7 +267,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  // ─── Pinned product ───
   pinnedProduct: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,30 +275,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: spacing[3],
   },
-  productThumb: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-  },
-  pinnedInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  // ─── Messages ───
-  messagesScroll: {
-    padding: spacing[4],
-    gap: spacing[2],
-  },
-  messageRow: {
-    flexDirection: 'row',
-    marginVertical: 2,
-  },
-  myRow: {
-    justifyContent: 'flex-end',
-  },
-  partnerRow: {
-    justifyContent: 'flex-start',
-  },
+  productThumb: { width: 36, height: 36, borderRadius: radii.md },
+  pinnedInfo: { flex: 1, gap: 2 },
+  messagesScroll: { padding: spacing[4], gap: spacing[2] },
+  messageRow: { flexDirection: 'row', marginVertical: 2 },
+  myRow: { justifyContent: 'flex-end' },
+  partnerRow: { justifyContent: 'flex-start' },
   bubble: {
     maxWidth: '78%',
     borderRadius: radii.xl,
@@ -309,11 +293,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
     borderBottomLeftRadius: radii.sm,
   },
-  bubbleTime: {
-    alignSelf: 'flex-end',
-    marginTop: 3,
-  },
-  // ─── Input bar ───
+  bubbleTime: { alignSelf: 'flex-end', marginTop: 3 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -343,7 +323,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  sendBtnDisabled: {
-    opacity: 0.5,
-  },
+  sendBtnDisabled: { opacity: 0.5 },
 });

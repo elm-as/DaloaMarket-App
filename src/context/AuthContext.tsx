@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile, RegisterInput, LoginInput } from '@daloa/types';
-import { authService, supabase } from '@daloa/api';
+import { authService, supabase, notificationsService } from '@daloa/api';
 import { SecureStorageAdapter } from '@daloa/utils';
 
 const CACHED_PROFILE_KEY = '@daloa_cached_user_profile';
@@ -117,6 +117,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      if (user?.id) {
+        await notificationsService.deactivatePushToken(user.id);
+      }
       await authService.logout();
     } catch (err) {
       console.warn('Erreur déconnexion authService:', err);

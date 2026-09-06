@@ -409,7 +409,7 @@ export default function ListingDetailScreen() {
           <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
             Le vendeur
           </AppText>
-          <ListingSellerBox seller={seller} isPro={isPro} />
+          <ListingSellerBox seller={seller} isPro={isPro} listing={listing} />
 
           {/* ⑤ Contrôles propriétaire */}
           {isOwner && (
