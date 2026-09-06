@@ -1,0 +1,66 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'src/**'
+      - 'packages/**'
+      - 'assets/**'
+      - 'app.json'
+      - 'eas.json'
+      - 'package.json'
+      - 'yarn.lock'
+
+jobs:
+  build:
+    name: Build Android APK (Local EAS)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📦 Install Global Tools
+        run: |
+          npm install -g eas-cli @expo/eas-cli-local-build-plugin
+
+      - name: 📦 Install Project Dependencies
+        run: |
+          yarn install --frozen-lockfile || yarn install
+
+      - name: 🏗️ Build APK with EAS Local
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_LOCAL_BUILD_WORKINGDIR: /tmp/eas-build-workingdir
+          EAS_NO_VCS: 1
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+        run: |
+          mkdir -p build
+          eas build --platform android --profile preview --local --output=build/DaloaMarket-preview.apk --non-interactive
+
+      - name: 📤 Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DaloaMarket-preview-apk
+          path: build/DaloaMarket-preview.apk
+          if-no-files-found: error
+          retention-days: 30
