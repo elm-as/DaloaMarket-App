@@ -52,9 +52,22 @@ export default function SellerShopScreen() {
           if (bySlug) {
             sellerRecord = bySlug;
           } else {
-            // 3. Recherche par nom de boutique
-            const { data: byName } = await supabase.from('users').select('*').ilike('shop_name', id).maybeSingle();
-            sellerRecord = byName;
+            // 3. Recherche par préfixe UUID court (ex: /b/8856277b)
+            const cleanHex = id.toLowerCase().replace(/[^a-f0-9]/g, '');
+            if (cleanHex.length >= 4 && cleanHex.length < 32) {
+              const minRaw = cleanHex.padEnd(32, '0');
+              const maxRaw = cleanHex.padEnd(32, 'f');
+              const minUuid = `${minRaw.slice(0, 8)}-${minRaw.slice(8, 12)}-${minRaw.slice(12, 16)}-${minRaw.slice(16, 20)}-${minRaw.slice(20, 32)}`;
+              const maxUuid = `${maxRaw.slice(0, 8)}-${maxRaw.slice(8, 12)}-${maxRaw.slice(12, 16)}-${maxRaw.slice(16, 20)}-${maxRaw.slice(20, 32)}`;
+              const { data: byPrefix } = await supabase.from('users').select('*').gte('id', minUuid).lte('id', maxUuid).limit(1).maybeSingle();
+              if (byPrefix) sellerRecord = byPrefix;
+            }
+
+            // 4. Recherche par nom de boutique
+            if (!sellerRecord) {
+              const { data: byName } = await supabase.from('users').select('*').ilike('shop_name', id).maybeSingle();
+              sellerRecord = byName;
+            }
           }
         }
 

@@ -1,6 +1,8 @@
 import { supabase } from '../supabase';
 import { ListingFull, ListingFilters, ListingCreateInput, ListingVariant } from '@daloa/types';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const listingsService = {
   /**
    * Récupère la liste des annonces avec pagination et filtres
@@ -98,16 +100,39 @@ export const listingsService = {
   },
 
   /**
-   * Récupère une annonce complète par son ID
+   * Récupère une annonce complète par son ID (supporte UUID complet ou préfixe court /l/c14e460e)
    */
   async getListingById(id: string): Promise<ListingFull> {
-    const { data, error } = await supabase
-      .from('listings')
-      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_description, shop_logo_url, shop_banner_url, shop_slug, district, shop_latitude, shop_longitude, rating, pro_until, created_at)')
-      .eq('id', id)
-      .single();
+    const selectCols =
+      '*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_description, shop_logo_url, shop_banner_url, shop_slug, district, shop_latitude, shop_longitude, rating, pro_until, created_at)';
 
-    if (error) throw error;
+    let data: any = null;
+
+    if (UUID_REGEX.test(id)) {
+      const res = await supabase.from('listings').select(selectCols).eq('id', id).maybeSingle();
+      if (res.error) throw res.error;
+      data = res.data;
+    } else {
+      const cleanHex = (id.split('-').pop() || id).toLowerCase().replace(/[^a-f0-9]/g, '');
+      if (cleanHex.length >= 4 && cleanHex.length < 32) {
+        const minRaw = cleanHex.padEnd(32, '0');
+        const maxRaw = cleanHex.padEnd(32, 'f');
+        const minUuid = `${minRaw.slice(0, 8)}-${minRaw.slice(8, 12)}-${minRaw.slice(12, 16)}-${minRaw.slice(16, 20)}-${minRaw.slice(20, 32)}`;
+        const maxUuid = `${maxRaw.slice(0, 8)}-${maxRaw.slice(8, 12)}-${maxRaw.slice(12, 16)}-${maxRaw.slice(16, 20)}-${maxRaw.slice(20, 32)}`;
+
+        const res = await supabase
+          .from('listings')
+          .select(selectCols)
+          .gte('id', minUuid)
+          .lte('id', maxUuid)
+          .neq('status', 'deleted')
+          .limit(1)
+          .maybeSingle();
+
+        if (res.data) data = res.data;
+      }
+    }
+
     if (!data) throw new Error('Annonce introuvable');
 
     return {
