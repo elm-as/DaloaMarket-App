@@ -186,3 +186,31 @@ export const MOBILE_MONEY_NETWORKS = [
   { id: 'mtn', name: 'MTN MoMo', color: '#FFCC00', icon: 'mtn' },
   { id: 'moov', name: 'Moov Money', color: '#006699', icon: 'moov' },
 ] as const;
+
+/**
+ * Normalise l'identifiant du réseau de paiement vers le format standardisé en base de données.
+ * Exemple: 'wave' -> 'wave-ci', 'orange' -> 'orange-money-ci'.
+ */
+export const normalizePayoutNetwork = (network?: string): string => {
+  const map: Record<string, string> = {
+    wave: 'wave-ci',
+    'wave-ci': 'wave-ci',
+    orange: 'orange-money-ci',
+    'orange-money-ci': 'orange-money-ci',
+    mtn: 'mtn-ci',
+    'mtn-ci': 'mtn-ci',
+    moov: 'moov-ci',
+    'moov-ci': 'moov-ci',
+  };
+  return network ? map[network.trim().toLowerCase()] || 'wave-ci' : 'wave-ci';
+};
+
+/**
+ * Coordonnées de support par défaut (utilisées si non surchargées par variable d'environnement).
+ * Pour changer le numéro WhatsApp lors de l'acquisition d'un nouveau numéro professionnel,
+ * définissez la variable d'environnement EXPO_PUBLIC_SUPPORT_WHATSAPP ou modifiez cette constante.
+ */
+export const DEFAULT_SUPPORT_PHONE = '+2250788000831';
+export const DEFAULT_SUPPORT_WHATSAPP = '2250788000831';
+export const DEFAULT_SUPPORT_EMAIL = 'support@daloamarket.com';
+

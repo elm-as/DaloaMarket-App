@@ -5,123 +5,45 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 import {
-  ShieldCheck,
-  Globe,
-  Users,
-  ShoppingBag,
-  CreditCard,
-  Truck,
-  Star,
-  Scale,
+  FileText,
   ArrowLeft,
   ChevronDown,
+  CheckCircle2,
 } from 'lucide-react-native';
+import { TERMS_ARTICLES, TERMS_LAST_UPDATE, LegalArticle } from '../../src/legal/terms-data';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-interface TermSection {
-  id: string;
-  icon: any;
-  title: string;
-  content: string[];
-}
-
-const TERMS: TermSection[] = [
-  {
-    id: 'intro',
-    icon: Globe,
-    title: '1. Rôle d’intermédiaire & Acceptation',
-    content: [
-      'DaloaMarket est une plateforme de commerce de proximité opérée à Daloa (Côte d’Ivoire) mettant en relation des acheteurs, des vendeurs et des coursiers indépendants.',
-      'Le contrat de vente est conclu directement entre l’acheteur et le vendeur. DaloaMarket intervient comme tiers de confiance technique et opérateur de la passerelle de séquestre (escrow).',
-    ],
-  },
-  {
-    id: 'account',
-    icon: Users,
-    title: '2. Compte utilisateur & Sécurité',
-    content: [
-      'L’utilisateur s’engage à fournir des informations exactes lors de son inscription (numéro de téléphone, nom et quartier à Daloa).',
-      'Chaque utilisateur est personnellement responsable de la garde de ses accès et de ses codes de validation de commande.',
-    ],
-  },
-  {
-    id: 'listings',
-    icon: ShoppingBag,
-    title: '3. Règles de publication des annonces',
-    content: [
-      'Sont formellement interdits : les contrefaçons, les produits volés, les armes, les stupéfiants, les médicaments non autorisés et tout contenu illicite en droit ivoirien.',
-      'Chaque annonce doit comporter un prix réel en FCFA, des photos réelles et récentes de l’article et la mention honnête de son état.',
-      'La publication est gratuite jusqu’à 20 annonces actives simultanément. Au-delà, l’abonnement au Pass Vendeur Pro est requis.',
-    ],
-  },
-  {
-    id: 'escrow',
-    icon: CreditCard,
-    title: '4. Paiement Séquestre & Frais',
-    content: [
-      'Frais acheteur : 0 FCFA (0% de commission acheteur). L’acheteur ne paie que le prix du bien et les frais de livraison.',
-      'Commissions vendeur : 3,5% pour les vendeurs standards, et réduite à 2,5% pour les Vendeurs Pro.',
-      'Les fonds Mobile Money (Wave, Orange, MTN, Moov) sont bloqués en compte séquestre dès la commande et versés au vendeur uniquement après remise du code OTP secret.',
-    ],
-  },
-  {
-    id: 'delivery',
-    icon: Truck,
-    title: '5. Livraisons & Réseau DaloaDelivery',
-    content: [
-      'Tarifs officiels : 500 FCFA pour les premiers 1,5 km, puis 85 FCFA par km supplémentaire, calculés par géolocalisation.',
-      'Le coursier indépendant perçoit 90% des frais de livraison (10% de frais techniques retenus par la plateforme).',
-      'Validation de sécurité : le coursier doit se trouver à moins de 100 mètres des coordonnées GPS de destination pour valider la remise.',
-    ],
-  },
-  {
-    id: 'affiliated',
-    icon: ShieldCheck,
-    title: '6. Livreurs Affiliés & Responsabilité',
-    content: [
-      'Les Vendeurs Pro peuvent mandater leurs propres livreurs affiliés personnels de confiance pour assurer leurs courses ou le paiement en espèces à la livraison (COD).',
-      'Le Vendeur Pro assume la responsabilité intégrale des actes et pertes de ses livreurs affiliés.',
-      'Protection acheteur : en cas de litige, perte ou non-remise par un livreur affilié, l’acheteur est intégralement remboursé.',
-    ],
-  },
-  {
-    id: 'pro',
-    icon: Star,
-    title: '7. Pass Vendeur Pro & Visibilité',
-    content: [
-      'Pass Vendeur Pro : 2 500 FCFA / mois ou 25 000 FCFA / an (2 mois offerts). Débloque le stock illimité, le badge Pro, les livreurs affiliés et la commission réduite à 2,5%.',
-      'Options de mise en avant : Boost en vedette 7 jours à 500 FCFA, et Bump de tête de liste à 200 FCFA.',
-    ],
-  },
-  {
-    id: 'disputes',
-    icon: Scale,
-    title: '8. Litiges & Droit applicable',
-    content: [
-      'Toute contestation doit être signalée avant la transmission du code secret OTP. Une fois l’OTP validé, la transaction est réputée conforme et définitive.',
-      'Les présentes conditions sont soumises à la législation de la République de Côte d’Ivoire. Tout litige non résolu à l’amiable relève des juridictions compétentes de Daloa et d’Abidjan.',
-    ],
-  },
-];
-
 export default function TermsScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
-  const [openSectionId, setOpenSectionId] = useState<string | null>('intro');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['acceptance', 'service-desc', 'payments-escrow']));
 
-  const toggleSection = (id: string) => {
+  const toggleExpand = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setOpenSectionId(openSectionId === id ? null : id);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedIds(new Set(TERMS_ARTICLES.map((a) => a.id)));
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <LinearGradient
-        colors={[accent[400], accent[600], accent[700]]}
+        colors={[accent[500], accent[600], accent[700]]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.hero}
@@ -137,63 +59,93 @@ export default function TermsScreen() {
           </AppPressable>
           <View style={styles.heroTitles}>
             <AppText variant="overline" color={accent[100]}>
-              Cadre Juridique
+              Cadre Contractuel Officiel
             </AppText>
             <AppText variant="title" color={colors.text.inverse}>
-              Conditions générales (CGU)
+              Conditions Générales (CGU)
             </AppText>
           </View>
           <View style={styles.iconCircle}>
-            <ShieldCheck size={18} color={accent[200]} />
+            <FileText size={18} color={accent[100]} />
           </View>
+        </View>
+
+        <View style={styles.metaBadge}>
+          <AppText variant="caption" color={colors.text.inverse} style={styles.metaText}>
+            Dernière mise à jour : {TERMS_LAST_UPDATE} • Daloa, Côte d'Ivoire
+          </AppText>
         </View>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.introCard}>
-          <AppText variant="caption" color={colors.text.muted} style={styles.introText}>
-            Dernière mise à jour : 2026. Les présentes CGU encadrent l’usage de la plateforme DaloaMarket
-            et du service de livraison DaloaDelivery en République de Côte d’Ivoire.
+        <View style={styles.actionRow}>
+          <AppText variant="caption" color={colors.text.muted}>
+            {TERMS_ARTICLES.length} articles contractuels
           </AppText>
+          <AppPressable onPress={expandAll} haptic="light">
+            <AppText variant="caption" color={accent[600]} style={styles.expandAllText}>
+              Tout déplier
+            </AppText>
+          </AppPressable>
         </View>
 
         <View style={styles.card}>
-          {TERMS.map((sec, idx) => {
-            const IconComp = sec.icon;
-            const isOpen = openSectionId === sec.id;
+          {TERMS_ARTICLES.map((article, idx) => {
+            const isExpanded = expandedIds.has(article.id);
+            const isLast = idx === TERMS_ARTICLES.length - 1;
+
             return (
-              <View key={sec.id} style={[styles.termRow, idx < TERMS.length - 1 && styles.termBorder]}>
+              <View key={article.id} style={[styles.articleWrap, !isLast && styles.articleDivider]}>
                 <AppPressable
-                  onPress={() => toggleSection(sec.id)}
-                  style={styles.headerBtn}
-                  accessibilityRole="button"
+                  onPress={() => toggleExpand(article.id)}
+                  style={styles.articleHeader}
+                  haptic="light"
+                  accessibilityLabel={`Article ${article.number} ${article.title}`}
                 >
-                  <View style={[styles.iconBox, { backgroundColor: accent[50] }]}>
-                    <IconComp size={16} color={accent.DEFAULT} />
+                  <View style={styles.numberBadge}>
+                    <AppText variant="bodyStrong" color={accent[700]}>
+                      {article.number}
+                    </AppText>
                   </View>
-                  <AppText variant="bodyStrong" style={styles.termTitle}>
-                    {sec.title}
-                  </AppText>
-                  <ChevronDown
-                    size={18}
-                    color={isOpen ? accent.DEFAULT : colors.text.subtle}
-                    style={isOpen ? styles.chevronOpen : undefined}
-                  />
+                  <View style={styles.articleHeaderText}>
+                    <AppText variant="bodyStrong" color={colors.text.DEFAULT}>
+                      {article.title}
+                    </AppText>
+                    <AppText variant="caption" color={colors.text.muted} numberOfLines={isExpanded ? undefined : 1}>
+                      {article.summary}
+                    </AppText>
+                  </View>
+                  <View style={[styles.chevronWrap, isExpanded && styles.chevronRotated]}>
+                    <ChevronDown size={18} color={colors.text.muted} />
+                  </View>
                 </AppPressable>
-                {isOpen && (
-                  <View style={styles.contentWrap}>
-                    {sec.content.map((p, pIdx) => (
-                      <AppText key={pIdx} variant="caption" color={colors.text.body} style={styles.paragraph}>
+
+                {isExpanded && (
+                  <View style={styles.articleBody}>
+                    {article.paragraphs.map((p, pIdx) => (
+                      <AppText key={pIdx} variant="caption" color={colors.text.DEFAULT} style={styles.paragraph}>
                         {p}
                       </AppText>
                     ))}
+
+                    {article.bullets && article.bullets.length > 0 && (
+                      <View style={styles.bulletsWrap}>
+                        {article.bullets.map((b, bIdx) => (
+                          <View key={bIdx} style={styles.bulletRow}>
+                            <CheckCircle2 size={14} color={accent[600]} style={styles.bulletIcon} />
+                            <AppText variant="caption" color={colors.text.DEFAULT} style={styles.bulletText}>
+                              {b}
+                            </AppText>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
             );
           })}
         </View>
-
         <View style={{ height: insets.bottom + spacing[6] }} />
       </ScrollView>
     </View>
@@ -206,9 +158,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.DEFAULT,
   },
   hero: {
-    paddingHorizontal: spacing[3],
+    paddingHorizontal: spacing[4],
     paddingTop: spacing[2],
-    paddingBottom: spacing[5],
+    paddingBottom: spacing[4],
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
@@ -227,65 +179,102 @@ const styles = StyleSheet.create({
   },
   heroTitles: {
     flex: 1,
-    marginLeft: spacing[2],
+    marginHorizontal: spacing[3],
   },
   iconCircle: {
     width: 36,
     height: 36,
-    borderRadius: radii.full,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  metaBadge: {
+    marginTop: spacing[3],
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    paddingVertical: spacing[1],
+    paddingHorizontal: spacing[3],
+    borderRadius: radii.full,
+    alignSelf: 'flex-start',
+  },
+  metaText: {
+    fontSize: 11,
+  },
   scrollContent: {
     padding: spacing[4],
-    gap: spacing[3],
   },
-  introCard: {
-    paddingHorizontal: spacing[2],
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[2],
+    paddingHorizontal: spacing[1],
   },
-  introText: {
-    lineHeight: 18,
+  expandAllText: {
+    fontWeight: '700',
   },
   card: {
     backgroundColor: colors.bg.surface,
     borderRadius: radii.xl,
+    padding: spacing[3],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
-    paddingHorizontal: spacing[3],
   },
-  termRow: {
-    paddingVertical: spacing[3],
+  articleWrap: {
+    paddingVertical: spacing[2],
   },
-  termBorder: {
+  articleDivider: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
-  headerBtn: {
+  articleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[2],
+    paddingVertical: spacing[2],
   },
-  iconBox: {
-    width: 30,
-    height: 30,
+  numberBadge: {
+    width: 28,
+    height: 28,
     borderRadius: radii.md,
+    backgroundColor: 'rgba(255, 127, 0, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: spacing[3],
   },
-  termTitle: {
+  articleHeaderText: {
     flex: 1,
-    lineHeight: 18,
   },
-  chevronOpen: {
+  chevronWrap: {
+    marginLeft: spacing[2],
+  },
+  chevronRotated: {
     transform: [{ rotate: '180deg' }],
   },
-  contentWrap: {
-    marginTop: spacing[2],
-    paddingLeft: 38,
+  articleBody: {
+    paddingLeft: spacing[8],
+    paddingRight: spacing[2],
+    paddingBottom: spacing[3],
     gap: spacing[2],
   },
   paragraph: {
     lineHeight: 19,
+    color: '#374151',
+  },
+  bulletsWrap: {
+    marginTop: spacing[2],
+    gap: 6,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  bulletIcon: {
+    marginTop: 2,
+    marginRight: spacing[2],
+  },
+  bulletText: {
+    flex: 1,
+    lineHeight: 18,
+    color: '#4B5563',
   },
 });

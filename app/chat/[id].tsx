@@ -18,7 +18,7 @@ import {
   useAccent,
 } from '@daloa/ui';
 import { Send, ArrowLeft } from 'lucide-react-native';
-import { formatDate } from '@daloa/utils';
+import { formatDate, censorMessageContent } from '@daloa/utils';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 
 export default function ChatRoomScreen() {
@@ -68,7 +68,8 @@ export default function ChatRoomScreen() {
 
   const handleSend = async () => {
     if (!inputText.trim() || !user?.id || !partnerId) return;
-    const textToSend = inputText.trim();
+    const rawText = inputText.trim();
+    const textToSend = censorMessageContent(rawText);
     setInputText('');
 
     try {

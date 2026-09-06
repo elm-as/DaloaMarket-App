@@ -12,7 +12,7 @@ export const PRICING_CONFIG = {
 
   // Commissions sur les ventes d'articles
   marketplace: {
-    buyerServiceFeeRate: 0.0, // 0.0% : Annulé côté acheteur (zéro frais pour l'acheteur)
+    buyerServiceFeeRate: 0.02, // 2% frais de service acheteur (sécurisation & infrastructure)
     standardSellerFeeRate: 0.035, // 3.5% commission vendeur standard
     proSellerFeeRate: 0.025, // 2.5% commission vendeur Pro
   },

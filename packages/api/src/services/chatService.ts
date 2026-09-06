@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { ChatConversationPreview, ChatMessageItem } from '@daloa/types';
+import { censorMessageContent } from '@daloa/utils';
 
 export const chatService = {
   /**
@@ -104,12 +105,14 @@ export const chatService = {
     listingId?: string | null;
     imageUrl?: string | null;
   }): Promise<ChatMessageItem> {
+    const cleanContent = censorMessageContent(params.content);
+
     const { data, error } = await supabase
       .from('messages')
       .insert({
         sender_id: params.senderId,
         receiver_id: params.receiverId,
-        content: params.content,
+        content: cleanContent,
         listing_id: params.listingId || null,
         read: false,
       })

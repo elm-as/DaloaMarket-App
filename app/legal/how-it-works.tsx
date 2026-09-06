@@ -8,7 +8,7 @@ import {
   ShieldCheck, ArrowLeft, Lock, PackageCheck, Truck, CheckCircle2,
   AlertTriangle, RotateCcw, MessageCircle
 } from 'lucide-react-native';
-import { ENV_CONFIG } from '@daloa/config';
+import { ENV_CONFIG, getSupportWhatsAppUrl } from '@daloa/config';
 import { Haptics } from '@daloa/utils';
 
 const STEPS = [
@@ -56,7 +56,7 @@ export default function HowItWorksScreen() {
 
   const handleSupport = () => {
     Haptics.success();
-    Linking.openURL(`https://wa.me/${ENV_CONFIG.SUPPORT_WHATSAPP}?text=Bonjour%20Support%20DaloaMarket%2C%20litige%20commande`);
+    Linking.openURL(getSupportWhatsAppUrl('Bonjour Support DaloaMarket, litige commande'));
   };
 
   return (

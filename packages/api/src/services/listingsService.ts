@@ -103,7 +103,7 @@ export const listingsService = {
   async getListingById(id: string): Promise<ListingFull> {
     const { data, error } = await supabase
       .from('listings')
-      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_description, shop_logo_url, shop_banner_url, shop_slug, district, rating, pro_until, created_at)')
+      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_description, shop_logo_url, shop_banner_url, shop_slug, district, shop_latitude, shop_longitude, rating, pro_until, created_at)')
       .eq('id', id)
       .single();
 

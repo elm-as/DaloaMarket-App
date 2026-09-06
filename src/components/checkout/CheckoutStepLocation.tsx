@@ -50,7 +50,7 @@ export function CheckoutStepLocation({
           <View style={styles.sectionCard}>
             <AppText variant="bodyStrong">Quartier de livraison à Daloa</AppText>
             <AppText variant="caption" color={colors.text.muted}>
-              Sélectionnez votre quartier parmi les 38 zones de Daloa
+              Sélectionnez votre quartier de livraison à Daloa
             </AppText>
 
             <AppPressable

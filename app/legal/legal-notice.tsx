@@ -4,10 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { Shield, ArrowLeft, CheckCircle2 } from 'lucide-react-native';
-import { PRIVACY_SECTIONS, PRIVACY_LAST_UPDATE } from '../../src/legal/privacy-data';
+import { FileText, ArrowLeft, Building2 } from 'lucide-react-native';
+import { LEGAL_NOTICE_DATA } from '../../src/legal/legal-notice-data';
 
-export default function PrivacyScreen() {
+export default function LegalNoticeScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
@@ -31,70 +31,45 @@ export default function PrivacyScreen() {
           </AppPressable>
           <View style={styles.heroTitles}>
             <AppText variant="overline" color={accent[100]}>
-              Vos données & Vie Privée
+              Informations Officielles
             </AppText>
             <AppText variant="title" color={colors.text.inverse}>
-              Politique de Confidentialité
+              Mentions Légales
             </AppText>
           </View>
           <View style={styles.iconCircle}>
-            <Shield size={18} color={accent[100]} />
+            <Building2 size={18} color={accent[100]} />
           </View>
         </View>
 
         <View style={styles.metaBadge}>
           <AppText variant="caption" color={colors.text.inverse} style={styles.metaText}>
-            Dernière mise à jour : {PRIVACY_LAST_UPDATE} • Daloa, Côte d'Ivoire
+            Éditeur officiel • Daloa / Abidjan, Côte d'Ivoire
           </AppText>
         </View>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.card}>
-          {PRIVACY_SECTIONS.map((section, idx) => {
-            const isLast = idx === PRIVACY_SECTIONS.length - 1;
-
-            return (
-              <View key={section.id} style={[styles.section, !isLast && styles.sectionDivider]}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.numberBadge}>
-                    <AppText variant="bodyStrong" color={accent[700]}>
-                      {section.number}
+        <View style={styles.contentWrap}>
+          {LEGAL_NOTICE_DATA.map((group) => (
+            <View key={group.id} style={styles.groupCard}>
+              <AppText variant="bodyStrong" color={colors.text.DEFAULT} style={styles.groupTitle}>
+                {group.title}
+              </AppText>
+              <View style={styles.itemsWrap}>
+                {group.items.map((item, idx) => (
+                  <View key={idx} style={styles.itemRow}>
+                    <AppText variant="caption" color={colors.text.muted} style={styles.itemLabel}>
+                      {item.label}
+                    </AppText>
+                    <AppText variant="caption" color={colors.text.DEFAULT} style={styles.itemValue}>
+                      {item.value}
                     </AppText>
                   </View>
-                  <View style={styles.headerTextWrap}>
-                    <AppText variant="bodyStrong" color={colors.text.DEFAULT}>
-                      {section.title}
-                    </AppText>
-                    <AppText variant="caption" color={colors.text.muted}>
-                      {section.summary}
-                    </AppText>
-                  </View>
-                </View>
-
-                <View style={styles.sectionBody}>
-                  {section.paragraphs.map((p, pIdx) => (
-                    <AppText key={pIdx} variant="caption" color={colors.text.DEFAULT} style={styles.paragraph}>
-                      {p}
-                    </AppText>
-                  ))}
-
-                  {section.bullets && section.bullets.length > 0 && (
-                    <View style={styles.bulletsWrap}>
-                      {section.bullets.map((b, bIdx) => (
-                        <View key={bIdx} style={styles.bulletRow}>
-                          <CheckCircle2 size={13} color={accent[600]} style={styles.bulletIcon} />
-                          <AppText variant="caption" color={colors.text.DEFAULT} style={styles.bulletText}>
-                            {b}
-                          </AppText>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                ))}
               </View>
-            );
-          })}
+            </View>
+          ))}
         </View>
         <View style={{ height: insets.bottom + spacing[6] }} />
       </ScrollView>
@@ -153,60 +128,35 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing[4],
   },
-  card: {
+  contentWrap: {
+    gap: spacing[3],
+  },
+  groupCard: {
     backgroundColor: colors.bg.surface,
     borderRadius: radii.xl,
-    padding: spacing[3],
+    padding: spacing[4],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
   },
-  section: {
-    paddingVertical: spacing[3],
-  },
-  sectionDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  groupTitle: {
     marginBottom: spacing[2],
+    fontSize: 14,
+    fontWeight: '700',
   },
-  numberBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(255, 127, 0, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing[3],
-  },
-  headerTextWrap: {
-    flex: 1,
-  },
-  sectionBody: {
-    paddingLeft: spacing[8],
+  itemsWrap: {
     gap: spacing[2],
   },
-  paragraph: {
-    lineHeight: 18,
-    color: '#374151',
+  itemRow: {
+    paddingVertical: spacing[1],
   },
-  bulletsWrap: {
-    marginTop: spacing[1],
-    gap: spacing[1],
+  itemLabel: {
+    fontSize: 11,
+    color: colors.text.muted,
   },
-  bulletRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  bulletIcon: {
-    marginTop: 2,
-    marginRight: spacing[2],
-  },
-  bulletText: {
-    flex: 1,
-    lineHeight: 17,
-    color: '#4B5563',
+  itemValue: {
+    fontSize: 13,
+    color: '#1F2937',
+    fontWeight: '500',
+    marginTop: 1,
   },
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { colors, radii, spacing, Button, AppText, useAccent } from '@daloa/ui';
-import { ArrowLeft, Check, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, ShieldCheck } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import {
   PaymentMethodSelector,
@@ -19,6 +19,7 @@ interface CheckoutStepPaymentProps {
   quantity: number;
   activePrice: number;
   deliveryFee: number;
+  buyerServiceFee: number;
   totalAmount: number;
   distanceKm: number;
   isSubmitting: boolean;
@@ -36,6 +37,7 @@ export function CheckoutStepPayment({
   quantity,
   activePrice,
   deliveryFee,
+  buyerServiceFee,
   totalAmount,
   distanceKm,
   isSubmitting,
@@ -92,6 +94,17 @@ export function CheckoutStepPayment({
             {deliveryMode === 'pickup' ? '0 FCFA' : formatFCFA(deliveryFee)}
           </AppText>
         </View>
+
+        {buyerServiceFee > 0 && (
+          <View style={styles.breakRow}>
+            <AppText variant="caption" color={colors.text.muted}>
+              Frais de service plateforme (2%)
+            </AppText>
+            <AppText variant="body" style={styles.boldNum}>
+              {formatFCFA(buyerServiceFee)}
+            </AppText>
+          </View>
+        )}
 
         <View style={styles.divider} />
 
@@ -181,22 +194,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: spacing[1],
   },
   boldNum: {
+    fontVariant: ['tabular-nums'],
     fontWeight: '700',
   },
   totalAmountText: {
-    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
   },
   otpNoticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: spacing[3],
     backgroundColor: colors.bg.surface,
     borderRadius: radii.lg,
+    padding: spacing[3],
+    gap: spacing[2],
     borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
+    borderColor: colors.border.subtle,
+  },
+  flex1: {
+    flex: 1,
   },
   navRow: {
     gap: spacing[2],
@@ -204,8 +223,5 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     marginTop: 2,
-  },
-  flex1: {
-    flex: 1,
   },
 });

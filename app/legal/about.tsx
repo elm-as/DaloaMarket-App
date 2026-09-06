@@ -145,11 +145,15 @@ export default function AboutScreen() {
             </View>
             <AppPressable onPress={handlePhone} style={styles.actionContactRow}>
               <Phone size={15} color={accent[600]} />
-              <AppText variant="caption" color={accent[600]} style={styles.bold}>+225 07 88 00 08 31</AppText>
+              <AppText variant="caption" color={accent[600]} style={styles.bold}>{ENV_CONFIG.SUPPORT_PHONE}</AppText>
             </AppPressable>
-            <AppPressable onPress={() => handleMail('support@daloamarket.com')} style={styles.actionContactRow}>
+            <AppPressable onPress={() => handleMail(ENV_CONFIG.SUPPORT_EMAIL)} style={styles.actionContactRow}>
               <Mail size={15} color={accent[600]} />
-              <AppText variant="caption" color={accent[600]} style={styles.bold}>support@daloamarket.com</AppText>
+              <AppText variant="caption" color={accent[600]} style={styles.bold}>{ENV_CONFIG.SUPPORT_EMAIL}</AppText>
+            </AppPressable>
+            <AppPressable onPress={() => router.push('/legal/legal-notice' as any)} style={[styles.actionContactRow, { marginTop: 4 }]}>
+              <ShieldCheck size={15} color={accent[600]} />
+              <AppText variant="caption" color={accent[600]} style={styles.bold}>Consulter les mentions légales & éditeur</AppText>
             </AppPressable>
           </View>
         </View>

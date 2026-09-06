@@ -8,7 +8,7 @@ import {
   MessageCircle, Phone, ArrowLeft, Headphones, Mail, ChevronRight,
   ShieldCheck, HelpCircle, Clock, Send
 } from 'lucide-react-native';
-import { ENV_CONFIG } from '@daloa/config';
+import { ENV_CONFIG, getSupportWhatsAppUrl, getSupportCallUrl } from '@daloa/config';
 import { Haptics } from '@daloa/utils';
 
 export default function HelpScreen() {
@@ -24,12 +24,12 @@ export default function HelpScreen() {
 
   const handleWhatsApp = () => {
     Haptics.success();
-    Linking.openURL(`https://wa.me/${ENV_CONFIG.SUPPORT_WHATSAPP}?text=Bonjour%20Support%20DaloaMarket%2C%20assistance`);
+    Linking.openURL(getSupportWhatsAppUrl('Bonjour Support DaloaMarket, assistance'));
   };
 
   const handleCall = () => {
     Haptics.lightImpact();
-    Linking.openURL(`tel:${ENV_CONFIG.SUPPORT_PHONE}`);
+    Linking.openURL(getSupportCallUrl());
   };
 
   const handleEmail = () => {
