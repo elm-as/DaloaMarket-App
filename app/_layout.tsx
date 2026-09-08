@@ -20,6 +20,12 @@ function onAppStateChange(status: any) {
   }
   if (status === 'active') {
     supabase.auth.startAutoRefresh();
+    // Au réveil de veille prolongée, vérifier si la session a expiré pour la rafraîchir
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.expires_at && session.expires_at * 1000 < Date.now() + 60000) {
+        supabase.auth.refreshSession().catch(() => undefined);
+      }
+    }).catch(() => undefined);
   } else {
     supabase.auth.stopAutoRefresh();
   }

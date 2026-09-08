@@ -70,20 +70,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     fetchSession();
 
-    // Écouter les changements d'état d'authentification Supabase
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Écouter les changements d'état d'authentification Supabase de façon synchrone
+    // IMPORTANT : Ne jamais exécuter de requêtes Supabase asynchrones dans ce callback
+    // sous peine de deadlocker la machine d'état Supabase au réveil de l'app.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user);
-        const { data: p } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-        if (p) {
-          const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) };
-          setProfile(prof);
-          void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(prof));
-        }
       } else {
         setUser(null);
         setProfile(null);
@@ -96,6 +88,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []);
+
+  // Synchronisation du profil utilisateur en arrière-plan dès que l'ID utilisateur change
+  useEffect(() => {
+    if (!user?.id) return;
+    let isCancelled = false;
+
+    async function syncUserProfile() {
+      try {
+        const { data: p } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!isCancelled && p) {
+          const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) };
+          setProfile(prof);
+          void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(prof));
+        }
+      } catch (err) {
+        console.warn('Erreur synchronisation profil utilisateur:', err);
+      }
+    }
+
+    syncUserProfile();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user?.id]);
 
   const login = async (input: LoginInput) => {
     const result = await authService.login(input);
