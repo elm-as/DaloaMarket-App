@@ -1,28 +1,17 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
-import { supabase } from '@daloa/api';
+import { supabase, authService } from '@daloa/api';
 import { colors, radii, spacing, Input, Button, AppText, AppPressable, Avatar, useAccent } from '@daloa/ui';
 import { ArrowLeft, Camera, User, Phone, MapPin, ChevronDown, CheckCircle2, AlertCircle } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
 import { DistrictPickerSheet } from '../../src/components/settings/DistrictPickerSheet';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
-
-async function uploadAvatar(userId: string, uri: string): Promise<string | null> {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  const mimeType = blob.type || 'image/jpeg';
-  const ext = mimeType.includes('png') ? 'png' : 'jpg';
-  const path = `${userId}/avatar_${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('avatars').upload(path, blob, { contentType: mimeType, upsert: true });
-  if (error) throw error;
-  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
-}
 
 export default function AccountSettingsScreen() {
   const router = useRouter();
@@ -55,23 +44,28 @@ export default function AccountSettingsScreen() {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') return;
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images',
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,
+        base64: true,
       });
-      if (result.canceled || !result.assets[0] || !user?.id) return;
+      if (result.canceled || !result.assets || !result.assets[0] || !user?.id) return;
 
+      const asset = result.assets[0];
       setUploadingAvatar(true);
-      const url = await uploadAvatar(user.id, result.assets[0].uri);
+      const url = await authService.uploadAvatar(user.id, {
+        base64: asset.base64,
+        uri: asset.uri,
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
       if (url) {
         setAvatarUrl(url);
-        await supabase.from('users').update({ avatar_url: url }).eq('id', user.id);
         await refreshProfile();
         Haptics.success();
       }
     } catch (err: any) {
-      setFeedback({ type: 'error', text: err.message || 'Échec du téléversement de la photo' });
+      setFeedback({ type: 'error', text: err?.message || 'Échec du téléversement de la photo' });
     } finally {
       setUploadingAvatar(false);
     }
@@ -166,7 +160,11 @@ export default function AccountSettingsScreen() {
               style={[styles.cameraBtn, { backgroundColor: accent.DEFAULT }]}
               accessibilityLabel="Changer la photo de profil"
             >
-              <Camera size={16} color={colors.text.inverse} />
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color={colors.text.inverse} />
+              ) : (
+                <Camera size={16} color={colors.text.inverse} />
+              )}
             </AppPressable>
           </View>
           <AppText variant="caption" color={colors.text.subtle} style={styles.avatarHelp}>
@@ -248,10 +246,7 @@ export default function AccountSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg.DEFAULT,
-  },
+  container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
   header: {
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[4],
@@ -269,12 +264,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitles: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: spacing[4],
-  },
+  headerTitles: { flex: 1 },
+  scrollContent: { padding: spacing[4] },
   feedbackBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,24 +275,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
     borderWidth: 1,
   },
-  feedbackError: {
-    backgroundColor: colors.status.errorLight,
-    borderColor: colors.status.error,
-  },
-  feedbackSuccess: {
-    backgroundColor: colors.status.successLight,
-    borderColor: colors.status.success,
-  },
-  feedbackText: {
-    flex: 1,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginVertical: spacing[3],
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
+  feedbackError: { backgroundColor: colors.status.errorLight, borderColor: colors.status.error },
+  feedbackSuccess: { backgroundColor: colors.status.successLight, borderColor: colors.status.success },
+  feedbackText: { flex: 1 },
+  avatarSection: { alignItems: 'center', marginVertical: spacing[3] },
+  avatarWrap: { position: 'relative' },
   cameraBtn: {
     position: 'absolute',
     bottom: 0,
@@ -314,9 +292,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.bg.surface,
   },
-  avatarHelp: {
-    marginTop: spacing[2],
-  },
+  avatarHelp: { marginTop: spacing[2] },
   formCard: {
     backgroundColor: colors.bg.surface,
     padding: spacing[4],
@@ -326,14 +302,8 @@ const styles = StyleSheet.create({
     gap: spacing[3],
     marginBottom: spacing[4],
   },
-  fieldGroup: {
-    gap: 4,
-  },
-  label: {
-    fontWeight: '700',
-    fontSize: 11,
-    textTransform: 'uppercase',
-  },
+  fieldGroup: { gap: 4 },
+  label: { fontWeight: '700', fontSize: 11, textTransform: 'uppercase' },
   districtSelector: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -345,13 +315,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
     borderRadius: radii.lg,
   },
-  districtLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-    flex: 1,
-  },
-  saveBtn: {
-    marginTop: spacing[2],
-  },
+  districtLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flex: 1 },
+  saveBtn: { marginTop: spacing[2] },
 });

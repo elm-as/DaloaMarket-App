@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Settings, Sparkles, MapPin, Phone, Star } from 'lucide-react-native';
+import { Settings, Sparkles, MapPin, Phone, Star, Camera } from 'lucide-react-native';
 import { colors, spacing, Avatar, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 interface ProfileHeroProps {
@@ -13,6 +13,8 @@ interface ProfileHeroProps {
   rating?: number | null;
   isPro?: boolean;
   onOpenSettings: () => void;
+  onEditAvatar?: () => void;
+  isUploadingAvatar?: boolean;
 }
 
 export const ProfileHero: React.FC<ProfileHeroProps> = ({
@@ -23,6 +25,8 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
   rating,
   isPro = false,
   onOpenSettings,
+  onEditAvatar,
+  isUploadingAvatar = false,
 }) => {
   const insets = useSafeAreaInsets();
   const accent = useAccent();
@@ -61,19 +65,34 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
 
       {/* Carte d'identité commerçant */}
       <View style={styles.identityRow}>
-        <View style={styles.avatarWrap}>
+        <AppPressable
+          onPress={onEditAvatar}
+          disabled={!onEditAvatar || isUploadingAvatar}
+          style={styles.avatarWrap}
+          accessibilityLabel="Changer ma photo de profil"
+          accessibilityRole="button"
+        >
           <Avatar
             name={displayName}
             uri={avatarUrl || undefined}
             size={68}
             isPro={isPro}
           />
+          {isUploadingAvatar ? (
+            <View style={styles.avatarLoadingOverlay}>
+              <ActivityIndicator size="small" color={colors.text.inverse} />
+            </View>
+          ) : onEditAvatar ? (
+            <View style={styles.cameraBadge}>
+              <Camera size={12} color={colors.text.inverse} />
+            </View>
+          ) : null}
           {isPro && (
             <View style={styles.proSparkleBadge}>
               <Sparkles size={11} color={colors.text.inverse} />
             </View>
           )}
-        </View>
+        </AppPressable>
 
         <View style={styles.identityInfo}>
           <View style={styles.nameRow}>
@@ -173,9 +192,34 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     padding: 2,
   },
-  proSparkleBadge: {
+  cameraBadge: {
     position: 'absolute',
     bottom: -2,
+    right: -2,
+    backgroundColor: '#0F172A',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
+  avatarLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proSparkleBadge: {
+    position: 'absolute',
+    top: -2,
     right: -2,
     backgroundColor: '#EA580C',
     width: 20,

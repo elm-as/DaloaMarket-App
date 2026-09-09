@@ -159,7 +159,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
-      if (p) setProfile({ ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) });
+      if (p) {
+        const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) };
+        setProfile(prof);
+        void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(prof));
+      }
     }
   };
 

@@ -214,4 +214,98 @@ export const authService = {
 
     await supabase.auth.signOut();
   },
+
+  /**
+   * Téléverse un avatar utilisateur vers Supabase Storage (bucket 'avatars')
+   * et met à jour l'enregistrement dans la table 'users'.
+   *
+   * Utilise ArrayBuffer pour garantir une compatibilité totale React Native Android/iOS.
+   */
+  async uploadAvatar(userId: string, input: UploadAvatarInput): Promise<string> {
+    const mimeType = input.mimeType || 'image/jpeg';
+    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+    const path = `${userId}/avatar_${Date.now()}.${ext}`;
+
+    let bodyData: ArrayBuffer | Blob;
+
+    if (input.base64) {
+      bodyData = decodeBase64ToArrayBuffer(input.base64);
+    } else if (input.uri) {
+      const response = await fetch(input.uri);
+      bodyData = await response.blob();
+    } else {
+      throw new Error('Aucune donnée d’image fournie pour l’avatar.');
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, bodyData, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Échec upload avatar storage:', uploadError);
+      throw new Error(`Erreur lors du téléversement de la photo: ${uploadError.message}`);
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path);
+    const publicUrl = publicUrlData.publicUrl;
+
+    const { error: dbError } = await supabase
+      .from('users')
+      .update({ avatar_url: publicUrl })
+      .eq('id', userId);
+
+    if (dbError) {
+      console.error('Échec mise à jour users.avatar_url:', dbError);
+      throw new Error(`Erreur lors de la sauvegarde du profil: ${dbError.message}`);
+    }
+
+    return publicUrl;
+  },
 };
+
+export interface UploadAvatarInput {
+  base64?: string | null;
+  uri?: string;
+  mimeType?: string;
+}
+
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+
+function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  const cleaned = base64.replace(/^data:image\/[a-z]+;base64,/, '').replace(/\s/g, '');
+  const atobFn =
+    typeof atob === 'function'
+      ? atob
+      : typeof global !== 'undefined' && typeof (global as any).atob === 'function'
+      ? (global as any).atob
+      : null;
+
+  if (atobFn) {
+    const binary = atobFn(cleaned);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  let bufferLength = cleaned.length * 0.75;
+  if (cleaned.endsWith('==')) bufferLength -= 2;
+  else if (cleaned.endsWith('=')) bufferLength -= 1;
+  const bytes = new Uint8Array(bufferLength);
+  let p = 0;
+  for (let i = 0; i < cleaned.length; i += 4) {
+    const enc1 = BASE64_CHARS.indexOf(cleaned[i]);
+    const enc2 = BASE64_CHARS.indexOf(cleaned[i + 1]);
+    const enc3 = BASE64_CHARS.indexOf(cleaned[i + 2]);
+    const enc4 = BASE64_CHARS.indexOf(cleaned[i + 3]);
+    bytes[p++] = (enc1 << 2) | (enc2 >> 4);
+    if (enc3 !== 64 && enc3 !== -1) bytes[p++] = ((enc2 & 15) << 4) | (enc3 >> 2);
+    if (enc4 !== 64 && enc4 !== -1) bytes[p++] = ((enc3 & 3) << 6) | enc4;
+  }
+  return bytes.buffer;
+}
