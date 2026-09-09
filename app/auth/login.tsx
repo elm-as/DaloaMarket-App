@@ -7,16 +7,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { signInWithGoogle } from '../../src/lib/googleAuth';
 import { supabase } from '@daloa/api';
 import {
-  colors,
-  radii,
-  spacing,
-  AppText,
-  AppPressable,
-  Button,
-  Input,
-  KeyboardScreen,
-  useAccent,
-  GoogleIcon,
+  colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon,
 } from '@daloa/ui';
 import { Mail, Lock, ArrowLeft, LogIn, Sparkles, UserPlus, ShieldCheck, Truck } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';

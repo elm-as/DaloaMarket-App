@@ -5,17 +5,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { signInWithGoogle } from '../../src/lib/googleAuth';
+import { supabase } from '@daloa/api';
 import {
-  colors,
-  radii,
-  spacing,
-  AppText,
-  AppPressable,
-  Button,
-  Input,
-  KeyboardScreen,
-  useAccent,
-  GoogleIcon,
+  colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon,
 } from '@daloa/ui';
 import { DALOA_DISTRICTS } from '@daloa/config';
 import { User, Mail, Phone, Lock, MapPin, ArrowLeft, ShieldCheck } from 'lucide-react-native';
@@ -68,6 +60,11 @@ export default function RegisterScreen() {
       setIsGoogleLoading(true);
       setErrorMsg(null);
       await signInWithGoogle();
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        Haptics.success();
+        safeBack(router, '/(tabs)/profile');
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Impossible de s’inscrire avec Google.');
     } finally {
