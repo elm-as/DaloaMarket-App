@@ -154,8 +154,11 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
 
       {/* ── Prix ── */}
       <View style={styles.section}>
-        <AppText variant="label" color={colors.text.body}>Prix de vente (FCFA) *</AppText>
-        <View style={[styles.priceInputWrapper, { borderColor: price ? accent[300] : colors.border.DEFAULT }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <AppText variant="label" color={colors.text.body}>Prix de vente (FCFA) *</AppText>
+          <AppText variant="caption" color={colors.text.subtle}>Min. 300 FCFA</AppText>
+        </View>
+        <View style={[styles.priceInputWrapper, { borderColor: price ? (numPrice < 300 ? colors.status.error : accent[300]) : colors.border.DEFAULT }]}>
           <TextInput
             value={price}
             onChangeText={setPrice}
@@ -166,7 +169,14 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
           />
           <AppText variant="bodyStrong" color={accent[600]}>FCFA</AppText>
         </View>
-        {numPrice > 0 && (
+        {numPrice > 0 && numPrice < 300 && (
+          <View style={[styles.pricePreview, { backgroundColor: colors.status.errorLight, borderColor: colors.status.errorBorder }]}>
+            <AppText variant="caption" color={colors.status.errorDark}>
+              ⚠️ Le montant minimum pour une annonce est de 300 FCFA.
+            </AppText>
+          </View>
+        )}
+        {numPrice >= 300 && (
           <View style={[styles.pricePreview, { backgroundColor: accent[50], borderColor: accent[100] }]}>
             <AppText variant="caption" color={accent[700]}>
               Votre article sera affiché à{' '}

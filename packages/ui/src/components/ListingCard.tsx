@@ -82,10 +82,19 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
     return getListingPriceRange(listing.price, listing.variants);
   }, [listing.price, listing.variants, listing.minPrice, listing.maxPrice]);
 
-  const targetPhoto =
-    Array.isArray(listing.photos) && listing.photos.length > 0 && typeof listing.photos[0] === 'string' && listing.photos[0].startsWith('http')
-      ? listing.photos[0]
-      : FALLBACK_PHOTO;
+  const firstPhoto =
+    Array.isArray(listing.photos) && listing.photos.length > 0 && typeof listing.photos[0] === 'string'
+      ? listing.photos[0].trim()
+      : null;
+  const isValidPhotoUri =
+    firstPhoto &&
+    (firstPhoto.startsWith('http://') ||
+      firstPhoto.startsWith('https://') ||
+      firstPhoto.startsWith('file:') ||
+      firstPhoto.startsWith('content:') ||
+      firstPhoto.startsWith('data:') ||
+      firstPhoto.startsWith('/'));
+  const targetPhoto = isValidPhotoUri ? firstPhoto : FALLBACK_PHOTO;
 
   const [failedUrl, setFailedUrl] = React.useState<string | null>(null);
   const photoUri = failedUrl === targetPhoto ? FALLBACK_PHOTO : targetPhoto;

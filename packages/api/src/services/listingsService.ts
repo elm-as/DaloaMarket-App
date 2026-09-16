@@ -238,14 +238,16 @@ export const listingsService = {
   /**
    * Téléverse une photo vers Supabase Storage
    */
-  async uploadImage(uri: string, folder = 'listings'): Promise<string> {
+  async uploadImage(uri: string, folder = 'general'): Promise<string> {
     try {
       const response = await fetch(uri);
       const blob = await response.blob();
-      const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const contentType = blob.type || 'image/jpeg';
+      const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+      const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
 
       const { data, error } = await supabase.storage.from('listings').upload(filename, blob, {
-        contentType: 'image/jpeg',
+        contentType,
         upsert: false,
       });
 

@@ -237,8 +237,34 @@ export default function OrderTrackingScreen() {
     }
   };
 
-  /* État d'erreur / commande introuvable */
-  if (isError || (!isLoading && !order)) {
+  /* 1. Loading skeleton (pendant le chargement initial ou tant que la commande n'est pas résolue sans erreur) */
+  if (isLoading || (!order && !isError)) {
+    return (
+      <View style={[styles.container, { paddingTop: 0 }]}>
+        <LinearGradient
+          colors={[accent[400], accent[600], accent[700]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + spacing[2] }]}
+        >
+          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn}>
+            <ArrowLeft size={20} color={colors.text.inverse} />
+          </AppPressable>
+          <AppText variant="overline" color={accent[100]}>COMMANDE</AppText>
+          <AppText variant="h2" color={colors.text.inverse}>Suivi en direct</AppText>
+        </LinearGradient>
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={accent.DEFAULT} />
+          <AppText variant="caption" color={colors.text.muted}>
+            Chargement du suivi...
+          </AppText>
+        </View>
+      </View>
+    );
+  }
+
+  /* 2. État d'erreur / commande introuvable (seulement après fin du chargement et confirmation d'erreur) */
+  if (isError || !order) {
     return (
       <View style={[styles.container, { paddingTop: 0 }]}>
         <LinearGradient
@@ -275,32 +301,6 @@ export default function OrderTrackingScreen() {
               Voir mes commandes
             </AppText>
           </AppPressable>
-        </View>
-      </View>
-    );
-  }
-
-  /* Loading skeleton */
-  if (isLoading || !order) {
-    return (
-      <View style={[styles.container, { paddingTop: 0 }]}>
-        <LinearGradient
-          colors={[accent[400], accent[600], accent[700]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + spacing[2] }]}
-        >
-          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn}>
-            <ArrowLeft size={20} color={colors.text.inverse} />
-          </AppPressable>
-          <AppText variant="overline" color={accent[100]}>COMMANDE</AppText>
-          <AppText variant="h2" color={colors.text.inverse}>Suivi en direct</AppText>
-        </LinearGradient>
-        <View style={styles.loadingBox}>
-          <ActivityIndicator color={accent.DEFAULT} />
-          <AppText variant="caption" color={colors.text.muted}>
-            Chargement du suivi...
-          </AppText>
         </View>
       </View>
     );
@@ -678,7 +678,7 @@ export default function OrderTrackingScreen() {
                   {driver.vehicle_type?.toUpperCase() || 'MOTO'}
                 </AppText>
                 <RatingStars
-                  rating={driver.rating || 5.0}
+                  rating={driver.rating ?? 0}
                   totalReviews={driver.total_reviews}
                   size={11}
                 />

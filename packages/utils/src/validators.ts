@@ -49,7 +49,7 @@ export type DriverRegisterFormData = z.infer<typeof driverRegisterSchema>;
 export const listingCreateSchema = z.object({
   title: z.string().min(3, "Le titre de l'annonce doit comporter au moins 3 caractères").max(80, 'Titre trop long (max 80)'),
   description: z.string().min(10, 'La description doit comporter au moins 10 caractères'),
-  price: z.number().positive('Le prix doit être supérieur à 0 FCFA'),
+  price: z.number().min(300, 'Le montant minimum d’une annonce est de 300 FCFA'),
   originalPrice: z.number().positive().optional().nullable(),
   category: z.string().min(1, 'Veuillez sélectionner une catégorie'),
   condition: z.enum(['new', 'like_new', 'good', 'used']),

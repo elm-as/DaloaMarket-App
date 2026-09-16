@@ -88,8 +88,8 @@ export default function ListingCreateScreen() {
     }
     if (currentStep === 2) {
       const num = parseFloat(price);
-      if (isNaN(num) || num <= 0) {
-        showAlert('Prix invalide', 'Veuillez renseigner un prix valide en FCFA.');
+      if (isNaN(num) || num < 300) {
+        showAlert('Prix invalide', 'Le prix minimum d’une annonce est de 300 FCFA.');
         return;
       }
     }
@@ -112,6 +112,18 @@ export default function ListingCreateScreen() {
 
     try {
       setIsSubmitting(true);
+      const uploadedPhotos: string[] = [];
+      for (const p of photos) {
+        if (p.startsWith('http')) {
+          uploadedPhotos.push(p);
+        } else {
+          const publicUrl = await listingsService.uploadImage(p, user.id);
+          uploadedPhotos.push(publicUrl);
+        }
+      }
+
+      const finalPhotos = uploadedPhotos.length > 0 ? uploadedPhotos : [FALLBACK_PHOTO];
+
       const created = await listingsService.createListing(user.id, {
         title: title.trim(),
         description: description.trim(),
@@ -122,7 +134,7 @@ export default function ListingCreateScreen() {
         district: selectedDistrict,
         stock,
         accepts_delivery: acceptsDelivery,
-        photos: photos.length > 0 ? photos : [FALLBACK_PHOTO],
+        photos: finalPhotos,
         variants: variants.map((v) => ({
           label: v.title,
           price: v.price || null,

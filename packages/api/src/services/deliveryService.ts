@@ -70,7 +70,7 @@ export const deliveryService = {
     const { data, error } = await supabase
       .from('delivery_assignments')
       .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, phone, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, phone))')
-      .in('status', ['awaiting_pickup', 'pending_seller_confirmation'])
+      .eq('status', 'awaiting_pickup')
       .is('delivery_person_id', null)
       .order('created_at', { ascending: false });
 
@@ -318,7 +318,7 @@ export const deliveryService = {
       earningsToday,
       pendingEscrowAmount: 0,
       totalAvailableBalance,
-      rating: driver?.rating || 5.0,
+      rating: driver?.rating != null ? Number(driver.rating) : null,
       isOnline: Boolean(driver?.is_available),
     };
   },

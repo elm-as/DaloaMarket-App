@@ -134,10 +134,12 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           deliveryLat: params.deliveryCoords?.latitude,
           deliveryLng: params.deliveryCoords?.longitude,
         });
-        params.clearCart();
         Haptics.success();
-        if (firstOrderId) router.replace(`/order/${firstOrderId}` as any);
-        else router.replace('/(tabs)/orders' as any);
+        const targetPath = firstOrderId ? `/order/${firstOrderId}` : '/(tabs)/orders';
+        router.replace(targetPath as any);
+        setTimeout(() => {
+          params.clearCart();
+        }, 400);
         return;
       }
 

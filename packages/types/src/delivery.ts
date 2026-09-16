@@ -70,6 +70,6 @@ export interface DriverDailyStats {
   earningsToday: number;
   pendingEscrowAmount: number;
   totalAvailableBalance: number;
-  rating: number;
+  rating: number | null;
   isOnline: boolean;
 }
