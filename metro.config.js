@@ -1,6 +1,11 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
-const { FileStore } = require('metro-cache');
+let FileStore;
+try {
+  FileStore = require('metro-cache').FileStore;
+} catch {
+  // Expo getDefaultConfig handles caching by default if metro-cache is not found
+}
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, '../..');
@@ -75,10 +80,12 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   }
 };
 
-config.cacheStores = [
-  new FileStore({
-    root: path.join(projectRoot, '.metro-cache'),
-  }),
-];
+if (FileStore) {
+  config.cacheStores = [
+    new FileStore({
+      root: path.join(projectRoot, '.metro-cache'),
+    }),
+  ];
+}
 
 module.exports = config;
