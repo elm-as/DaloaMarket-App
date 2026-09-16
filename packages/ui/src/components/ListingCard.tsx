@@ -82,20 +82,13 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
     return getListingPriceRange(listing.price, listing.variants);
   }, [listing.price, listing.variants, listing.minPrice, listing.maxPrice]);
 
-  const initialPhoto =
+  const targetPhoto =
     Array.isArray(listing.photos) && listing.photos.length > 0 && typeof listing.photos[0] === 'string' && listing.photos[0].startsWith('http')
       ? listing.photos[0]
       : FALLBACK_PHOTO;
 
-  const [photoUri, setPhotoUri] = React.useState(initialPhoto);
-
-  React.useEffect(() => {
-    const next =
-      Array.isArray(listing.photos) && listing.photos.length > 0 && typeof listing.photos[0] === 'string' && listing.photos[0].startsWith('http')
-        ? listing.photos[0]
-        : FALLBACK_PHOTO;
-    setPhotoUri(next);
-  }, [listing.photos]);
+  const [failedUrl, setFailedUrl] = React.useState<string | null>(null);
+  const photoUri = failedUrl === targetPhoto ? FALLBACK_PHOTO : targetPhoto;
 
   const cartQty = listing.cartQty || 0;
   const maxStock = listing.stock ?? 1;
@@ -125,12 +118,13 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
       <View style={styles.imageContainer}>
         <Image
           source={{ uri: photoUri }}
+          recyclingKey={listing.id}
           style={styles.image}
           contentFit="cover"
           transition={120}
           cachePolicy="memory-disk"
           allowDownscaling={true}
-          onError={() => setPhotoUri(FALLBACK_PHOTO)}
+          onError={() => setFailedUrl(targetPhoto)}
         />
 
         {/* Badges superposés à gauche */}
