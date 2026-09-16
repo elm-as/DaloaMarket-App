@@ -10,12 +10,18 @@
     "preview": {
       "node": "22.14.0",
       "distribution": "internal",
+      "env": {
+        "EXPO_USE_PNPM": "1"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
       "node": "22.14.0",
+      "env": {
+        "EXPO_USE_PNPM": "1"
+      },
       "android": {
         "buildType": "app-bundle"
       }
