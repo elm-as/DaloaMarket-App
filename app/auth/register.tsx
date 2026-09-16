@@ -1,16 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { signInWithGoogle } from '../../src/lib/googleAuth';
-import { supabase } from '@daloa/api';
-import {
-  colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon,
-} from '@daloa/ui';
+import { supabase, getPendingReferralCode, storeReferralCode } from '@daloa/api';
+import { colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon, typography } from '@daloa/ui';
 import { DALOA_DISTRICTS } from '@daloa/config';
-import { User, Mail, Phone, Lock, MapPin, ArrowLeft, ShieldCheck } from 'lucide-react-native';
+import { User, Mail, Phone, Lock, MapPin, ArrowLeft, ShieldCheck, Award } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
 
@@ -29,6 +27,29 @@ export default function RegisterScreen() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Code ambassadeur : soit apporte par le lien d'ouverture, soit tape ici.
+  const [refCode, setRefCode] = useState('');
+  const [refDepuisLien, setRefDepuisLien] = useState(false);
+
+  useEffect(() => {
+    let annule = false;
+    void getPendingReferralCode().then((code) => {
+      if (code && !annule) {
+        setRefCode(code);
+        setRefDepuisLien(true);
+      }
+    });
+    return () => {
+      annule = true;
+    };
+  }, []);
+
+  /** Un code tape a la main prime sur celui garde en memoire : intention la plus recente. */
+  const memoriserLeCode = async () => {
+    const saisi = refCode.trim();
+    if (saisi) await storeReferralCode(saisi);
+  };
+
   const handleRegister = async () => {
     if (!fullName.trim()) return setErrorMsg('Veuillez saisir votre nom complet');
     if (!email.trim() || !email.includes('@')) return setErrorMsg('Veuillez renseigner une adresse email valide');
@@ -38,6 +59,7 @@ export default function RegisterScreen() {
     try {
       setIsLoading(true);
       setErrorMsg(null);
+      await memoriserLeCode();
       await register({
         fullName: fullName.trim(),
         email: email.trim(),
@@ -59,6 +81,9 @@ export default function RegisterScreen() {
     try {
       setIsGoogleLoading(true);
       setErrorMsg(null);
+      // Google fait sortir de l'application : le code doit etre sur le disque
+      // avant, sinon Android peut tuer le processus et l'emporter avec lui.
+      await memoriserLeCode();
       await signInWithGoogle();
       const { data } = await supabase.auth.getSession();
       if (data?.session) {
@@ -173,6 +198,24 @@ export default function RegisterScreen() {
             onChangeText={setPassword}
             isPassword
             leftIcon={<Lock size={16} color={colors.text.subtle} />}
+          />
+
+          <Input
+            label="Code parrain (facultatif)"
+            placeholder="Le code de votre ambassadeur"
+            value={refCode}
+            onChangeText={(v) => {
+              setRefCode(v.toUpperCase());
+              setRefDepuisLien(false);
+            }}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            helperText={
+              refDepuisLien
+                ? 'Code reconnu — votre ambassadeur sera crédité.'
+                : 'À remplir uniquement si un ambassadeur vous a donné un code.'
+            }
+            leftIcon={<Award size={16} color={colors.text.subtle} />}
           />
 
           <Button
@@ -304,7 +347,7 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 9.5,
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
     letterSpacing: 0.5,
   },
   roleTabs: {

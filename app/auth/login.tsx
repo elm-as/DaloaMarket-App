@@ -6,9 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { signInWithGoogle } from '../../src/lib/googleAuth';
 import { supabase } from '@daloa/api';
-import {
-  colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon,
-} from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon, typography } from '@daloa/ui';
 import { Mail, Lock, ArrowLeft, LogIn, Sparkles, UserPlus, ShieldCheck, Truck } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
@@ -306,7 +304,7 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
     letterSpacing: 0.5,
   },
   forgotBtn: {

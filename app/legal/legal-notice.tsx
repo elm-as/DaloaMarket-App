@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { FileText, ArrowLeft, Building2 } from 'lucide-react-native';
 import { LEGAL_NOTICE_DATA } from '../../src/legal/legal-notice-data';
 
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   groupTitle: {
     marginBottom: spacing[2],
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   itemsWrap: {
     gap: spacing[2],
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   itemValue: {
     fontSize: 13,
     color: '#1F2937',
-    fontWeight: '500',
+    fontFamily: typography.families.medium,
     marginTop: 1,
   },
 });

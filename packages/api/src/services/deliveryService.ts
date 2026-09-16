@@ -15,6 +15,31 @@ import {
 } from './deliveryVerificationService';
 import { deliveryStorageService } from './deliveryStorageService';
 
+/**
+ * Part des frais de livraison retenue par la plateforme.
+ *
+ * `delivery_assignments` n'a pas de colonne `driver_fee` : la commission est
+ * derivee ici du prix de la course, et le livreur conserve les 90 % restants
+ * — le taux annonce aux coursiers a l'inscription.
+ */
+export const PLATFORM_COMMISSION_RATE = 0.1;
+
+const commissionOn = (deliveryPrice: number): number =>
+  Math.round(deliveryPrice * PLATFORM_COMMISSION_RATE);
+
+/**
+ * `orders` n'a pas de colonne `delivery_district` : `ordersService` concatene le
+ * quartier dans `delivery_address` sous la forme « Adresse (Quartier) ». On le
+ * re-extrait ici, plutot que de demander a PostgREST une colonne inexistante.
+ */
+const parseDropoffAddress = (address?: string | null): { address: string; district: string } => {
+  const raw = (address || '').trim();
+  const match = raw.match(/^(.*?)\s*\(([^()]+)\)$/);
+  return match
+    ? { address: match[1].trim(), district: match[2].trim() }
+    : { address: raw, district: '' };
+};
+
 export const deliveryService = {
   /**
    * Bascule la disponibilité du livreur (En Ligne / Hors Ligne)
@@ -44,7 +69,7 @@ export const deliveryService = {
   async getAvailableRuns(driverCoords?: Coordinates | null): Promise<AvailableDeliveryRun[]> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_district, delivery_lat, delivery_lng, total_amount, quantity, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, phone, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, phone))')
+      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, phone, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, phone))')
       .in('status', ['awaiting_pickup', 'pending_seller_confirmation'])
       .is('delivery_person_id', null)
       .order('created_at', { ascending: false });
@@ -67,17 +92,18 @@ export const deliveryService = {
       };
 
       const distanceKm = haversineDistance(pickupCoords, dropoffCoords);
-      const deliveryPrice = item.delivery_price || 500;
-      const driverFee = item.driver_fee || Math.round(deliveryPrice * 0.10);
+      const deliveryPrice = Number(item.delivery_price) || 500;
+      const driverFee = commissionOn(deliveryPrice);
       const driverNetGain = deliveryPrice - driverFee;
+      const dropoff = parseDropoffAddress(order.delivery_address);
 
       return {
         assignmentId: item.id,
         orderId: item.order_id,
         pickupLocation: item.pickup_location || `${seller.shop_name || 'Vendeur'} (${seller.district || listing.district || 'Daloa'})`,
-        dropoffLocation: item.dropoff_location || `${order.delivery_address} (${order.delivery_district})`,
+        dropoffLocation: item.dropoff_location || item.dropoff_address || dropoff.address || 'Adresse client',
         pickupDistrict: seller.district || listing.district || 'Daloa Centre',
-        dropoffDistrict: order.delivery_district || 'Daloa',
+        dropoffDistrict: dropoff.district || 'Daloa',
         pickupCoordinates: pickupCoords,
         dropoffCoordinates: dropoffCoords,
         distanceKm: Math.round(distanceKm * 10) / 10,
@@ -133,7 +159,7 @@ export const deliveryService = {
   async getActiveRun(driverId: string): Promise<ActiveDeliveryRunDetails | null> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_district, delivery_lat, delivery_lng, total_amount, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, phone, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, phone))')
+      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, phone, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, phone))')
       .eq('delivery_person_id', driverId)
       .in('status', ['accepted', 'picked_up', 'in_transit'])
       .order('created_at', { ascending: false })
@@ -155,8 +181,9 @@ export const deliveryService = {
       lng: order.delivery_lng ?? -6.4502,
     };
     const distanceKm = haversineDistance(pickupCoords, dropoffCoords);
-    const deliveryPrice = data.delivery_price || 500;
-    const driverFee = data.driver_fee || Math.round(deliveryPrice * 0.10);
+    const deliveryPrice = Number(data.delivery_price) || 500;
+    const driverFee = commissionOn(deliveryPrice);
+    const dropoff = parseDropoffAddress(order.delivery_address);
 
     return {
       assignmentId: data.id,
@@ -168,9 +195,9 @@ export const deliveryService = {
       pickupPhotoUrl: data.pickup_photo_url,
       deliveryPhotoUrl: data.delivery_photo_url,
       pickupLocation: data.pickup_location,
-      dropoffLocation: data.dropoff_location,
+      dropoffLocation: data.dropoff_location || data.dropoff_address || dropoff.address || 'Adresse client',
       pickupDistrict: seller.district || listing.district || 'Daloa Centre',
-      dropoffDistrict: order.delivery_district || 'Daloa',
+      dropoffDistrict: dropoff.district || 'Daloa',
       pickupCoordinates: pickupCoords,
       dropoffCoordinates: dropoffCoords,
       distanceKm: Math.round(distanceKm * 10) / 10,
@@ -256,7 +283,7 @@ export const deliveryService = {
     // Récupérer toutes les courses livrées par ce coursier
     const { data: allDeliveredRuns } = await supabase
       .from('delivery_assignments')
-      .select('delivery_price, driver_fee, delivered_at')
+      .select('delivery_price, delivered_at')
       .eq('delivery_person_id', driverId)
       .eq('status', 'delivered');
 
@@ -274,7 +301,8 @@ export const deliveryService = {
     let totalLifetimeEarnings = 0;
 
     (allDeliveredRuns || []).forEach((r) => {
-      const netGain = (r.delivery_price || 0) - (r.driver_fee || 0);
+      const deliveryPrice = Number(r.delivery_price) || 0;
+      const netGain = deliveryPrice - commissionOn(deliveryPrice);
       totalLifetimeEarnings += netGain;
 
       if (r.delivered_at && new Date(r.delivered_at) >= today) {
@@ -339,6 +367,7 @@ export const deliveryService = {
       cniUrl: string;
       selfieCniUrl: string;
       portraitLiveUrl?: string;
+      licenceUrl?: string | null;
     }
   ): Promise<void> {
     return deliveryStorageService.submitKycVerification(driverId, payload);

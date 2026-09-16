@@ -30,6 +30,7 @@ export const DEFAULT_CATEGORIES: CategoryItem[] = [
   { id: 'home', name: 'Maison', icon: Home, color: colors.categories.home.text, bg: colors.categories.home.bg },
   { id: 'vehicles', name: 'Auto/Moto', icon: Car, color: colors.categories.vehicles.text, bg: colors.categories.vehicles.bg },
   { id: 'food', name: 'Alimentaire', icon: UtensilsCrossed, color: colors.categories.food.text, bg: colors.categories.food.bg },
+  { id: 'beauty', name: 'Beauté', icon: Sparkles, color: colors.categories.beauty.text, bg: colors.categories.beauty.bg },
   { id: 'sports', name: 'Sports', icon: Dumbbell, color: colors.categories.sports.text, bg: colors.categories.sports.bg },
   { id: 'books', name: 'Livres', icon: BookOpen, color: colors.categories.books.text, bg: colors.categories.books.bg },
 ];

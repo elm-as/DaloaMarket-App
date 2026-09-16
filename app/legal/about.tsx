@@ -3,11 +3,11 @@ import { View, ScrollView, StyleSheet, Image, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import {
-  ShieldCheck, MapPin, Users, Rocket, ArrowLeft, Truck, Lock, ShoppingBag, Zap, Phone, Mail
+  ShieldCheck, MapPin, Users, Rocket, ArrowLeft, Truck, Lock, ShoppingBag, Zap, MessageCircle, Mail
 } from 'lucide-react-native';
-import { ENV_CONFIG } from '@daloa/config';
+import { ENV_CONFIG, getSupportWhatsAppUrl, getSupportWhatsAppDisplay } from '@daloa/config';
 import { Haptics } from '@daloa/utils';
 
 const METRICS = [
@@ -35,7 +35,7 @@ const PILLARS = [
   { icon: Lock, title: 'Paiement séquestre garanti', desc: 'Fonds bloqués jusqu’à l’inspection physique du produit par l’acheteur.' },
   { icon: Truck, title: 'Coursiers DaloaDelivery', desc: 'Les livreurs touchent 90% du prix de livraison avec traçabilité GPS.' },
   { icon: ShoppingBag, title: 'Vitrines marchands dédiées', desc: 'Boutiques personnalisables avec gestion de stock et avis réels.' },
-  { icon: Zap, title: 'Reversements instantanés', desc: 'Gains virés vers Wave, Orange, MTN et Moov en moins de 10 minutes.' },
+  { icon: Zap, title: 'Reversements Mobile Money', desc: 'Gains virés vers Wave, Orange, MTN et Moov après validation de la livraison par code OTP.' },
 ];
 
 export default function AboutScreen() {
@@ -43,9 +43,10 @@ export default function AboutScreen() {
   const accent = useAccent();
   const insets = useSafeAreaInsets();
 
-  const handlePhone = () => {
+  // Le support ne prend pas d'appels : WhatsApp uniquement.
+  const handleWhatsApp = () => {
     Haptics.lightImpact();
-    Linking.openURL(`tel:${ENV_CONFIG.SUPPORT_PHONE}`);
+    Linking.openURL(getSupportWhatsAppUrl('Bonjour Support DaloaMarket'));
   };
 
   const handleMail = (email: string) => {
@@ -143,9 +144,11 @@ export default function AboutScreen() {
               <AppText variant="caption" color={colors.text.subtle}>Siège opérationnel</AppText>
               <AppText variant="bodyStrong">Daloa / Abidjan, Côte d'Ivoire</AppText>
             </View>
-            <AppPressable onPress={handlePhone} style={styles.actionContactRow}>
-              <Phone size={15} color={accent[600]} />
-              <AppText variant="caption" color={accent[600]} style={styles.bold}>{ENV_CONFIG.SUPPORT_PHONE}</AppText>
+            <AppPressable onPress={handleWhatsApp} style={styles.actionContactRow}>
+              <MessageCircle size={15} color={accent[600]} />
+              <AppText variant="caption" color={accent[600]} style={styles.bold}>
+                WhatsApp {getSupportWhatsAppDisplay()}
+              </AppText>
             </AppPressable>
             <AppPressable onPress={() => handleMail(ENV_CONFIG.SUPPORT_EMAIL)} style={styles.actionContactRow}>
               <Mail size={15} color={accent[600]} />
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
   gap3: { gap: spacing[3] },
   gap2: { gap: spacing[2] },
   flex1: { flex: 1 },
-  bold: { fontWeight: '700' },
+  bold: { fontFamily: typography.families.bold },
   teamCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], backgroundColor: colors.bg.subtle, padding: spacing[3], borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border.subtle },
   avatarInitials: { width: 36, height: 36, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
   pillarRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },

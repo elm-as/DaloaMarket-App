@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TextInput } from 'react-native';
-import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Tag } from 'lucide-react-native';
+import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles, Tag } from 'lucide-react-native';
 import { MARKET_CATEGORIES, LISTING_CONDITIONS } from '@daloa/config';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { formatFCFA } from '@daloa/utils';
@@ -25,6 +25,7 @@ const ICON_MAP: Record<string, React.FC<any>> = {
   Home,
   Car,
   UtensilsCrossed,
+  Sparkles,
   Dumbbell,
   BookOpen,
   Tag,

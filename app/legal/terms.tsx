@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, LayoutAnimation, Platform, UIManager } fr
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import {
   FileText,
   ArrowLeft,
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[1],
   },
   expandAllText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   card: {
     backgroundColor: colors.bg.surface,

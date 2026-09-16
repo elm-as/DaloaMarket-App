@@ -13,15 +13,20 @@ export interface RatingStarsProps {
   showText?: boolean;
 }
 
+/**
+ * Affichage des étoiles de notation fidèle à la réalité des avis.
+ * Évite rigoureusement les fausses notes par défaut (pas de 5.0 fictif avec 0 avis).
+ */
 export const RatingStars: React.FC<RatingStarsProps> = ({
-  rating = 5.0,
+  rating = 0,
   totalReviews,
   size = 14,
   interactive = false,
   onRatingChange,
   showText = true,
 }) => {
-  const currentRating = rating ?? 5.0;
+  const hasReviews = totalReviews != null && totalReviews > 0;
+  const currentRating = hasReviews ? (rating ?? 0) : (interactive ? (rating ?? 0) : 0);
 
   const handleStarPress = (starIndex: number) => {
     if (!interactive) return;
@@ -44,8 +49,9 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
             >
               <Star
                 size={size}
-                color="#F59E0B"
+                color={hasReviews || interactive ? '#F59E0B' : colors.grey[300]}
                 fill={isFilled ? '#F59E0B' : 'transparent'}
+                strokeWidth={1.8}
               />
             </TouchableOpacity>
           );
@@ -53,8 +59,14 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
       </View>
       {showText && (
         <Text style={styles.ratingText}>
-          {currentRating.toFixed(1)}
-          {totalReviews != null && ` (${totalReviews})`}
+          {hasReviews ? (
+            <>
+              <Text style={styles.tabularNums}>{currentRating.toFixed(1)}</Text>
+              <Text style={styles.subtleText}>{` (${totalReviews})`}</Text>
+            </>
+          ) : (
+            <Text style={styles.subtleText}>Nouveau (0 avis)</Text>
+          )}
         </Text>
       )}
     </View>
@@ -72,9 +84,19 @@ const styles = StyleSheet.create({
     marginRight: spacing[1] + 2,
   },
   ratingText: {
-    color: colors.grey[500],
+    color: colors.grey[600],
     fontSize: typography.sizes.xs,
     fontFamily: typography.families.medium,
-    fontWeight: typography.weights.medium,
+  },
+  tabularNums: {
+    fontVariant: ['tabular-nums'],
+    fontFamily: typography.families.extrabold,
+    color: '#D97706',
+  },
+  subtleText: {
+    color: colors.grey[400],
+    fontSize: 11,
   },
 });
+
+export default RatingStars;

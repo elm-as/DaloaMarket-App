@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import * as Location from 'expo-location';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
 import { MapPin, Navigation, LocateFixed, Plus, Minus } from 'lucide-react-native';
 import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics } from '@daloa/utils';
@@ -96,7 +96,7 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     const sellerSnippet = hasSeller ? `var sM=L.circleMarker([${sLat},${sLng}],{radius:8,fillColor:'#10B981',color:'#fff',weight:2,fillOpacity:0.9}).addTo(map);sM.bindPopup('<b>Boutique Vendeur</b>');` : '';
     const routeSnippet = leafletCoords.length > 0 ? `var poly=L.polyline(${JSON.stringify(leafletCoords)},{color:'${accent.DEFAULT}',weight:4,opacity:0.85}).addTo(map);map.fitBounds(poly.getBounds(),{padding:[30,30]});` : '';
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup('<b>Lieu de livraison</b>').openPopup();${sellerSnippet}${routeSnippet}function notify(nLat,nLng){if(window.parent){window.parent.postMessage(JSON.stringify({type:'DELIVERY_COORDS',latitude:nLat,longitude:nLng}),'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notify(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notify(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup('<b>Lieu de livraison</b>').openPopup();${sellerSnippet}${routeSnippet}function notify(nLat,nLng){if(window.parent){window.parent.postMessage(JSON.stringify({type:'DELIVERY_COORDS',latitude:nLat,longitude:nLng}),'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notify(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notify(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
   }, [currentLat, currentLng, sellerCoords, routeInfo.coordinates, accent.DEFAULT]);
 
   useEffect(() => {
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   boldText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   btnRow: {
     flexDirection: 'row',

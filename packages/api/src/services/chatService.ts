@@ -9,13 +9,13 @@ export const chatService = {
   async getConversations(userId: string): Promise<ChatConversationPreview[]> {
     const { data: sentMessages, error: sentErr } = await supabase
       .from('messages')
-      .select('*, receiver:receiver_id(id, full_name, avatar_url), listings:listing_id(id, title, photos, price)')
+      .select('*, receiver:receiver_id(id, full_name, shop_name, avatar_url), listings:listing_id(id, title, photos, price)')
       .eq('sender_id', userId)
       .order('created_at', { ascending: false });
 
     const { data: receivedMessages, error: recErr } = await supabase
       .from('messages')
-      .select('*, sender:sender_id(id, full_name, avatar_url), listings:listing_id(id, title, photos, price)')
+      .select('*, sender:sender_id(id, full_name, shop_name, avatar_url), listings:listing_id(id, title, photos, price)')
       .eq('receiver_id', userId)
       .order('created_at', { ascending: false });
 
@@ -24,17 +24,18 @@ export const chatService = {
     const conversationsMap: Record<string, ChatConversationPreview> = {};
 
     (sentMessages || []).forEach((msg: any) => {
-      const partner = msg.receiver || { id: msg.receiver_id, full_name: 'Utilisateur', avatar_url: null };
+      const partner = msg.receiver || { id: msg.receiver_id, full_name: 'Utilisateur', shop_name: null, avatar_url: null };
+      const partnerName = partner.shop_name?.trim() || partner.full_name || 'Utilisateur';
       if (!conversationsMap[partner.id] || new Date(msg.created_at) > new Date(conversationsMap[partner.id].lastMessageTime)) {
         conversationsMap[partner.id] = {
           partnerId: partner.id,
-          partnerName: partner.full_name || 'Utilisateur',
+          partnerName,
           partnerAvatar: partner.avatar_url || null,
           lastMessage: msg.content,
           lastMessageTime: msg.created_at,
           unreadCount: 0,
           listingId: msg.listing_id,
-          listingTitle: msg.listings?.title,
+          listingTitle: msg.listings?.title || (!msg.listing_id ? 'Support & Assistance DaloaMarket' : undefined),
           listingPhoto: msg.listings?.photos?.[0],
           listingPrice: msg.listings?.price,
         };
@@ -42,20 +43,21 @@ export const chatService = {
     });
 
     (receivedMessages || []).forEach((msg: any) => {
-      const partner = msg.sender || { id: msg.sender_id, full_name: 'Utilisateur', avatar_url: null };
+      const partner = msg.sender || { id: msg.sender_id, full_name: 'Utilisateur', shop_name: null, avatar_url: null };
+      const partnerName = partner.shop_name?.trim() || partner.full_name || 'Utilisateur';
       const current = conversationsMap[partner.id];
       const isUnread = !msg.read;
 
       if (!current || new Date(msg.created_at) > new Date(current.lastMessageTime)) {
         conversationsMap[partner.id] = {
           partnerId: partner.id,
-          partnerName: partner.full_name || 'Utilisateur',
+          partnerName,
           partnerAvatar: partner.avatar_url || null,
           lastMessage: msg.content,
           lastMessageTime: msg.created_at,
           unreadCount: (current?.unreadCount || 0) + (isUnread ? 1 : 0),
           listingId: msg.listing_id || current?.listingId,
-          listingTitle: msg.listings?.title || current?.listingTitle,
+          listingTitle: msg.listings?.title || current?.listingTitle || (!msg.listing_id ? 'Support & Assistance DaloaMarket' : undefined),
           listingPhoto: msg.listings?.photos?.[0] || current?.listingPhoto,
           listingPrice: msg.listings?.price || current?.listingPrice,
         };

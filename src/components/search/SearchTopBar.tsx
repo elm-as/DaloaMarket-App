@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Search, X, SlidersHorizontal, ArrowUpDown, Tag, Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen } from 'lucide-react-native';
+import { Search, X, SlidersHorizontal, ArrowUpDown, Tag, Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles } from 'lucide-react-native';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { MARKET_CATEGORIES } from '@daloa/config';
 import { SearchFilterValues } from './SearchFilterModal';
 
 const ICON_MAP: Record<string, React.FC<any>> = {
-  Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen,
+  Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles,
 };
 
 interface SearchTopBarProps {

@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, Avatar, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Avatar, AppText, AppPressable, ProBadge, useAccent } from '@daloa/ui';
 import {
   Store,
   CreditCard,
@@ -13,7 +13,6 @@ import {
   Trash2,
   ArrowLeft,
   Settings,
-  Sparkles,
   MapPin,
   User,
 } from 'lucide-react-native';
@@ -77,14 +76,7 @@ export default function SettingsScreen() {
               <AppText variant="bodyStrong" color={colors.text.body} numberOfLines={1} style={styles.profileName}>
                 {displayName}
               </AppText>
-              {isPro && (
-                <View style={[styles.proBadge, { backgroundColor: accent.DEFAULT }]}>
-                  <Sparkles size={9} color={colors.text.inverse} />
-                  <AppText variant="overline" color={colors.text.inverse}>
-                    PRO
-                  </AppText>
-                </View>
-              )}
+              {isPro && <ProBadge size="xs" />}
             </View>
             {subtitle ? (
               <AppText variant="caption" color={colors.text.muted} numberOfLines={1}>
@@ -275,14 +267,6 @@ const styles = StyleSheet.create({
   },
   profileName: {
     flexShrink: 1,
-  },
-  proBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    gap: 2,
   },
   scrollContent: {
     padding: spacing[4],

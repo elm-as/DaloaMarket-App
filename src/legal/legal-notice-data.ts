@@ -10,9 +10,11 @@ export const LEGAL_NOTICE_DATA: LegalNoticeSection[] = [
     title: 'Éditeur de la plateforme',
     items: [
       { label: 'Plateforme', value: 'DaloaMarket (daloamarket.com)' },
-      { label: 'Fondateur & Lead Dev', value: 'OULOBO Elmas Tresor (ElmasCore)' },
+      { label: 'Directeur de la publication', value: 'OULOBO Elmas Tresor (ElmasCore)' },
+      { label: 'Forme juridique', value: 'Entreprise individuelle — non immatriculée au RCCM à ce jour' },
       { label: 'Pôle Communication & Opérations', value: 'Armand J. & Diomandé (DNPH)' },
-      { label: 'Siège Opérationnel', value: 'Daloa / Abidjan, République de Côte d’Ivoire' },
+      { label: 'Adresse de l’éditeur', value: 'RueO21,68 — Yopougon, Abidjan, Côte d’Ivoire' },
+      { label: 'Zone d’activité', value: 'Daloa et sa région, Côte d’Ivoire' },
       { label: 'Contact officiel', value: 'contact@daloamarket.com' },
     ],
   },

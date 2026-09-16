@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Avatar, AppText, AppPressable, Button, colors, radii, spacing, useAccent, WhatsAppIcon } from '@daloa/ui';
-import { MessageCircle, Store, Star, Sparkles } from 'lucide-react-native';
+import { Avatar, AppText, AppPressable, Button, colors, radii, spacing, ProBadge, useAccent, WhatsAppIcon } from '@daloa/ui';
+import { MessageCircle, Store, Star } from 'lucide-react-native';
 import { formatDate, formatWhatsAppPhone, Haptics } from '@daloa/utils';
 import { useAuth } from '../../context/AuthContext';
 
@@ -72,11 +72,6 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
             size={52}
             isPro={isPro}
           />
-          {isPro && (
-            <View style={styles.proDot}>
-              <Star size={9} color="#78350F" fill="#78350F" />
-            </View>
-          )}
         </View>
 
         <View style={styles.sellerInfo}>
@@ -84,14 +79,7 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
             <AppText variant="bodyStrong" numberOfLines={1} style={styles.sellerName}>
               {shopName}
             </AppText>
-            {isPro && (
-              <View style={[styles.proBadge, { backgroundColor: accent.DEFAULT }]}>
-                <Sparkles size={9} color={colors.text.inverse} />
-                <AppText variant="overline" color={colors.text.inverse}>
-                  PRO
-                </AppText>
-              </View>
-            )}
+            {isPro && <ProBadge size="xs" />}
           </View>
 
           <View style={styles.ratingRow}>
@@ -179,19 +167,6 @@ const styles = StyleSheet.create({
   avatarWrap: {
     position: 'relative',
   },
-  proDot: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: radii.full,
-    backgroundColor: '#FCD34D',
-    borderWidth: 2,
-    borderColor: colors.bg.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   sellerInfo: {
     flex: 1,
     gap: 2,
@@ -203,14 +178,6 @@ const styles = StyleSheet.create({
   },
   sellerName: {
     flexShrink: 1,
-  },
-  proBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    gap: 2,
   },
   ratingRow: {
     flexDirection: 'row',

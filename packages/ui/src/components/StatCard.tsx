@@ -62,7 +62,6 @@ const styles = StyleSheet.create({
     color: colors.grey[500],
     fontSize: typography.sizes.xs,
     fontFamily: typography.families.medium,
-    fontWeight: typography.weights.medium,
   },
   iconBox: {
     width: 28,
@@ -79,13 +78,11 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: typography.sizes.xl,
     fontFamily: typography.families.bold,
-    fontWeight: typography.weights.bold,
   },
   trendText: {
     color: colors.status.success,
     fontSize: typography.sizes.xs,
     fontFamily: typography.families.semibold,
-    fontWeight: typography.weights.semibold,
     marginTop: 2,
   },
 });

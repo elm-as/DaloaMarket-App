@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii, spacing, AppText, AppPressable, Button, Avatar, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, Button, Avatar, useAccent, typography } from '@daloa/ui';
 import {
   User,
   LogIn,
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   },
   badgeTxt: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
   },
   sep: {
     height: 1,

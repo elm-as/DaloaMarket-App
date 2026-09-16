@@ -3,7 +3,7 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Store, Lock, Sparkles } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 
 interface ShopHeaderBannerProps {
   bannerUrl: string | null;
@@ -245,14 +245,14 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   importTitle: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 12.5,
   },
   importSub: {
     fontSize: 10,
   },
   btnLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   logoRow: {
     alignItems: 'center',
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   logoTextLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   shopTitle: {
     marginTop: 2,

@@ -15,6 +15,7 @@ export interface CreateDeliveryPersonPayload {
   payout_network?: string | null;
   payout_number?: string | null;
   cni_url?: string | null;
+  licence_url?: string | null;
   selfie_cni_url?: string | null;
   portrait_live_url?: string | null;
 }
@@ -35,6 +36,7 @@ export interface DeliveryPersonProfile {
   payout_network: string | null;
   payout_number: string | null;
   cni_url: string | null;
+  licence_url: string | null;
   selfie_cni_url: string | null;
   portrait_live_url: string | null;
   created_at: string;
@@ -142,22 +144,35 @@ export const deliveryPersonService = {
   },
 
   /**
-   * Téléverse une photo de profil livreur vers le bucket public livreur-photos
+   * Téléverse une photo de profil livreur vers le bucket public livreur-photos.
+   * Compatible binaire base64 pour éviter les échecs de blob sur Android.
    */
-  async uploadProfilePhoto(fileUri: string, userId: string): Promise<string> {
+  async uploadProfilePhoto(
+    input: string | { fileUri?: string; base64?: string | null; mimeType?: string },
+    userId: string
+  ): Promise<string> {
     const timestamp = Date.now();
     const fileName = `${userId}-${timestamp}.jpg`;
 
-    const response = await fetch(fileUri);
-    if (!response.ok) {
-      throw new Error(`Impossible de lire la photo locale: ${fileUri}`);
+    const fileUri = typeof input === 'string' ? input : input.fileUri;
+    const base64 = typeof input === 'object' ? input.base64 : null;
+    const mimeType = (typeof input === 'object' && input.mimeType) || 'image/jpeg';
+
+    let bodyData: ArrayBuffer | Blob;
+
+    if (base64) {
+      bodyData = decodeBase64ToArrayBuffer(base64);
+    } else if (fileUri) {
+      const response = await fetch(fileUri);
+      bodyData = await response.blob();
+    } else {
+      throw new Error('Aucune photo fournie pour le livreur.');
     }
-    const blob = await response.blob();
 
     const { error: uploadError } = await supabase.storage
       .from('livreur-photos')
-      .upload(fileName, blob, {
-        contentType: 'image/jpeg',
+      .upload(fileName, bodyData, {
+        contentType: mimeType,
         upsert: true,
       });
 
@@ -173,3 +188,41 @@ export const deliveryPersonService = {
     return urlData.publicUrl;
   },
 };
+
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+
+function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  const cleaned = base64.replace(/^data:image\/[a-z]+;base64,/, '').replace(/\s/g, '');
+  const atobFn =
+    typeof atob === 'function'
+      ? atob
+      : typeof global !== 'undefined' && typeof (global as any).atob === 'function'
+      ? (global as any).atob
+      : null;
+
+  if (atobFn) {
+    const binary = atobFn(cleaned);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  let bufferLength = cleaned.length * 0.75;
+  if (cleaned.endsWith('==')) bufferLength -= 2;
+  else if (cleaned.endsWith('=')) bufferLength -= 1;
+  const bytes = new Uint8Array(bufferLength);
+  let p = 0;
+  for (let i = 0; i < cleaned.length; i += 4) {
+    const enc1 = BASE64_CHARS.indexOf(cleaned[i]);
+    const enc2 = BASE64_CHARS.indexOf(cleaned[i + 1]);
+    const enc3 = BASE64_CHARS.indexOf(cleaned[i + 2]);
+    const enc4 = BASE64_CHARS.indexOf(cleaned[i + 3]);
+    bytes[p++] = (enc1 << 2) | (enc2 >> 4);
+    if (enc3 !== 64 && enc3 !== -1) bytes[p++] = ((enc2 & 15) << 4) | (enc3 >> 2);
+    if (enc4 !== 64 && enc4 !== -1) bytes[p++] = ((enc3 & 3) << 6) | enc4;
+  }
+  return bytes.buffer;
+}

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react-native';
-import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { usePhase } from '../../context/PhaseContext';
 
 interface ProfileProBannerProps {
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   goldBadgeText: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 10,
   },
   secureTag: {
@@ -112,10 +112,10 @@ const styles = StyleSheet.create({
   },
   secureText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: typography.families.semibold,
   },
   title: {
-    fontWeight: '900',
+    fontFamily: typography.families.black,
     fontSize: 15,
     lineHeight: 20,
     marginBottom: 4,
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
   },
   ctaText: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 12,
   },
 });

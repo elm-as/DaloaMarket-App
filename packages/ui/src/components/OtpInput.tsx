@@ -118,6 +118,5 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: typography.sizes['3xl'],
     fontFamily: typography.families.bold,
-    fontWeight: typography.weights.bold,
   },
 });

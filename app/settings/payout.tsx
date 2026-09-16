@@ -11,16 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '@daloa/api';
-import {
-  colors,
-  radii,
-  spacing,
-  Input,
-  Button,
-  AppText,
-  AppPressable,
-  useAccent,
-} from '@daloa/ui';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import {
   ArrowLeft,
   ShieldCheck,
@@ -351,7 +342,7 @@ const styles = StyleSheet.create({
   logoContainer: { width: 50, height: 38, alignItems: 'center', justifyContent: 'center', marginVertical: 2 },
   operatorLogo: { width: 48, height: 34 },
   badgePill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radii.full },
-  badgeText: { fontSize: 9, fontWeight: '700' },
+  badgeText: { fontSize: 9, fontFamily: typography.families.bold },
   checkCircle: {
     position: 'absolute',
     top: 8,

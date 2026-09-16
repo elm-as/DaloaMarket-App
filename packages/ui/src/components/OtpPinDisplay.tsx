@@ -100,7 +100,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 12.5,
     fontFamily: typography.families.extrabold,
-    fontWeight: '800',
     letterSpacing: -0.1,
   },
   copyBtn: {
@@ -117,7 +116,6 @@ const styles = StyleSheet.create({
   copyText: {
     fontSize: 11,
     fontFamily: typography.families.bold,
-    fontWeight: '700',
     color: colors.grey[700],
   },
   codeContainer: {
@@ -143,13 +141,11 @@ const styles = StyleSheet.create({
   digitText: {
     fontSize: 22,
     fontFamily: typography.families.black,
-    fontWeight: '900',
     letterSpacing: 0.5,
   },
   sublabel: {
     fontSize: 11,
     fontFamily: typography.families.medium,
-    fontWeight: '500',
     color: colors.grey[600],
     lineHeight: 15,
     marginTop: 6,

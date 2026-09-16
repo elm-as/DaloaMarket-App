@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { UserCheck, MapPin, LogOut } from 'lucide-react-native';
-import { supabase } from '@daloa/api';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
+import { UserCheck, MapPin, LogOut, Award } from 'lucide-react-native';
+import {
+  supabase,
+  getPendingReferralCode,
+  storeReferralCode,
+  redeemPendingReferral,
+} from '@daloa/api';
 import { Haptics } from '@daloa/utils';
 import { useAuth } from '../../context/AuthContext';
 import { DistrictPickerSheet } from '../settings/DistrictPickerSheet';
@@ -25,11 +30,30 @@ export const CompleteProfileScreen: React.FC = () => {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Une inscription Google ne passe jamais par l'ecran d'inscription : c'est
+  // donc ici, et seulement ici, que la personne peut voir son code de
+  // parrainage et le corriger — ou le saisir si le lien ne l'a pas porte.
+  const [refCode, setRefCode] = useState('');
+  const [refDepuisLien, setRefDepuisLien] = useState(false);
+
+  useEffect(() => {
+    let annule = false;
+    void getPendingReferralCode().then((code) => {
+      if (code && !annule) {
+        setRefCode(code);
+        setRefDepuisLien(true);
+      }
+    });
+    return () => {
+      annule = true;
+    };
+  }, []);
+
   const handleSave = async () => {
-    if (!fullName.trim()) return Alert.alert('Nom requis', 'Veuillez saisir votre nom complet.');
+    if (!fullName.trim()) return showAlert('Nom requis', 'Veuillez saisir votre nom complet.');
     if (phone.trim().replace(/\D/g, '').length < 8)
-      return Alert.alert('Numéro invalide', 'Veuillez saisir un numéro WhatsApp valide.');
-    if (!district.trim()) return Alert.alert('Quartier requis', 'Veuillez sélectionner votre quartier.');
+      return showAlert('Numéro invalide', 'Veuillez saisir un numéro WhatsApp valide.');
+    if (!district.trim()) return showAlert('Quartier requis', 'Veuillez sélectionner votre quartier.');
 
     if (!user?.id) return;
     try {
@@ -39,10 +63,18 @@ export const CompleteProfileScreen: React.FC = () => {
         .update({ full_name: fullName.trim(), phone: phone.trim(), district })
         .eq('id', user.id);
       if (error) throw error;
+
+      // Un code saisi ici prime sur celui garde en memoire : intention la plus
+      // recente. Le rattachement est tente tout de suite, sans bloquer la suite
+      // si la base le refuse — elle a ses propres regles.
+      const saisi = refCode.trim();
+      if (saisi) await storeReferralCode(saisi);
+      await redeemPendingReferral(user.id);
+
       Haptics.success();
       await refreshProfile();
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || 'Impossible d’enregistrer votre profil.');
+      showAlert('Erreur', err.message || 'Impossible d’enregistrer votre profil.');
     } finally {
       setIsSaving(false);
     }
@@ -103,6 +135,24 @@ export const CompleteProfileScreen: React.FC = () => {
             {district || 'Sélectionner votre quartier'}
           </AppText>
         </AppPressable>
+
+        <Input
+          label="Code parrain (facultatif)"
+          placeholder="Le code de votre ambassadeur"
+          value={refCode}
+          onChangeText={(v) => {
+            setRefCode(v.toUpperCase());
+            setRefDepuisLien(false);
+          }}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          helperText={
+            refDepuisLien
+              ? 'Code reconnu — votre ambassadeur sera crédité.'
+              : 'À remplir uniquement si un ambassadeur vous a donné un code.'
+          }
+          leftIcon={<Award size={16} color={colors.text.subtle} />}
+        />
 
         <Button
           title="Enregistrer et continuer"

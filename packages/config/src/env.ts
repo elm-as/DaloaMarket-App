@@ -1,5 +1,4 @@
 import {
-  DEFAULT_SUPPORT_PHONE,
   DEFAULT_SUPPORT_WHATSAPP,
   DEFAULT_SUPPORT_EMAIL,
 } from './constants';
@@ -23,7 +22,6 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const paymentApiUrl = process.env.EXPO_PUBLIC_PAYMENT_API_URL;
 
-const supportPhone = process.env.EXPO_PUBLIC_SUPPORT_PHONE || DEFAULT_SUPPORT_PHONE;
 const supportWhatsapp = process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP || DEFAULT_SUPPORT_WHATSAPP;
 const supportEmail = process.env.EXPO_PUBLIC_SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL;
 
@@ -33,7 +31,6 @@ export const ENV_CONFIG = {
   PAYMENT_API_URL: requirePublicUrl(paymentApiUrl, 'EXPO_PUBLIC_PAYMENT_API_URL'),
   MARKET_WEB_URL: 'https://daloamarket.com',
   DELIVERY_WEB_URL: 'https://delivery.daloamarket.com',
-  SUPPORT_PHONE: supportPhone,
   SUPPORT_WHATSAPP: supportWhatsapp,
   SUPPORT_EMAIL: supportEmail,
 };
@@ -49,9 +46,16 @@ export function getSupportWhatsAppUrl(customMessage?: string): string {
 }
 
 /**
- * Construit l'URL d'appel téléphonique direct d'assistance officielle
+ * Le même numéro, mais lisible : « +225 01 73 80 15 59 ».
+ *
+ * Dérivé de SUPPORT_WHATSAPP plutôt qu'écrit à côté : un numéro affiché ne peut
+ * donc jamais diverger de celui que le lien compose réellement.
  */
-export function getSupportCallUrl(): string {
-  return `tel:${ENV_CONFIG.SUPPORT_PHONE}`;
+export function getSupportWhatsAppDisplay(): string {
+  const digits = ENV_CONFIG.SUPPORT_WHATSAPP.replace(/\D/g, '');
+  const local = digits.startsWith('225') ? digits.slice(3) : digits;
+  const groups = local.match(/.{1,2}/g) ?? [local];
+  return `+225 ${groups.join(' ')}`;
 }
+
 

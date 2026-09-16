@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, Switch, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet, Switch, TextInput, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
 import { ArrowLeft, ShieldCheck, Rocket, TrendingUp, Lock, Save } from 'lucide-react-native';
 import type { PhaseConfig } from '@daloa/api';
 import { systemSettingsService } from '@daloa/api';
@@ -36,14 +36,14 @@ export default function AdminScreen() {
     setSaving(true);
     try {
       await savePhaseConfig(active);
-      Alert.alert(
+      showAlert(
         'Configuration enregistrée',
         active.phase === 0
           ? 'Phase 0 (Lancement libre) active en temps réel sur le web et le mobile.'
           : 'Phase 1 (Croissance Pro) active en temps réel sur le web et le mobile.'
       );
     } catch (err: any) {
-      Alert.alert('Échec', err?.message || 'Erreur lors de la mise à jour de la phase.');
+      showAlert('Échec', err?.message || 'Erreur lors de la mise à jour de la phase.');
     } finally {
       setSaving(false);
     }

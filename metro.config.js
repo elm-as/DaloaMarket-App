@@ -3,7 +3,31 @@ const path = require('path');
 const { FileStore } = require('metro-cache');
 
 const projectRoot = __dirname;
+const monorepoRoot = path.resolve(projectRoot, '../..');
+
 const config = getDefaultConfig(projectRoot);
+
+// Support monorepo pnpm : on s'en remet aux valeurs par défaut d'Expo.
+//
+// Depuis que les paquets partagés vivent à la racine et sont déclarés en
+// `workspace:*`, `getDefaultConfig` résout tout seul la bonne liste : le
+// node_modules de la racine, les deux apps, et les cinq paquets. L'ancien
+// `watchFolders = [monorepoRoot]` écrasait cette liste par le dépôt entier —
+// d'où la surveillance de 300 000 fichiers hors périmètre, et l'alerte
+// d'expo-doctor sur les entrées manquantes.
+
+// Exclusion des dépôts non-Expo du monorepo, et de l'app sœur : rien ne doit
+// se résoudre depuis ces arbres.
+const exclusionPattern =
+  /[/\\](DaloaDelivery|DaloaMarket-v2|partners\.daloamarket\.com|docs\.daloamarket\.ci|status\.daloamarket\.ci|tuto\.daloamarket\.com|screeshots_app|docs|apps[/\\]daloadelivery)([/\\]|$)/;
+
+const currentBlockList = config.resolver.blockList;
+config.resolver.blockList = Array.isArray(currentBlockList)
+  ? [...currentBlockList, exclusionPattern]
+  : currentBlockList
+    ? [currentBlockList, exclusionPattern]
+    : [exclusionPattern];
+
 
 // Shims pour modules Node.js (ws, zlib, stream)
 config.resolver.extraNodeModules = {
@@ -33,10 +57,22 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       type: 'sourceFile',
     };
   }
-  if (originalResolveRequest) {
-    return originalResolveRequest(context, moduleName, platform);
+  try {
+    if (originalResolveRequest) {
+      return originalResolveRequest(context, moduleName, platform);
+    }
+    return context.resolveRequest(context, moduleName, platform);
+  } catch (err) {
+    try {
+      const resolved = require.resolve(moduleName, { paths: [projectRoot] });
+      return {
+        filePath: resolved,
+        type: 'sourceFile',
+      };
+    } catch {
+      throw err;
+    }
   }
-  return context.resolveRequest(context, moduleName, platform);
 };
 
 config.cacheStores = [

@@ -73,7 +73,7 @@ export const DALOA_DISTRICTS = [
   'Cocotier',
   'Corridor',
   'Gbokora',
-  'Hodjinninkloni',
+  'Odjenecourani',
   'Houssoukro',
   'Institut Pastoral',
   'Jacqueville',
@@ -146,6 +146,14 @@ export const MARKET_CATEGORIES: CategoryDefinition[] = [
     subcategories: ['Plats cuisinés & Fast-food', 'Épicerie & Vivres frais', 'Pâtisseries & Desserts', 'Boissons & Jus locaux', 'Épices & Condiments'],
   },
   {
+    id: 'beauty',
+    name: 'Beauté & Cosmétiques',
+    slug: 'cosmetiques',
+    iconName: 'Sparkles',
+    color: '#D946EF',
+    subcategories: ['Soins du visage', 'Soins du corps', 'Cheveux & Perruques', 'Maquillage', 'Parfums & Déodorants', 'Hygiène & Bien-être'],
+  },
+  {
     id: 'sports',
     name: 'Sports & Loisirs',
     slug: 'sports-loisirs',
@@ -209,8 +217,21 @@ export const normalizePayoutNetwork = (network?: string): string => {
  * Coordonnées de support par défaut (utilisées si non surchargées par variable d'environnement).
  * Pour changer le numéro WhatsApp lors de l'acquisition d'un nouveau numéro professionnel,
  * définissez la variable d'environnement EXPO_PUBLIC_SUPPORT_WHATSAPP ou modifiez cette constante.
+ *
+ * Le support ne prend pas d'appels : WhatsApp uniquement. C'est pour cela qu'il
+ * n'existe volontairement pas de constante de numéro appelable — la remettre
+ * ferait réapparaître des liens `tel:` que personne ne décrochera.
  */
-export const DEFAULT_SUPPORT_PHONE = '+2250788000831';
-export const DEFAULT_SUPPORT_WHATSAPP = '2250788000831';
+export const DEFAULT_SUPPORT_WHATSAPP = '2250173801559';
 export const DEFAULT_SUPPORT_EMAIL = 'support@daloamarket.com';
 
+/**
+ * Vehicules pour lesquels un permis de conduire est exige a la verification.
+ *
+ * Le velo en est exclu : il n'exige aucun titre de conduite, et l'imposer
+ * ecarterait la majorite des coursiers de Daloa.
+ */
+export const VEHICLES_REQUIRING_LICENCE = ['Moto', 'Voiture', 'Triporteur'] as const;
+
+export const requiresDrivingLicence = (vehicleType?: string | null): boolean =>
+  VEHICLES_REQUIRING_LICENCE.includes((vehicleType || '') as any);

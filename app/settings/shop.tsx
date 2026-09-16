@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '@daloa/api';
 import { DALOA_CENTER, PRICING_CONFIG } from '@daloa/config';
-import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import {
   ArrowLeft, MapPin, Check, ChevronDown, Palette, AlertCircle, CheckCircle2, Truck,
 } from 'lucide-react-native';
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   colorActive: { borderWidth: 3, borderColor: '#000' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[3] },
   codDeliverersBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radii.md, borderWidth: 1 },
-  codDeliverersText: { fontWeight: '800' },
+  codDeliverersText: { fontFamily: typography.families.extrabold },
   feedbackCard: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing[3], borderRadius: radii.lg },
   feedbackSuccess: { backgroundColor: colors.status.successLight },
   feedbackError: { backgroundColor: colors.status.errorLight },

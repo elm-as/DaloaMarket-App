@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile, RegisterInput, LoginInput } from '@daloa/types';
-import { authService, supabase, notificationsService } from '@daloa/api';
+import { authService, supabase, notificationsService, redeemPendingReferral } from '@daloa/api';
 import { SecureStorageAdapter } from '@daloa/utils';
 
 const CACHED_PROFILE_KEY = '@daloa_cached_user_profile';
@@ -106,6 +106,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) };
           setProfile(prof);
           void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(prof));
+
+          // Seul endroit traversé par tous les modes de connexion — email,
+          // Google, reprise de session. C'est ici que le code ambassadeur mis
+          // de côté à l'ouverture du lien est consommé, et nulle part ailleurs.
+          //
+          // Conditionné à l'existence de la ligne `users` : au tout début d'une
+          // inscription elle peut manquer une fraction de seconde, et un
+          // rattachement tenté trop tôt serait refusé — code perdu pour rien.
+          void redeemPendingReferral(user.id);
         }
       } catch (err) {
         console.warn('Erreur synchronisation profil utilisateur:', err);

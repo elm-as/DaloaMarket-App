@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { authService } from '@daloa/api';
-import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
 import { KeyRound, Mail, ArrowLeft } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 
@@ -17,20 +17,20 @@ export default function ResetPasswordScreen() {
 
   const handleReset = async () => {
     if (!email.trim()) {
-      Alert.alert('Erreur', 'Veuillez renseigner votre adresse email.');
+      showAlert('Erreur', 'Veuillez renseigner votre adresse email.');
       return;
     }
     try {
       setIsLoading(true);
       await authService.resetPassword(email.trim());
       Haptics.success();
-      Alert.alert(
+      showAlert(
         'Email envoyé',
         'Un lien de réinitialisation de mot de passe a été envoyé à votre adresse email.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || "Impossible d'envoyer le lien");
+      showAlert('Erreur', err.message || "Impossible d'envoyer le lien");
     } finally {
       setIsLoading(false);
     }

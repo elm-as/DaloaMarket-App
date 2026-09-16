@@ -1,171 +1,124 @@
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Linking, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, ScrollView, StyleSheet, Linking, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import {
-  MessageCircle, Phone, ArrowLeft, Headphones, Mail, ChevronRight,
-  ShieldCheck, HelpCircle, Clock, Send
+  Mail, MessageSquare, Sparkles, ArrowLeft, BookOpen,
 } from 'lucide-react-native';
-import { ENV_CONFIG, getSupportWhatsAppUrl, getSupportCallUrl } from '@daloa/config';
+import { ENV_CONFIG } from '@daloa/config';
 import { Haptics } from '@daloa/utils';
+import { useAuth } from '../../src/context/AuthContext';
+import { supabase } from '@daloa/api';
+import { HelpFeedbackForm } from '../../src/components/legal/HelpFeedbackForm';
+import { UserFeedbacksList } from '../../src/components/legal/UserFeedbacksList';
 
 export default function HelpScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
-  const [name, setName] = useState('');
-  const [contact, setContact] = useState('');
-  const [subject, setSubject] = useState('Litige ou commande');
-  const [message, setMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
+  const [userFeedbacks, setUserFeedbacks] = useState<any[]>([]);
 
-  const handleWhatsApp = () => {
-    Haptics.success();
-    Linking.openURL(getSupportWhatsAppUrl('Bonjour Support DaloaMarket, assistance'));
-  };
+  const fetchUserFeedbacks = useCallback(() => {
+    if (!user?.id) return;
+    supabase
+      .from('user_feedbacks')
+      .select('id, dislikes, admin_reply, replied_at, created_at, source')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (data) setUserFeedbacks(data);
+      });
+  }, [user?.id]);
 
-  const handleCall = () => {
-    Haptics.lightImpact();
-    Linking.openURL(getSupportCallUrl());
-  };
-
-  const handleEmail = () => {
-    Haptics.lightImpact();
-    Linking.openURL(`mailto:${ENV_CONFIG.SUPPORT_EMAIL}?subject=Assistance%20DaloaMarket`);
-  };
-
-  const handleSubmitMessage = () => {
-    if (!name.trim() || !contact.trim() || !message.trim()) {
-      Alert.alert('Champs requis', 'Veuillez renseigner votre nom, contact et message.');
-      return;
-    }
-    setIsSending(true);
-    Haptics.success();
-    setTimeout(() => {
-      setIsSending(false);
-      setName(''); setContact(''); setMessage('');
-      Alert.alert('Message transmis', 'Notre équipe locale à Daloa a reçu votre demande et vous répondra rapidement.');
-    }, 800);
-  };
+  useEffect(() => {
+    fetchUserFeedbacks();
+  }, [fetchUserFeedbacks]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <LinearGradient colors={[accent[400], accent[600], accent[700]]} style={styles.hero}>
-        <View style={styles.heroTop}>
-          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn} accessibilityLabel="Retour">
-            <ArrowLeft size={18} color={colors.text.inverse} />
-          </AppPressable>
-          <View style={styles.heroTitles}>
-            <AppText variant="overline" color={accent[100]}>Assistance locale</AppText>
-            <AppText variant="title" color={colors.text.inverse}>Aide & Support</AppText>
-          </View>
-          <View style={styles.iconCircle}>
-            <Headphones size={18} color={accent[200]} />
-          </View>
-        </View>
-      </LinearGradient>
+      <View style={styles.topBar}>
+        <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn} accessibilityLabel="Retour">
+          <ArrowLeft size={20} color={colors.text.DEFAULT} />
+        </AppPressable>
+        <AppText variant="subtitle" style={styles.bold}>Aide &amp; Feedbacks</AppText>
+        <View style={{ width: 38 }} />
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.supportCard}>
-          <View style={styles.cardHeaderRow}>
-            <Headphones size={18} color={accent.DEFAULT} />
-            <AppText variant="subtitle">Besoin d'aide immédiate ?</AppText>
+        {/* Bannière Hero */}
+        <LinearGradient colors={[accent[500], accent[600], '#D97706']} style={styles.heroCard}>
+          <View style={styles.logoBadge}>
+            <Image source={require('../../assets/logo.png')} style={styles.logoImg} resizeMode="contain" />
           </View>
-          <AppText variant="caption" color={colors.text.muted}>
-            Notre équipe de permanence à Daloa vous assiste sur vos commandes, paiements séquestre et litiges.
+          <AppText variant="title" color={colors.text.inverse} style={styles.heroTitle}>Aide &amp; Support</AppText>
+          <AppText variant="caption" color={accent[100]} center style={styles.heroSubtitle}>
+            Une question ou un avis ? Notre équipe est à votre écoute.
           </AppText>
+        </LinearGradient>
 
-          <View style={styles.scheduleBadge}>
-            <Clock size={12} color={accent[700]} />
-            <AppText variant="caption" color={accent[700]} style={styles.bold}>
-              Disponible 7j/7 de 08h00 à 20h00
+        {/* 4 accès rapides */}
+        <View style={styles.grid}>
+          <AppPressable
+            onPress={() => {
+              Haptics.lightImpact();
+              Linking.openURL(`mailto:${ENV_CONFIG.SUPPORT_EMAIL}?subject=Assistance%20DaloaMarket`);
+            }}
+            style={styles.gridCard}
+          >
+            <View style={[styles.iconBox, { backgroundColor: accent[50] }]}>
+              <Mail size={18} color={accent.DEFAULT} />
+            </View>
+            <AppText variant="caption" color={colors.text.muted}>Email support</AppText>
+            <AppText variant="caption" color={colors.text.DEFAULT} style={[styles.bold, styles.smallText]}>
+              {ENV_CONFIG.SUPPORT_EMAIL}
             </AppText>
-          </View>
+          </AppPressable>
 
-          <View style={styles.btnRow}>
-            <Button
-              title="WhatsApp Direct"
-              variant="whatsapp"
-              size="md"
-              leftIcon={<MessageCircle size={18} color={colors.text.inverse} />}
-              onPress={handleWhatsApp}
-              style={styles.flex1}
-            />
-            <Button
-              title="Appeler"
-              variant="outline"
-              size="md"
-              leftIcon={<Phone size={18} color={colors.text.DEFAULT} />}
-              onPress={handleCall}
-            />
-          </View>
+          <AppPressable onPress={() => router.push('/legal/faq' as any)} style={styles.gridCard}>
+            <View style={[styles.iconBox, { backgroundColor: accent[50] }]}>
+              <MessageSquare size={18} color={accent.DEFAULT} />
+            </View>
+            <AppText variant="bodyStrong">FAQ</AppText>
+            <AppText variant="caption" color={colors.text.muted}>Questions fréquentes</AppText>
+          </AppPressable>
 
-          <AppPressable onPress={handleEmail} style={styles.emailRow}>
-            <Mail size={14} color={colors.grey[600]} />
-            <AppText variant="caption" color={colors.grey[600]}>Email : {ENV_CONFIG.SUPPORT_EMAIL}</AppText>
+          <AppPressable onPress={() => router.push('/legal/how-it-works' as any)} style={styles.gridCard}>
+            <View style={[styles.iconBox, { backgroundColor: accent[50] }]}>
+              <BookOpen size={18} color={accent.DEFAULT} />
+            </View>
+            <AppText variant="bodyStrong">Comment ça marche</AppText>
+            <AppText variant="caption" color={colors.text.muted}>Guide complet</AppText>
+          </AppPressable>
+
+          <AppPressable
+            onPress={() => {
+              Haptics.lightImpact();
+              Linking.openURL('https://tuto.daloamarket.com');
+            }}
+            style={[styles.gridCard, styles.tutoCard]}
+          >
+            <View style={[styles.iconBox, styles.tutoIconBox]}>
+              <Sparkles size={18} color="#D97706" />
+            </View>
+            <AppText variant="bodyStrong" color="#92400E">Guide Vendeur</AppText>
+            <AppText variant="caption" color="#B45309">Tutos &amp; Conseils</AppText>
           </AppPressable>
         </View>
 
-        <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
-          Guides & Résolutions rapides
+        {/* Formulaire de Feedback inspiré du Web */}
+        <HelpFeedbackForm userId={user?.id} onSubmitted={fetchUserFeedbacks} />
+
+        {/* Section "Vos avis" en dessous de tout */}
+        <UserFeedbacksList feedbacks={userFeedbacks} />
+
+        <AppText variant="caption" color={colors.text.subtle} center style={styles.footerNote}>
+          DaloaMarket · Écoute &amp; Support client officiel
         </AppText>
-
-        <View style={styles.linksCard}>
-          <AppPressable onPress={() => router.push('/legal/faq' as any)} style={styles.menuRow}>
-            <View style={[styles.menuIconBox, { backgroundColor: accent[50] }]}>
-              <HelpCircle size={16} color={accent.DEFAULT} />
-            </View>
-            <View style={styles.flex1}>
-              <AppText variant="bodyStrong">Questions fréquentes (FAQ)</AppText>
-              <AppText variant="caption" color={colors.text.muted}>Paiements, livraisons et création de boutique</AppText>
-            </View>
-            <ChevronRight size={16} color={colors.grey[400]} />
-          </AppPressable>
-
-          <View style={styles.rowDivider} />
-
-          <AppPressable onPress={() => router.push('/legal/how-it-works' as any)} style={styles.menuRow}>
-            <View style={[styles.menuIconBox, { backgroundColor: colors.status.successLight }]}>
-              <ShieldCheck size={16} color={colors.status.successDark} />
-            </View>
-            <View style={styles.flex1}>
-              <AppText variant="bodyStrong">Garantie séquestre & litiges</AppText>
-              <AppText variant="caption" color={colors.text.muted}>Protocole anti-arnaque et remboursement à 100%</AppText>
-            </View>
-            <ChevronRight size={16} color={colors.grey[400]} />
-          </AppPressable>
-        </View>
-
-        <View style={styles.supportCard}>
-          <AppText variant="subtitle">Envoyez-nous un message</AppText>
-          <View style={styles.formGroup}>
-            <AppText variant="caption" color={colors.text.body} style={styles.bold}>Votre nom</AppText>
-            <TextInput style={styles.input} placeholder="Ex: Kouassi Jean" placeholderTextColor={colors.grey[400]} value={name} onChangeText={setName} />
-          </View>
-          <View style={styles.formGroup}>
-            <AppText variant="caption" color={colors.text.body} style={styles.bold}>Numéro de téléphone ou Email</AppText>
-            <TextInput style={styles.input} placeholder="Ex: 07 00 00 00 00" placeholderTextColor={colors.grey[400]} value={contact} onChangeText={setContact} />
-          </View>
-          <View style={styles.formGroup}>
-            <AppText variant="caption" color={colors.text.body} style={styles.bold}>Objet de votre demande</AppText>
-            <TextInput style={styles.input} placeholder="Ex: Litige commande #1234..." placeholderTextColor={colors.grey[400]} value={subject} onChangeText={setSubject} />
-          </View>
-          <View style={styles.formGroup}>
-            <AppText variant="caption" color={colors.text.body} style={styles.bold}>Votre message</AppText>
-            <TextInput style={[styles.input, styles.textarea]} placeholder="Détaillez votre situation..." placeholderTextColor={colors.grey[400]} multiline numberOfLines={3} value={message} onChangeText={setMessage} />
-          </View>
-          <Button
-            title={isSending ? 'Envoi en cours...' : 'Envoyer ma demande'}
-            variant="primary"
-            size="md"
-            leftIcon={<Send size={16} color={colors.text.inverse} />}
-            onPress={handleSubmitMessage}
-            disabled={isSending}
-          />
-        </View>
         <View style={{ height: insets.bottom + spacing[6] }} />
       </ScrollView>
     </View>
@@ -174,25 +127,33 @@ export default function HelpScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
-  hero: { paddingHorizontal: spacing[3], paddingTop: spacing[2], paddingBottom: spacing[5], borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backBtn: { width: 36, height: 36, borderRadius: radii.lg, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  heroTitles: { flex: 1, marginLeft: spacing[2] },
-  iconCircle: { width: 36, height: 36, borderRadius: radii.full, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  scrollContent: { padding: spacing[4], gap: spacing[3] },
-  supportCard: { backgroundColor: colors.bg.surface, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border.DEFAULT, padding: spacing[4], gap: spacing[3] },
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  scheduleBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.bg.subtle, borderRadius: radii.md, alignSelf: 'flex-start' },
-  btnRow: { flexDirection: 'row', gap: spacing[2] },
-  flex1: { flex: 1 },
-  bold: { fontWeight: '700' },
-  emailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionOverline: { marginTop: spacing[1], marginLeft: spacing[1] },
-  linksCard: { backgroundColor: colors.bg.surface, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border.DEFAULT, overflow: 'hidden' },
-  menuRow: { flexDirection: 'row', alignItems: 'center', padding: spacing[3], gap: spacing[3] },
-  menuIconBox: { width: 32, height: 32, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
-  rowDivider: { height: 1, backgroundColor: colors.border.subtle, marginLeft: 50 },
-  formGroup: { gap: 3 },
-  input: { backgroundColor: colors.bg.subtle, borderWidth: 1, borderColor: colors.border.DEFAULT, borderRadius: radii.lg, paddingHorizontal: spacing[3], paddingVertical: 8, fontSize: 13.5, color: colors.text.DEFAULT },
-  textarea: { height: 72, textAlignVertical: 'top' },
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle,
+  },
+  backBtn: {
+    width: 38, height: 38, borderRadius: radii.full, backgroundColor: colors.bg.subtle,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bold: { fontFamily: typography.families.bold },
+  scrollContent: { padding: spacing[4], gap: spacing[4] },
+  heroCard: { borderRadius: radii['2xl'], padding: spacing[5], alignItems: 'center', gap: spacing[1] },
+  logoBadge: {
+    width: 44, height: 44, borderRadius: radii.xl, backgroundColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center', marginBottom: spacing[1], overflow: 'hidden',
+  },
+  logoImg: { width: 28, height: 28 },
+  heroTitle: { fontSize: 20, fontFamily: typography.families.extrabold },
+  heroSubtitle: { fontSize: 12 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gridCard: {
+    width: '48%', backgroundColor: colors.bg.surface, borderRadius: radii.xl,
+    padding: spacing[3], borderWidth: 1, borderColor: colors.border.subtle, gap: spacing[1],
+  },
+  iconBox: { width: 34, height: 34, borderRadius: radii.lg, alignItems: 'center', justifyContent: 'center' },
+  smallText: { fontSize: 11 },
+  tutoCard: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  tutoIconBox: { backgroundColor: '#FEF3C7' },
+  footerNote: { fontSize: 11, marginTop: spacing[2] },
 });

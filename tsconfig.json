@@ -7,11 +7,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@daloa/types": ["./packages/types/src/index.ts"],
-      "@daloa/config": ["./packages/config/src/index.ts"],
-      "@daloa/utils": ["./packages/utils/src/index.ts"],
-      "@daloa/api": ["./packages/api/src/index.ts"],
-      "@daloa/ui": ["./packages/ui/src/index.ts"]
+      "@daloa/types": ["../../packages/types/src/index.ts"],
+      "@daloa/config": ["../../packages/config/src/index.ts"],
+      "@daloa/utils": ["../../packages/utils/src/index.ts"],
+      "@daloa/api": ["../../packages/api/src/index.ts"],
+      "@daloa/ui": ["../../packages/ui/src/index.ts"]
     }
   },
   "include": [

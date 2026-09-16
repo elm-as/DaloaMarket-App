@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Check, SlidersHorizontal, MapPin, Search, Tag, Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen } from 'lucide-react-native';
+import { X, Check, SlidersHorizontal, MapPin, Search, Tag, Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles } from 'lucide-react-native';
 import { colors, radii, spacing, typography, AppText, AppPressable, Button, useAccent } from '@daloa/ui';
 import { DALOA_DISTRICTS, MARKET_CATEGORIES, LISTING_CONDITIONS } from '@daloa/config';
 
@@ -32,7 +32,7 @@ interface SearchFilterModalProps {
 }
 
 const ICON_MAP: Record<string, React.FC<any>> = {
-  Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen,
+  Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles,
 };
 
 const CONDITION_COLORS: Record<string, string> = {

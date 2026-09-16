@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
-import { colors, radii, spacing, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { Truck, Store, ArrowRight, ShieldCheck } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   totalPrice: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   sectionBox: {
     gap: spacing[2],

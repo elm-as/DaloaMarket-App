@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchX } from 'lucide-react-native';
 import { useInfiniteListings, analyticsService } from '@daloa/api';
+import { MARKET_CATEGORIES } from '@daloa/config';
 import { useAuth } from '../../src/context/AuthContext';
 import { colors, radii, spacing, ListingCard, Skeleton, EmptyState, useResponsive, AppText, AppPressable } from '@daloa/ui';
 import { useCart } from '../../src/context/CartContext';
@@ -58,6 +59,19 @@ export default function SearchScreen() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState<SearchFilterValues>(EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
+
+  // Applique la catégorie reçue en paramètre : deep links /mode, /cosmetiques,
+  // /electronique… qui redirigent tous vers cet écran avec { category: slug }.
+  const params = useLocalSearchParams<{ category?: string | string[] }>();
+  const rawCategoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
+
+  useEffect(() => {
+    if (!rawCategoryParam) return;
+    const key = rawCategoryParam.toLowerCase();
+    const match = MARKET_CATEGORIES.find((c) => c.slug === key || c.id === key);
+    if (!match) return;
+    setFilters((prev) => (prev.category === match.id ? prev : { ...prev, category: match.id }));
+  }, [rawCategoryParam]);
 
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
 

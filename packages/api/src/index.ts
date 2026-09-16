@@ -13,6 +13,8 @@ export * from './services/affiliationsService';
 export * from './services/analyticsService';
 export * from './services/systemSettingsService';
 export * from './services/reviewsService';
+export * from './services/driverReviewsService';
 export * from './services/favoritesService';
 export * from './services/deliveryPersonService';
+export * from './services/referralService';
 export * from './queries/index';

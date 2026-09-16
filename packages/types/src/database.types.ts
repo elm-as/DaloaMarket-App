@@ -220,7 +220,6 @@ export interface Database {
           delivery_mode: 'delivery' | 'pickup' | string;
           payment_method: 'wave' | 'orange' | 'mtn' | 'moov' | 'cash_on_delivery' | string;
           delivery_address: string | null;
-          delivery_district: string | null;
           delivery_lat: number | null;
           delivery_lng: number | null;
           buyer_notes: string | null;
@@ -247,7 +246,6 @@ export interface Database {
           delivery_mode?: 'delivery' | 'pickup' | string;
           payment_method?: 'wave' | 'orange' | 'mtn' | 'moov' | 'cash_on_delivery' | string;
           delivery_address?: string | null;
-          delivery_district?: string | null;
           delivery_lat?: number | null;
           delivery_lng?: number | null;
           buyer_notes?: string | null;
@@ -274,7 +272,6 @@ export interface Database {
           delivery_mode?: 'delivery' | 'pickup' | string;
           payment_method?: 'wave' | 'orange' | 'mtn' | 'moov' | 'cash_on_delivery' | string;
           delivery_address?: string | null;
-          delivery_district?: string | null;
           delivery_lat?: number | null;
           delivery_lng?: number | null;
           buyer_notes?: string | null;
@@ -293,7 +290,6 @@ export interface Database {
           pickup_location: string;
           dropoff_location: string;
           delivery_price: number;
-          driver_fee: number;
           is_private: boolean;
           pickup_otp: string;
           delivery_otp: string;
@@ -323,7 +319,6 @@ export interface Database {
           pickup_location: string;
           dropoff_location: string;
           delivery_price: number;
-          driver_fee?: number;
           is_private?: boolean;
           pickup_otp?: string;
           delivery_otp?: string;
@@ -353,7 +348,6 @@ export interface Database {
           pickup_location?: string;
           dropoff_location?: string;
           delivery_price?: number;
-          driver_fee?: number;
           is_private?: boolean;
           pickup_otp?: string;
           delivery_otp?: string;

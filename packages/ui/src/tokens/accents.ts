@@ -1,34 +1,25 @@
 import { colors } from './colors';
 
 /**
- * Accents par application — la DA propre à chaque app.
+ * Accents par application.
  *
- * DaloaMarket  → orange chaleureux (marketplace, shopping)
- * DaloaDelivery→ cyan électrique  (outil de livraison, logistique)
+ * DÉCISION (14/09/2026) : les deux applications partagent le même orange
+ * `#FF9800`, qui est la valeur exacte utilisée par les deux sites web en
+ * production (DaloaMarket-v2 et DaloaDelivery). Une identité unique évite de
+ * désorienter les utilisateurs qui connaissent déjà le web.
  *
- * Les composants de @daloa/ui lisent l'accent via `useAccent()` / `useTheme()`
- * (voir theme/ThemeProvider). Le même composant rend donc orange dans Market
- * et cyan dans Delivery, sans code dupliqué.
+ * Historique : `delivery` valait auparavant un cyan `#06B6D4`, jamais déployé
+ * sur le web. Cohabitaient donc quatre valeurs (#FF9800 web, #FF7F00 tokens,
+ * #FF6B00 barre d'onglets mobile, #06B6D4 accent). Tout est ramené sur #FF9800.
+ *
+ * Les composants de @daloa/ui lisent l'accent via `useAccent()` / `useTheme()`.
+ * Le mécanisme reste en place : si les deux apps doivent un jour se
+ * différencier, il suffit de redéfinir `delivery` ici.
  */
 
-/** Échelle cyan DaloaDelivery (base #06B6D4). */
-const cyan = {
-  DEFAULT: '#06B6D4',
-  50: '#ECFEFF',
-  100: '#CFFAFE',
-  200: '#A5F3FC',
-  300: '#67E8F9',
-  400: '#22D3EE',
-  500: '#06B6D4',
-  600: '#0891B2',
-  700: '#0E7490',
-  800: '#155E75',
-  900: '#164E63',
-};
-
 export const accents = {
-  market: colors.primary, // orange (échelle déjà définie dans colors)
-  delivery: cyan,
+  market: colors.primary,
+  delivery: colors.primary,
 };
 
 export type AccentName = keyof typeof accents;

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { authService } from '@daloa/api';
-import { colors, radii, spacing, typography, Button, AppText, AppPressable } from '@daloa/ui';
+import { colors, radii, spacing, typography, Button, AppText, AppPressable, showAlert } from '@daloa/ui';
 import { AlertTriangle, Trash2, ArrowLeft } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
@@ -12,9 +12,10 @@ import { useAuth } from '../../src/context/AuthContext';
 const CONFIRM_WORD = 'SUPPRIMER';
 
 const CONSEQUENCES = [
-  'Vos annonces publiées seront retirées définitivement.',
-  'Votre historique de commandes et de messages sera supprimé.',
-  'Votre boutique et vos favoris seront perdus.',
+  'Vos annonces sont retirées de la vitrine et votre boutique est effacée.',
+  'Votre nom, téléphone, photo et coordonnées de paiement sont effacés.',
+  'Votre accès est révoqué définitivement : vous ne pourrez plus vous reconnecter.',
+  'Vos commandes et vos paiements sont conservés sans votre identité : la loi impose de garder ces écritures, et elles font foi en cas de litige.',
   'Cette action est irréversible.',
 ];
 
@@ -35,41 +36,24 @@ export default function DeleteAccountScreen() {
         setIsDeleting(true);
         await authService.deleteAccount();
         Haptics.warning();
-        if (Platform.OS === 'web') {
-          if (typeof window !== 'undefined') window.alert('Votre demande de suppression a été prise en compte. Vous êtes déconnecté.');
-          router.replace('/(tabs)' as any);
-        } else {
-          Alert.alert(
-            'Compte supprimé',
-            'Votre demande de suppression a été prise en compte. Vous êtes déconnecté.',
-            [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
-          );
-        }
+        showAlert(
+          'Compte supprimé',
+          'Vos données personnelles ont été effacées et votre accès révoqué.',
+          [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
+        );
       } catch (err: any) {
         await logout().catch(() => {});
-        if (Platform.OS === 'web') {
-          if (typeof window !== 'undefined') window.alert('Votre compte sera supprimé sous peu. Vous êtes déconnecté.');
-          router.replace('/(tabs)' as any);
-        } else {
-          Alert.alert(
-            'Demande enregistrée',
-            'Votre compte sera supprimé sous peu. Vous êtes déconnecté.',
-            [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
-          );
-        }
+        showAlert(
+          'Demande enregistrée',
+          'Votre compte sera supprimé sous peu. Vous êtes déconnecté.',
+          [{ text: 'OK', onPress: () => router.replace('/(tabs)' as any) }]
+        );
       } finally {
         setIsDeleting(false);
       }
     };
 
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.confirm('Supprimer définitivement votre compte ? Cette action ne peut pas être annulée.')) {
-        void performDelete();
-      }
-      return;
-    }
-
-    Alert.alert(
+    showAlert(
       'Supprimer définitivement ?',
       'Votre compte et toutes vos données seront supprimés. Cette action ne peut pas être annulée.',
       [

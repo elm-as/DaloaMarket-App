@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { PRICING_CONFIG } from '@daloa/config';
-import { colors, radii, spacing, Card, Button, Badge, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Card, Button, Badge, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
 import { Layers, Zap, ArrowUpCircle, ArrowLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 
@@ -16,7 +16,7 @@ export default function PacksScreen() {
 
   const handleBuyPack = (packName: string, price: number) => {
     Haptics.success();
-    Alert.alert(
+    showAlert(
       'Paiement Mobile Money',
       `Confirmez l'achat du ${packName} pour ${formatFCFA(price)} via Wave / Orange / MTN.`,
       [
@@ -24,7 +24,7 @@ export default function PacksScreen() {
         {
           text: 'Confirmer',
           onPress: () => {
-            Alert.alert('Succès !', "Vos crédits d'annonces ont été ajoutés.");
+            showAlert('Succès !', "Vos crédits d'annonces ont été ajoutés.");
             router.back();
           },
         },
@@ -80,7 +80,8 @@ export default function PacksScreen() {
               >
                 {pack.popular && (
                   <View style={styles.popularBadge}>
-                    <Badge label="POPULAIRE" variant="pro" />
+                    {/* "count" = accent orange : ce tag met en avant un pack, ce n'est pas un badge Pro. */}
+                    <Badge label="POPULAIRE" variant="count" />
                   </View>
                 )}
 

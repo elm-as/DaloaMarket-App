@@ -5,16 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserOrders } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
-import {
-  colors,
-  radii,
-  spacing,
-  Skeleton,
-  EmptyState,
-  AppText,
-  AppPressable,
-  useAccent,
-} from '@daloa/ui';
+import { colors, radii, spacing, Skeleton, EmptyState, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import {
   Package,
   ShoppingBag,
@@ -260,10 +251,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   boldLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   semiBoldLabel: {
-    fontWeight: '600',
+    fontFamily: typography.families.semibold,
   },
   // ── Status bar ──
   statusBar: {

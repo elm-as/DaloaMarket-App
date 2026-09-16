@@ -25,7 +25,6 @@ export const CurrencyText: React.FC<CurrencyTextProps> = ({
           color,
           fontSize: typography.sizes[size],
           fontFamily: typography.families[weight],
-          fontWeight: typography.weights[weight],
           fontVariant: ['tabular-nums'],
           letterSpacing: 0.3,
         },

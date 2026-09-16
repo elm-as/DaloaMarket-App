@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, ViewStyle } from 'react-native';
 import { colors, radii, typography } from '../tokens';
-import { Badge } from './Badge';
+import { ProBadge } from './ProBadge';
 
 export interface AvatarProps {
   uri?: string | null;
@@ -31,7 +31,7 @@ export const Avatar: React.FC<AvatarProps> = ({
 
   return (
     <View style={[{ width: size, height: size }, style]}>
-      {uri ? (
+      {uri && !uri.startsWith('blob:') ? (
         <Image
           source={{ uri }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
@@ -57,7 +57,7 @@ export const Avatar: React.FC<AvatarProps> = ({
 
       {isPro && (
         <View style={styles.proBadgeContainer}>
-          <Badge label="PRO" variant="pro" />
+          <ProBadge iconOnly size={size >= 64 ? 'md' : 'sm'} />
         </View>
       )}
 
@@ -84,7 +84,6 @@ const styles = StyleSheet.create({
   initialsText: {
     color: colors.primary[700],
     fontFamily: typography.families.bold,
-    fontWeight: typography.weights.bold,
   },
   proBadgeContainer: {
     position: 'absolute',

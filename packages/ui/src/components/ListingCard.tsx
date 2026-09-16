@@ -413,12 +413,12 @@ const styles = StyleSheet.create({
   priceText: {
     fontVariant: ['tabular-nums'],
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     flexShrink: 0,
   },
   priceRangeText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     letterSpacing: -0.2,
     flexShrink: 0,
   },

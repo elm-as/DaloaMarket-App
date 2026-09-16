@@ -7,7 +7,7 @@ export interface PrivacySection {
   bullets?: string[];
 }
 
-export const PRIVACY_LAST_UPDATE = '2 juillet 2026';
+export const PRIVACY_LAST_UPDATE = '16 septembre 2026';
 
 export const PRIVACY_SECTIONS: PrivacySection[] = [
   {
@@ -30,10 +30,14 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
       'Nous collectons uniquement les informations indispensables au bon fonctionnement de la mise en relation et de la livraison de vos colis à Daloa.',
     ],
     bullets: [
-      'Identité & Contact : nom complet, numéro de téléphone joignable, adresse email',
-      'Localisation : quartier de résidence à Daloa et coordonnées GPS lors d’une livraison active',
+      'Identité & Contact : nom complet, numéro de téléphone joignable, adresse email, photo de profil si vous en ajoutez une',
+      'Localisation : quartier de résidence à Daloa, coordonnées GPS du point de livraison, et position de votre boutique ou de vos annonces si vous les renseignez',
       'Transactions : historique des commandes, articles publiés, évaluations et avis clients',
-      'Sécurité Mobile Money : DaloaMarket ne stocke AUCUN code secret de compte Mobile Money. Les paiements sont chiffrés de bout en bout via Money Fusion.',
+      'Coordonnées de versement : si vous vendez ou livrez, le réseau Mobile Money et le numéro de téléphone sur lequel vos gains doivent être versés. Ce numéro nous est indispensable pour vous payer.',
+      'Adresse IP : l’adresse utilisée lors de votre inscription et la dernière adresse de connexion, afin de détecter les comptes frauduleux et les abus. Une adresse à l’origine d’abus répétés peut être bloquée.',
+      'Empreinte d’identifiant : à la suppression d’un compte, nous gardons une empreinte cryptographique irréversible (SHA-256) de son adresse e-mail et de son identifiant de connexion — jamais l’adresse elle-même, et l’empreinte ne permet pas de la retrouver. Elle sert uniquement à reconnaître la réinscription d’une personne dont le compte avait été banni ou signalé.',
+      'Notifications : si vous les activez, un jeton propre à votre appareil, nécessaire pour vous envoyer les alertes de commande et de message. Vous pouvez les désactiver à tout moment dans les réglages de votre téléphone.',
+      'Sécurité Mobile Money : DaloaMarket ne collecte ni ne stocke AUCUN code secret ni code PIN de compte Mobile Money. La saisie s’effectue exclusivement sur l’interface de notre prestataire Money Fusion.',
     ],
   },
   {
@@ -71,6 +75,9 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     paragraphs: [
       'Vos données sont hébergées sur une infrastructure Supabase hautement sécurisée avec chiffrement au repos (AES-256) et en transit (TLS 1.3).',
       'Les mots de passe sont hachés de manière irréversible et les identifiants d’accès sont protégés par des clés d’API restreintes avec Row Level Security (RLS).',
+      'Nos sous-traitants sont : Supabase (base de données, authentification, stockage des photos et e-mails transactionnels), Money Fusion (paiements et versements Mobile Money), Mapbox (cartes et calcul d’itinéraires), Expo — avec Apple et Google pour l’acheminement — (notifications push), Netlify et Render (hébergement du site et du service de paiement).',
+      'Certains de ces prestataires hébergent des données en dehors de la Côte d’Ivoire, notamment en Europe. Les transferts sont encadrés par les engagements contractuels de ces prestataires.',
+      'Aucun traceur publicitaire, aucun pixel de suivi et aucun outil de profilage commercial n’est utilisé dans l’application. Aucune donnée de navigation n’est transmise à une régie publicitaire ou à un réseau social.',
     ],
   },
   {
@@ -79,9 +86,11 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     title: 'Durée de conservation des données',
     summary: 'Conservation limitée à la durée d’activité de votre compte.',
     paragraphs: [
-      'Les données de compte sont conservées tant que celui-ci reste actif.',
-      'Les traces de commandes et transactions sont conservées pour une durée légale de 2 ans afin de permettre l’arbitrage des litiges et les obligations comptables.',
-      'Les coordonnées GPS temporaires des trajets sont purgées périodiquement.',
+      'Les données de compte sont conservées tant que celui-ci reste actif. La suppression prend effet immédiatement : nom, téléphone, adresse e-mail, photos et documents sont effacés ou rendus anonymes sans délai, et l’accès est révoqué définitivement.',
+      'Les données de commande et de transaction sont conservées jusqu’à 10 ans, conformément aux obligations comptables et fiscales ivoiriennes. Cette conservation s’impose à nous et survit à la suppression de votre compte.',
+      'Les adresses IP et journaux techniques sont conservés 12 mois au plus, pour la sécurité, la prévention de la fraude et le diagnostic d’incidents.',
+      'Les messages échangés sont conservés au maximum 24 mois, afin de vous donner accès à votre historique et de permettre au support d’instruire un éventuel litige. Une purge automatique hebdomadaire efface les plus anciens.',
+      'Les empreintes d’identifiants de comptes supprimés sont conservées 3 ans au titre de la prévention de la fraude, puis effacées automatiquement.',
     ],
   },
   {
@@ -102,7 +111,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     paragraphs: [
       'Pour toute question relative à vos données personnelles ou pour exercer vos droits, vous pouvez contacter notre référent DPO :',
       'Email dédié : privacy@daloamarket.com / support@daloamarket.com',
-      'Adresse : Direction DaloaMarket, Ville de Daloa, Côte d’Ivoire',
+      'Adresse postale : RueO21,68 — Yopougon, Abidjan, Côte d’Ivoire',
     ],
   },
 ];

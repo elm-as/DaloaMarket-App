@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase, useListings } from '@daloa/api';
 import { SellerInfo } from '@daloa/types';
 import {
-  colors, radii, spacing, Avatar, RatingStars, Badge, Button,
+  colors, radii, spacing, Avatar, RatingStars, ProBadge, Button,
   EmptyState, AppText, AppPressable, useAccent, WhatsAppIcon,
 } from '@daloa/ui';
 import {
@@ -191,7 +191,7 @@ export default function SellerShopScreen() {
             <AppText variant="title" numberOfLines={1} style={styles.flex1}>
               {seller.shop_name || seller.full_name || 'Boutique'}
             </AppText>
-            {isPro && <Badge label="PRO" variant="pro" />}
+            {isPro && <ProBadge size="sm" />}
           </View>
 
           {seller.shop_description ? (

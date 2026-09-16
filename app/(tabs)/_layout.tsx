@@ -8,7 +8,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { colors, radii, useAccent } from '@daloa/ui';
+import { colors, radii, useAccent, typography } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { useConversations } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
@@ -235,11 +235,11 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 10.5,
-    fontWeight: '600',
+    fontFamily: typography.families.semibold,
     fontVariant: ['tabular-nums'],
   },
   tabLabelFocused: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
   },
   badge: {
     position: 'absolute',
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   badgeText: {
     color: colors.text.inverse,
     fontSize: 8.5,
-    fontWeight: '900',
+    fontFamily: typography.families.black,
     fontVariant: ['tabular-nums'],
   },
   centerBtnWrapper: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
   centerBtnLabel: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     marginTop: 2,
     letterSpacing: -0.1,
   },

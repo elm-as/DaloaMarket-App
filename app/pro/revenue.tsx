@@ -5,17 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePayoutSettings, usePayoutHistory, payoutService } from '@daloa/api';
-import {
-  colors,
-  radii,
-  spacing,
-  CurrencyText,
-  StatusPill,
-  EmptyState,
-  AppText,
-  AppPressable,
-  useAccent,
-} from '@daloa/ui';
+import { colors, radii, spacing, CurrencyText, StatusPill, EmptyState, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { Wallet, ArrowDownRight, Clock, ArrowLeft, TrendingUp, ShoppingBag } from 'lucide-react-native';
 import { formatDate } from '@daloa/utils';
 
@@ -313,7 +303,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   autoPayoutTitle: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 11,
   },
   autoPayoutDesc: {

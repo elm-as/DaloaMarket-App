@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, ScrollView, StyleSheet, Share, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useListingDetail, useSimilarListings, useReviews, analyticsService } from '@daloa/api';
@@ -8,17 +8,7 @@ import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { ListingVariant } from '@daloa/types';
-import {
-  colors,
-  radii,
-  spacing,
-  Skeleton,
-  ListingCard,
-  AppText,
-  AppPressable,
-  useAccent,
-  useResponsive,
-} from '@daloa/ui';
+import { colors, radii, spacing, Skeleton, ListingCard, AppText, AppPressable, useAccent, useResponsive, typography, showAlert } from '@daloa/ui';
 import { Tag, MapPin, Truck, Check, Home, ChevronLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics, getListingPriceRange } from '@daloa/utils';
 import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
@@ -128,9 +118,23 @@ export default function ListingDetailScreen() {
     }
   };
 
+  /**
+   * Raccourci accueil : sert a sortir d'une chaine d'articles consultes a la
+   * suite sans repasser par chacun d'eux.
+   *
+   * `replace` ne remplacerait que l'ecran courant et laisserait les articles
+   * precedents dans la pile — le retour systeme les reparcourrait un a un,
+   * exactement ce que ce bouton doit eviter. `dismissAll` depile jusqu'a la
+   * racine. Le repli couvre l'arrivee directe par lien partage, ou il n'y a
+   * rien a depiler.
+   */
   const handleGoHome = () => {
     Haptics.lightImpact();
-    router.replace('/(tabs)' as any);
+    if (router.canDismiss()) {
+      router.dismissAll();
+    } else {
+      router.replace('/(tabs)' as any);
+    }
   };
 
   const avgRating =
@@ -197,7 +201,7 @@ export default function ListingDetailScreen() {
   };
 
   const handleReport = () => {
-    Alert.alert(
+    showAlert(
       'Signaler l\'annonce',
       'Pensez-vous que cette annonce est problématique ou frauduleuse ?',
       [
@@ -596,7 +600,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tagText: {
-    fontWeight: '600',
+    fontFamily: typography.families.semibold,
   },
   deliveryTag: {
     backgroundColor: colors.status.successLight,

@@ -124,13 +124,11 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 14.5,
     fontFamily: typography.families.black,
-    fontWeight: '900',
     letterSpacing: -0.2,
   },
   subheading: {
     fontSize: 11.5,
     fontFamily: typography.families.medium,
-    fontWeight: '500',
     color: colors.grey[600],
     lineHeight: 16,
     marginTop: 1,
@@ -162,7 +160,6 @@ const styles = StyleSheet.create({
   scanHintText: {
     fontSize: 11.5,
     fontFamily: typography.families.extrabold,
-    fontWeight: '800',
   },
   pinRow: {
     marginTop: 16,
@@ -172,7 +169,6 @@ const styles = StyleSheet.create({
   pinLabel: {
     fontSize: 10.5,
     fontFamily: typography.families.bold,
-    fontWeight: '700',
     color: colors.grey[500],
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -192,7 +188,6 @@ const styles = StyleSheet.create({
   pinDigit: {
     fontSize: 22,
     fontFamily: typography.families.black,
-    fontWeight: '900',
     color: '#111827',
   },
 });

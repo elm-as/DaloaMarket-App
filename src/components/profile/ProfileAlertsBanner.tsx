@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { AlertTriangle, MapPin, CreditCard, ChevronRight } from 'lucide-react-native';
-import { colors, spacing, radii, AppText, AppPressable } from '@daloa/ui';
+import { colors, spacing, radii, AppText, AppPressable, typography } from '@daloa/ui';
 
 interface ProfileAlertsBannerProps {
   hasListings: boolean;
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   alertTitle: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 12,
   },
   alertDesc: {

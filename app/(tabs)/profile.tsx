@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Share, Alert, Linking, RefreshControl, ActivityIndicator, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Share, Linking, RefreshControl, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase, authService } from '@daloa/api';
-import { colors, useAccent, ConfirmDialog } from '@daloa/ui';
+import { colors, useAccent, ConfirmDialog, showAlert } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { ProfileGuestView } from '../../src/components/profile/ProfileGuestView';
 import { ProfileHero } from '../../src/components/profile/ProfileHero';
@@ -83,7 +83,7 @@ export default function ProfileScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
+        showAlert(
           'Autorisation requise',
           'Veuillez autoriser l’accès à votre galerie de photos pour changer votre photo de profil.'
         );
@@ -115,7 +115,7 @@ export default function ProfileScreen() {
       Haptics.success();
     } catch (err: any) {
       console.error('Erreur changement photo de profil:', err);
-      Alert.alert('Erreur', err?.message || 'Impossible de mettre à jour votre photo de profil.');
+      showAlert('Erreur', err?.message || 'Impossible de mettre à jour votre photo de profil.');
     } finally {
       setIsUploadingAvatar(false);
     }

@@ -3,8 +3,16 @@ import { View, ScrollView, StyleSheet, LayoutAnimation, Platform, UIManager } fr
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { ChevronDown, ArrowLeft, HelpCircle } from 'lucide-react-native';
+import {
+  FEES,
+  DELIVERY,
+  PRO_PASS,
+  VISIBILITY,
+  PAYMENT_NETWORKS,
+  MAX_CONSECUTIVE_CANCELLATIONS,
+} from '../../src/legal/legal-facts';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -22,72 +30,72 @@ const FAQ_ITEMS: FaqItemData[] = [
   {
     category: 'escrow',
     q: "Qu'est-ce que le paiement séquestre (Escrow) ?",
-    a: "Votre argent est bloqué sur un compte de cantonnement sécurisé lors du paiement Mobile Money (Wave, Orange, MTN, Moov). Il n'est transféré au vendeur qu'après que vous ayez reçu et inspecté votre colis en remettant votre code secret OTP.",
+    a: `Quand vous payez en ligne (${PAYMENT_NETWORKS}), l'argent n'est pas versé immédiatement au vendeur : il est conservé par notre prestataire de paiement jusqu'à ce que vous confirmiez la réception de votre colis en communiquant votre code OTP au livreur.`,
   },
   {
     category: 'buyer',
-    q: "L'acheteur paie-t-il des frais de service ?",
-    a: "Non. Sur DaloaMarket, l'acheteur paie exactement le prix affiché du produit plus les frais de livraison éventuels. Il n'y a aucun frais de service caché pour l'acheteur (0% de commission acheteur).",
+    q: "Quels frais l'acheteur paie-t-il exactement ?",
+    a: `Vous réglez le prix de l'article, les frais de livraison s'il y a lieu, et des frais de service de ${FEES.buyerPct} du prix de l'article, qui couvrent la sécurisation du paiement et l'infrastructure. Le détail est affiché ligne par ligne avant validation : aucun frais n'est ajouté ensuite.`,
   },
   {
     category: 'delivery',
     q: 'Combien coûte la livraison à Daloa ?',
-    a: 'Le tarif officiel DaloaDelivery est de 500 FCFA pour les premiers 1,5 km, puis 85 FCFA par kilomètre supplémentaire. Le montant exact est calculé par coordonnées GPS et affiché avant validation.',
+    a: `Le tarif DaloaDelivery est de ${DELIVERY.basePrice} jusqu'à ${DELIVERY.baseKm} km, puis ${DELIVERY.perKm} par kilomètre supplémentaire. La distance est calculée par GPS et le montant exact s'affiche avant validation. Le retrait sur place chez le vendeur est sans frais de livraison.`,
   },
   {
     category: 'delivery',
     q: 'Combien gagne le livreur sur une course ?',
-    a: 'Les coursiers indépendants DaloaDelivery perçoivent 90% du montant de la livraison. Une retenue technique de 10% est appliquée par la plateforme pour la maintenance et la géolocalisation.',
+    a: `Les coursiers indépendants DaloaDelivery perçoivent ${FEES.driverNetPct} du montant de la course. Une retenue de ${FEES.driverPlatformPct} est appliquée par la plateforme pour la mise en relation, le suivi GPS et le traitement du paiement. Cette retenue ne porte jamais sur le prix de l'article.`,
   },
   {
     category: 'escrow',
     q: 'Que se passe-t-il si le colis est non conforme ou abîmé ?',
-    a: "Ne donnez JAMAIS votre code secret OTP au livreur si l'article est non conforme ou endommagé. Les fonds restent bloqués sous séquestre et notre support procède à votre remboursement intégral.",
+    a: "Ne donnez JAMAIS votre code OTP au livreur si l'article est non conforme ou endommagé : c'est ce code, et lui seul, qui débloque le versement au vendeur. Signalez le litige depuis le suivi de commande ou au support. Après vérification, vous êtes remboursé.",
   },
   {
     category: 'seller',
-    q: 'Combien coûte la publication d’annonces pour un vendeur ?',
-    a: "La publication est gratuite jusqu'à 20 annonces actives simultanément. Pour un nombre illimité d'annonces, un badge Pro et l'accès aux Livreurs Affiliés, vous pouvez activer le Pass Vendeur Pro.",
+    q: "Combien coûte la publication d'annonces pour un vendeur ?",
+    a: `Pendant la phase de lancement, la publication est gratuite et sans plafond, et DaloaMarket ne prélève aucune commission sur vos ventes. À la fin de cette phase, une commission vendeur de ${FEES.sellerStandardPct} s'appliquera (${FEES.sellerProPct} pour les Vendeurs Pro). Vous serez prévenu avant toute mise en application.`,
   },
   {
     category: 'seller',
     q: 'Quels sont les tarifs et avantages du Pass Vendeur Pro ?',
-    a: "Le Pass Vendeur Pro est disponible à 2 500 FCFA / mois ou 25 000 FCFA / an (2 mois offerts). Il débloque le stock illimité, le badge Pro vérifié, la commission réduite à 2,5% (au lieu de 3,5%), la gestion de livreurs affiliés et les options COD.",
+    a: `Le Pass Vendeur Pro est à ${PRO_PASS.monthly} / mois ou ${PRO_PASS.yearly} / an (2 mois offerts). Il donne le badge Pro vérifié, une priorité de classement et la commission réduite à ${FEES.sellerProPct} au lieu de ${FEES.sellerStandardPct} lorsque la grille entrera en vigueur. Pendant la phase de lancement, les annonces illimitées, le paiement à la livraison, le retrait sur place et les livreurs affiliés sont ouverts à tous les vendeurs.`,
   },
   {
     category: 'seller',
-    q: 'Comment fonctionnent les Livreurs Affiliés pour un vendeur Pro ?',
-    a: "Le Vendeur Pro peut inviter ses propres livreurs personnels de confiance via leur numéro de téléphone pour leur attribuer ses courses privées et autoriser le règlement en espèces à la livraison.",
+    q: 'Comment fonctionnent les Livreurs Affiliés ?',
+    a: "Un vendeur peut inviter ses propres livreurs de confiance via leur numéro de téléphone, pour leur attribuer ses courses et les autoriser à encaisser en espèces à la livraison. Cette possibilité est ouverte à tous les vendeurs pendant la phase de lancement.",
   },
   {
     category: 'escrow',
     q: 'Que se passe-t-il en cas de vol ou perte par un livreur affilié ?',
-    a: "L'acheteur est intégralement remboursé quoi qu'il arrive. Le Vendeur Pro est contractuellement responsable de ses livreurs affiliés personnels et règle directement le différend avec son employé.",
+    a: "L'acheteur est intégralement remboursé ou conserve son argent. Le vendeur est responsable des livreurs qu'il a lui-même affiliés et règle le différend directement avec eux.",
   },
   {
     category: 'seller',
     q: 'Quels sont les boosts de visibilité disponibles ?',
-    a: "Vous pouvez booster une annonce en vedette pendant 7 jours pour 500 FCFA (bandeau doré et affichage prioritaire sur l'accueil) ou faire un Bump de remontée en tête de liste pour 200 FCFA.",
+    a: `Le Boost à ${VISIBILITY.boost} place votre annonce en tête de liste avec un badge « Sponsorisé » pendant ${VISIBILITY.boostDays} jours. Le Bump à ${VISIBILITY.bump} la fait simplement remonter en tête, sans badge ni durée. Les deux sont indépendants du Pass Vendeur Pro.`,
   },
   {
     category: 'seller',
     q: 'Comment créer et personnaliser ma boutique ?',
-    a: "Rendez-vous dans Profil → Paramètres de ma boutique. Vous pouvez définir le nom commercial de votre enseigne, importer un logo, une bannière de couverture, votre quartier et une couleur de thème.",
+    a: "Rendez-vous dans Profil → Paramètres de ma boutique. Vous pouvez définir le nom commercial de votre enseigne, importer un logo, une bannière de couverture, votre quartier, un numéro WhatsApp et une couleur de thème.",
   },
   {
     category: 'buyer',
     q: 'Quels moyens de paiement sont acceptés ?',
-    a: 'Nous acceptons Wave Côte d’Ivoire, Orange Money, MTN MoMo et Moov Money via passerelle sécurisée. Le paiement en espèces à la livraison (COD) est également possible si le vendeur l’autorise.',
+    a: `Nous acceptons ${PAYMENT_NETWORKS} via passerelle sécurisée. Le paiement en espèces à la livraison est également disponible : pendant la phase de lancement, il est ouvert à tous les vendeurs et proposé par défaut.`,
   },
   {
     category: 'buyer',
     q: 'Puis-je annuler une commande avant livraison ?',
-    a: "Oui. Tant que le livreur n'a pas validé le ramassage chez le vendeur avec le code OTP Pickup, vous pouvez annuler votre commande. Le montant sous séquestre vous est restitué sous 24h.",
+    a: `Oui, tant que le livreur n'a pas validé le ramassage chez le vendeur. Si vous aviez payé en ligne, le montant vous est restitué. Au-delà de ${MAX_CONSECUTIVE_CANCELLATIONS} annulations consécutives, votre compte ne peut plus annuler seul et vous devez passer par le support.`,
   },
   {
     category: 'buyer',
     q: 'Comment supprimer mon compte DaloaMarket ?',
-    a: 'Allez dans Profil → Paramètres → Supprimer mon compte. Toutes vos données personnelles, annonces et historiques de commandes seront définitivement purgés.',
+    a: "Allez dans Profil → Paramètres → Supprimer mon compte. Vos annonces, votre boutique et vos favoris sont retirés. Certaines données liées à vos commandes sont conservées au-delà lorsque la loi ivoirienne nous impose de le faire, pour des raisons comptables et fiscales.",
   },
 ];
 
@@ -271,7 +279,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
   },
   categoryText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   scrollContent: {
     padding: spacing[4],

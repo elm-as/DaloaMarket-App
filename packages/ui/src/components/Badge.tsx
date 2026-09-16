@@ -13,8 +13,10 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'pro', size = 'md
   const getBadgeStyle = () => {
     switch (variant) {
       case 'pro':
+        // Bleu institutionnel : distinct de l'ambre des étoiles de notation,
+        // avec lequel l'orange se confondait. Voir aussi <ProBadge />.
         return {
-          bg: colors.primary.DEFAULT,
+          bg: colors.secondary.DEFAULT,
           text: '#FFFFFF',
         };
       case 'verified':
@@ -86,7 +88,6 @@ const styles = StyleSheet.create({
   },
   text: {
     fontFamily: typography.families.bold,
-    fontWeight: typography.weights.bold,
     letterSpacing: 0.3,
   },
 });

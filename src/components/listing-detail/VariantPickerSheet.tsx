@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Plus, Minus, ShoppingCart, Check } from 'lucide-react-native';
-import { AppText, AppPressable, colors, radii, spacing, useAccent } from '@daloa/ui';
+import { AppText, AppPressable, colors, radii, spacing, useAccent, typography } from '@daloa/ui';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { ListingVariant } from '@daloa/types';
 
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   },
   startingPrice: {
     fontVariant: ['tabular-nums'],
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   divider: {
     height: 1,
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   priceTag: {
     fontVariant: ['tabular-nums'],
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   stepperWrap: {
     flexDirection: 'row',
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
   },
 });
 

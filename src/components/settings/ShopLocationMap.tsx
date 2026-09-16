@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator, Linking } from 'react-native';
 import { Image } from 'expo-image';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
 import { MapPin, Navigation, LocateFixed, AlertTriangle, Plus, Minus, ExternalLink } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
@@ -45,7 +45,7 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
 
   // HTML interactif Leaflet OpenStreetMap autonome
   const mapHtml = useMemo(() => {
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup("<b>Boutique</b><br>Déplacez pour ajuster").openPopup();function notifyParent(newLat,newLng){if(window.parent){window.parent.postMessage(JSON.stringify({type:'SHOP_COORDS',latitude:newLat,longitude:newLng}),'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notifyParent(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notifyParent(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup("<b>Boutique</b><br>Déplacez pour ajuster").openPopup();function notifyParent(newLat,newLng){if(window.parent){window.parent.postMessage(JSON.stringify({type:'SHOP_COORDS',latitude:newLat,longitude:newLng}),'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notifyParent(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notifyParent(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
   }, [currentLat, currentLng]);
 
   // Écoute des messages envoyés par l'iframe (Web)
@@ -103,7 +103,7 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
               ) : (
                 <LocateFixed size={13} color={colors.text.inverse} />
               )}
-              <AppText variant="caption" color={colors.text.inverse} style={[styles.gpsBtnText, { fontWeight: '800' }]}>
+              <AppText variant="caption" color={colors.text.inverse} style={[styles.gpsBtnText, { fontFamily: typography.families.extrabold }]}>
                 Me localiser
               </AppText>
             </AppPressable>
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   gpsBtnText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   mapFrame: {
     height: 220,
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   googleMapsText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
     fontSize: 11,
   },
   coordsBadge: {

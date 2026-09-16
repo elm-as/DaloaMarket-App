@@ -49,7 +49,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: typography.sizes.xs,
     fontFamily: typography.families.semibold,
-    fontWeight: typography.weights.semibold,
   },
   retryBtn: {
     flexDirection: 'row',
@@ -64,6 +63,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: typography.sizes.xs,
     fontFamily: typography.families.bold,
-    fontWeight: typography.weights.bold,
   },
 });

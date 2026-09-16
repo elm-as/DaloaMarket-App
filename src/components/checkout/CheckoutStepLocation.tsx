@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { MapPin, ChevronDown, Store, ArrowLeft, ArrowRight, Phone } from 'lucide-react-native';
 import { DeliveryLocationMap } from './DeliveryLocationMap';
 import { Haptics } from '@daloa/utils';
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   boldText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   navRow: {
     flexDirection: 'row',

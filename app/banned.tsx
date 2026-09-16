@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii, spacing, Input, Button, AppText, AppPressable } from '@daloa/ui';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable, typography, showAlert } from '@daloa/ui';
 import { ShieldAlert, Send, LogOut, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../src/context/AuthContext';
 import { supabase } from '@daloa/api';
@@ -15,7 +15,7 @@ export default function BannedScreen() {
 
   const handleAppeal = async () => {
     if (!appealReason.trim()) {
-      Alert.alert('Erreur', 'Veuillez expliquer les raisons de votre contestation.');
+      showAlert('Erreur', 'Veuillez expliquer les raisons de votre contestation.');
       return;
     }
     try {
@@ -27,10 +27,10 @@ export default function BannedScreen() {
         reason: appealReason.trim(),
         status: 'pending',
       });
-      Alert.alert('Demande transmise', 'Votre recours a été envoyé aux administrateurs de DaloaMarket.');
+      showAlert('Demande transmise', 'Votre recours a été envoyé aux administrateurs de DaloaMarket.');
       setAppealReason('');
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || "Impossible d'envoyer le recours");
+      showAlert('Erreur', err.message || "Impossible d'envoyer le recours");
     } finally {
       setIsSubmitting(false);
     }
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   reasonLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

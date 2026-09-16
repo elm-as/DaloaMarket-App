@@ -2,8 +2,8 @@ import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Settings, Sparkles, MapPin, Phone, Star, Camera } from 'lucide-react-native';
-import { colors, spacing, Avatar, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { Settings, MapPin, Phone, Star, Camera } from 'lucide-react-native';
+import { colors, spacing, Avatar, AppText, AppPressable, ProBadge, useAccent, typography } from '@daloa/ui';
 
 interface ProfileHeroProps {
   displayName: string;
@@ -87,11 +87,6 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
               <Camera size={12} color={colors.text.inverse} />
             </View>
           ) : null}
-          {isPro && (
-            <View style={styles.proSparkleBadge}>
-              <Sparkles size={11} color={colors.text.inverse} />
-            </View>
-          )}
         </AppPressable>
 
         <View style={styles.identityInfo}>
@@ -99,13 +94,7 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
             <AppText variant="title" color={colors.text.inverse} numberOfLines={1} style={styles.nameText}>
               {displayName}
             </AppText>
-            {isPro && (
-              <View style={styles.proTag}>
-                <AppText variant="overline" color={colors.text.inverse}>
-                  PRO
-                </AppText>
-              </View>
-            )}
+            {isPro && <ProBadge size="sm" />}
           </View>
 
           {/* Note client */}
@@ -164,7 +153,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   pageTitle: {
-    fontWeight: '900',
+    fontFamily: typography.families.black,
   },
   settingsBtn: {
     flexDirection: 'row',
@@ -178,7 +167,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   settingsBtnText: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
   },
   identityRow: {
     flexDirection: 'row',
@@ -217,19 +206,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  proSparkleBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#EA580C',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
   identityInfo: {
     flex: 1,
     minWidth: 0,
@@ -240,16 +216,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   nameText: {
-    fontWeight: '900',
+    fontFamily: typography.families.black,
     flexShrink: 1,
-  },
-  proTag: {
-    backgroundColor: '#F97316',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   ratingRow: {
     flexDirection: 'row',
@@ -258,7 +226,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   ratingText: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontVariant: ['tabular-nums'],
   },
   metaRow: {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { colors, radii, spacing, Button, AppText, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Button, AppText, useAccent, typography } from '@daloa/ui';
 import { ArrowLeft, ShieldCheck } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import {
@@ -198,11 +198,11 @@ const styles = StyleSheet.create({
   },
   boldNum: {
     fontVariant: ['tabular-nums'],
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   totalAmountText: {
     fontVariant: ['tabular-nums'],
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
   },
   otpNoticeBox: {
     flexDirection: 'row',

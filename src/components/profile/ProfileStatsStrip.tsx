@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Package, CheckCircle, Star } from 'lucide-react-native';
-import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 
 interface ProfileStatsStripProps {
   activeCount: number;
@@ -111,13 +111,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statNumber: {
-    fontWeight: '900',
+    fontFamily: typography.families.black,
     fontVariant: ['tabular-nums'],
     fontSize: 20,
     lineHeight: 24,
   },
   statLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
     fontSize: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.5,

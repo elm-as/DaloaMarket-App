@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Linking,
-  Alert,
   TextInput,
   ActivityIndicator,
 } from 'react-native';
@@ -14,19 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useOrderDetail, ordersService, paymentService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
-import {
-  colors,
-  radii,
-  spacing,
-  Button,
-  Avatar,
-  RatingStars,
-  DeliveryCodeCard,
-  BottomSheet,
-  AppText,
-  AppPressable,
-  useAccent,
-} from '@daloa/ui';
+import { colors, radii, spacing, Button, Avatar, RatingStars, DeliveryCodeCard, BottomSheet, AppText, AppPressable, useAccent, typography, showAlert } from '@daloa/ui';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -121,7 +108,7 @@ export default function OrderTrackingScreen() {
 
   const handleCancelOrder = () => {
     if (!order) return;
-    Alert.alert(
+    showAlert(
       'Annuler cette commande ?',
       "Le coursier n'a pas encore récupéré le colis. Souhaitez-vous vraiment annuler votre commande ?",
       [
@@ -135,9 +122,9 @@ export default function OrderTrackingScreen() {
               await ordersService.cancelOrder(order.id, "Annulation demandée par l'acheteur");
               Haptics.success();
               await refetch();
-              Alert.alert('Commande annulée', 'Votre commande a été annulée avec succès.');
+              showAlert('Commande annulée', 'Votre commande a été annulée avec succès.');
             } catch (err: any) {
-              Alert.alert('Erreur', err.message || "Impossible d'annuler cette commande.");
+              showAlert('Erreur', err.message || "Impossible d'annuler cette commande.");
             } finally {
               setIsSubmitting(false);
             }
@@ -180,7 +167,7 @@ export default function OrderTrackingScreen() {
     if (res?.isPaid) {
       Haptics.success();
     } else {
-      Alert.alert(
+      showAlert(
         'Paiement en attente',
         "Nous n'avons pas encore reçu la confirmation. Si vous venez de payer, patientez quelques instants puis réessayez."
       );
@@ -195,12 +182,12 @@ export default function OrderTrackingScreen() {
       Haptics.warning();
       setIsDisputeOpen(false);
       refetch();
-      Alert.alert(
+      showAlert(
         'Litige signalé',
         "Votre signalement a été transmis à l'équipe de médiation DaloaMarket."
       );
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || 'Impossible de signaler le litige.');
+      showAlert('Erreur', err.message || 'Impossible de signaler le litige.');
     } finally {
       setIsSubmitting(false);
     }
@@ -214,12 +201,12 @@ export default function OrderTrackingScreen() {
       await ordersService.confirmSellerAvailability(order!.id);
       Haptics.success();
       refetch();
-      Alert.alert(
+      showAlert(
         'Disponibilité confirmée',
         'La course est maintenant visible par les livreurs. Préparez le colis.'
       );
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || 'Confirmation impossible.');
+      showAlert('Erreur', err.message || 'Confirmation impossible.');
     } finally {
       setIsSellerActing(false);
     }
@@ -227,7 +214,7 @@ export default function OrderTrackingScreen() {
 
   const handleCompletePickup = async (withOtp: boolean) => {
     if (withOtp && enteredPickupOtp.trim().length < 4) {
-      Alert.alert('Code incomplet', "Saisissez le code communiqué par l'acheteur.");
+      showAlert('Code incomplet', "Saisissez le code communiqué par l'acheteur.");
       return;
     }
     try {
@@ -239,12 +226,12 @@ export default function OrderTrackingScreen() {
       Haptics.success();
       setEnteredPickupOtp('');
       refetch();
-      Alert.alert(
+      showAlert(
         'Retrait validé',
         'La commande est marquée remise. Votre virement Mobile Money est programmé.'
       );
     } catch (err: any) {
-      Alert.alert('Validation refusée', err.message || 'Validation impossible.');
+      showAlert('Validation refusée', err.message || 'Validation impossible.');
     } finally {
       setIsSellerActing(false);
     }
@@ -552,7 +539,7 @@ export default function OrderTrackingScreen() {
               />
               <AppPressable
                 onPress={() =>
-                  Alert.alert(
+                  showAlert(
                     'Remise sans code',
                     "À n'utiliser que si l'acheteur n'a pas son code. La remise sera enregistrée sans vérification.",
                     [
@@ -756,10 +743,11 @@ export default function OrderTrackingScreen() {
           </View>
           <SummaryRow label="Article" value={listing?.title || 'Article DaloaMarket'} />
           <SummaryRow label="Quantité" value={`×${order.quantity || 1}`} />
-          <SummaryRow
-            label="Livraison à"
-            value={`${order.delivery_address || '—'} (${order.delivery_district || 'Daloa'})`}
-          />
+          {/* `orders` n'a pas de colonne `delivery_district` : ordersService
+              concatene deja le quartier dans `delivery_address`, sous la forme
+              « Adresse (Quartier) ». Y rajouter un suffixe affichait « … (Daloa) »
+              en double. Les types locaux perimes masquaient l'erreur. */}
+          <SummaryRow label="Livraison à" value={order.delivery_address || '—'} />
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <AppText variant="bodyStrong">Total séquestré</AppText>
@@ -1137,7 +1125,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[2],
   },
   cancelOrderText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   // ── Loading & Erreur ──
   loadingBox: {

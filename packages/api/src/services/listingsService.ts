@@ -60,7 +60,9 @@ export const listingsService = {
       query = query.order('view_count', { ascending: false });
     } else {
       // Par défaut : tri chronologique inversé (nouveautés en premier)
-      query = query.order('created_at', { ascending: false });
+      // sort_at = COALESCE(bumped_at, created_at) : une annonce bumpee remonte
+      // sans que sa date de publication reelle soit reecrite.
+      query = query.order('sort_at', { ascending: false });
     }
 
     const from = page * pageSize;
@@ -157,7 +159,7 @@ export const listingsService = {
       .eq('category', category)
       .eq('status', 'active')
       .neq('id', currentId)
-      .order('created_at', { ascending: false })
+      .order('sort_at', { ascending: false })
       .limit(limit);
 
     if (error) return [];

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { PlusCircle, Package, Truck, Store, Share2, Tag } from 'lucide-react-native';
-import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 
 interface ProfileQuickActionsProps {
   onPublishListing: () => void;
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   publishText: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 14,
   },
   grid: {
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   cardTitle: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 13,
   },
   cardSubtitle: {

@@ -64,14 +64,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontFamily: typography.families.extrabold,
-    fontWeight: '800',
     color: '#111827',
     letterSpacing: -0.2,
   },
   subtitle: {
     fontSize: 12,
     fontFamily: typography.families.medium,
-    fontWeight: '500',
     color: colors.grey[500],
     marginTop: 1,
   },
@@ -85,7 +83,6 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 12.5,
     fontFamily: typography.families.bold,
-    fontWeight: '700',
     color: colors.primary[600],
   },
 });

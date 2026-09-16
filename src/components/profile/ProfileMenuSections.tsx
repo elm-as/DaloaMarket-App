@@ -13,7 +13,7 @@ import {
   LogOut,
   ChevronRight,
 } from 'lucide-react-native';
-import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 
 interface ProfileMenuSectionsProps {
   onOpenRevenue: () => void;
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[6],
   },
   sectionHeader: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 10,
     letterSpacing: 0.6,
     marginBottom: spacing[2],
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   menuLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
     fontSize: 13,
   },
   menuSublabel: {
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[2],
   },
   logoutText: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontSize: 13,
   },
 });

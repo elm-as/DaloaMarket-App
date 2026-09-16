@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,8 +16,9 @@ import {
   AppText,
   AppPressable,
   useAccent,
+  showAlert,
 } from '@daloa/ui';
-import { Send, ArrowLeft } from 'lucide-react-native';
+import { Send, ArrowLeft, Lock } from 'lucide-react-native';
 import { formatDate, censorMessageContent } from '@daloa/utils';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 
@@ -35,7 +36,15 @@ export default function ChatRoomScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+
+  const isSupport = (!listingId || listingId === 'support' || listingId === 'null') && (
+    partnerName?.includes('DaloaMarket') ||
+    listingTitle?.includes('Support') ||
+    partnerId === 'af3721dd-6c4d-4709-930b-2f509f16e428' ||
+    partnerId === 'c9842647-f3d3-4ed8-9e42-ce16a2e40262'
+  );
+  const isReadOnly = isSupport && !isAdmin;
 
   if (!user) {
     return (
@@ -67,7 +76,7 @@ export default function ChatRoomScreen() {
   }, [messageList]);
 
   const handleSend = async () => {
-    if (!inputText.trim() || !user?.id || !partnerId) return;
+    if (isReadOnly || !inputText.trim() || !user?.id || !partnerId) return;
     const rawText = inputText.trim();
     const textToSend = censorMessageContent(rawText);
     setInputText('');
@@ -99,7 +108,7 @@ export default function ChatRoomScreen() {
     } catch (err) {
       console.warn('Erreur envoi message:', err);
       setInputText(textToSend);
-      Alert.alert('Envoi impossible', 'Le message n\'a pas pu être envoyé. Vérifiez votre connexion.');
+      showAlert('Envoi impossible', 'Le message n\'a pas pu être envoyé. Vérifiez votre connexion.');
     } finally {
       setIsSending(false);
     }
@@ -207,30 +216,41 @@ export default function ChatRoomScreen() {
           })}
         </ScrollView>
 
-        {/* Barre d'envoi */}
-        <View style={styles.inputBar}>
-          <TextInput
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Écrire un message..."
-            placeholderTextColor={colors.text.subtle}
-            style={styles.textInput}
-            multiline
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={handleSend}
-          />
-          <AppPressable
-            haptic="selection"
-            onPress={handleSend}
-            disabled={!inputText.trim() || isSending}
-            style={[styles.sendBtn, { backgroundColor: accent.DEFAULT }, !inputText.trim() && styles.sendBtnDisabled]}
-            accessibilityRole="button"
-            accessibilityLabel="Envoyer le message"
-          >
-            <Send size={18} color={colors.text.inverse} />
-          </AppPressable>
-        </View>
+        {/* Barre d'envoi ou bannière informative */}
+        {isReadOnly ? (
+          <View style={styles.readOnlyBanner}>
+            <View style={styles.lockCircle}>
+              <Lock size={16} color={colors.status.warning} />
+            </View>
+            <AppText variant="caption" color={colors.text.muted} style={styles.readOnlyText}>
+              Message officiel de l’équipe DaloaMarket. Ce canal informatif ne reçoit pas de réponse directe.
+            </AppText>
+          </View>
+        ) : (
+          <View style={styles.inputBar}>
+            <TextInput
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Écrire un message..."
+              placeholderTextColor={colors.text.subtle}
+              style={styles.textInput}
+              multiline
+              returnKeyType="send"
+              blurOnSubmit={false}
+              onSubmitEditing={handleSend}
+            />
+            <AppPressable
+              haptic="selection"
+              onPress={handleSend}
+              disabled={!inputText.trim() || isSending}
+              style={[styles.sendBtn, { backgroundColor: accent.DEFAULT }, !inputText.trim() && styles.sendBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Envoyer le message"
+            >
+              <Send size={18} color={colors.text.inverse} />
+            </AppPressable>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -325,4 +345,27 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sendBtnDisabled: { opacity: 0.5 },
+  readOnlyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.DEFAULT,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    gap: spacing[2],
+  },
+  lockCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readOnlyText: {
+    flex: 1,
+    textAlign: 'center',
+  },
 });

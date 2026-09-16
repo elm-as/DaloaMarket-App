@@ -4,14 +4,17 @@
  */
 export const colors = {
   // Couleurs Primaires (Orange Daloa)
+  // #FF9800 = valeur exacte des deux apps web en production
+  // (DaloaMarket-v2 et DaloaDelivery partagent cette échelle).
+  // Ne pas diverger : les utilisateurs connaissent déjà cet orange.
   primary: {
-    DEFAULT: '#FF7F00',
+    DEFAULT: '#FF9800',
     50: '#FFF4E6',
     100: '#FFE0B2',
     200: '#FFCC80',
     300: '#FFB74D',
     400: '#FFA726',
-    500: '#FF7F00',
+    500: '#FF9800',
     600: '#F57C00',
     700: '#E65100',
     800: '#BF360C',
@@ -129,11 +132,12 @@ export const colors = {
     sports: { bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
     books: { bg: '#ECFEFF', text: '#0891B2', border: '#A5F3FC' },
     food: { bg: '#FFF7ED', text: '#EA580C', border: '#FFEDD5' },
+    beauty: { bg: '#FDF4FF', text: '#C026D3', border: '#F5D0FE' },
   },
 
   // Compatibilité rétroactive
   market: {
-    primary: '#FF7F00',
+    primary: '#FF9800',
     primaryDark: '#E65100',
     primaryLight: '#FFF4E6',
     primaryGlow: 'rgba(255, 127, 0, 0.25)',
@@ -142,7 +146,7 @@ export const colors = {
   },
 
   delivery: {
-    primary: '#FF7F00',
+    primary: '#FF9800',
     primaryDark: '#E65100',
     primaryLight: '#FFF4E6',
     secondary: '#0066CC',

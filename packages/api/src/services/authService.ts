@@ -2,6 +2,50 @@ import { supabase } from '../supabase';
 import { UserProfile, RegisterInput, LoginInput, DeliveryPersonRow } from '@daloa/types';
 import { User } from '@supabase/supabase-js';
 
+/**
+ * Supprime les fichiers de l'utilisateur via l'API Storage.
+ *
+ * Indispensable ici : Supabase refuse le DELETE direct sur storage.objects
+ * (« Direct deletion from storage tables is not allowed »), donc
+ * `delete_my_account()` ne peut qu'inscrire les chemins dans une file de
+ * rattrapage. C'est cet appel-ci qui efface reellement les pieces d'identite.
+ *
+ * Silencieux par conception : un echec ne doit pas empecher l'anonymisation du
+ * compte, la file `account_file_purges` garde la trace de ce qui reste.
+ */
+async function purgeOwnStorageFiles(userId: string): Promise<void> {
+  const removeIn = async (bucket: string, folder: string) => {
+    const { data: files } = await supabase.storage.from(bucket).list(folder);
+    if (files && files.length > 0) {
+      await supabase.storage.from(bucket).remove(files.map((f: any) => `${folder}/${f.name}`));
+    }
+  };
+
+  try {
+    await removeIn('avatars', userId);
+  } catch { /* la file de rattrapage prendra le relais */ }
+
+  try {
+    // Les CNI sont rangees sous l'identifiant de la fiche livreur, pas celui du compte.
+    const { data: drivers } = await supabase
+      .from('delivery_persons')
+      .select('id')
+      .eq('user_id', userId);
+    for (const d of drivers || []) {
+      await removeIn('livreur-cni', (d as any).id);
+    }
+  } catch { /* idem */ }
+
+  try {
+    // livreur-photos nomme ses fichiers « <userId>-<horodatage>.jpg », a la racine.
+    const { data: photos } = await supabase.storage.from('livreur-photos').list('');
+    const mine = (photos || []).filter((f: any) => f.name.startsWith(`${userId}-`));
+    if (mine.length > 0) {
+      await supabase.storage.from('livreur-photos').remove(mine.map((f: any) => f.name));
+    }
+  } catch { /* idem */ }
+}
+
 export const authService = {
   /**
    * Récupère la session active et le profil utilisateur
@@ -25,16 +69,12 @@ export const authService = {
       .eq('id', userId)
       .single();
 
-    // Si rôle livreur, récupérer aussi le profil delivery_person
-    let deliveryProfile: DeliveryPersonRow | null = null;
-    if (profile?.role === 'delivery' || profile?.role === 'livreur') {
-      const { data: dProfile } = await supabase
-        .from('delivery_persons')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      deliveryProfile = dProfile;
-    }
+    // Récupérer le profil livreur s'il existe (un utilisateur DaloaMarket peut aussi être livreur DaloaDelivery)
+    const { data: deliveryProfile } = await supabase
+      .from('delivery_persons')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
 
     return {
       user: session.user,
@@ -198,6 +238,13 @@ export const authService = {
    * Le fallback marque le profil `deletion_requested` si la RPC n'existe pas encore.
    */
   async deleteAccount(): Promise<void> {
+    // Les fichiers partent d'abord : apres la RPC, la session est revoquee et
+    // l'API Storage refusera l'acces.
+    const { data: sessionUser } = await supabase.auth.getUser();
+    if (sessionUser.user?.id) {
+      await purgeOwnStorageFiles(sessionUser.user.id);
+    }
+
     const { error } = await supabase.rpc('delete_my_account');
 
     if (error) {

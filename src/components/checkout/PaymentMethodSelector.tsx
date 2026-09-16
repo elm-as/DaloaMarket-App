@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { CreditCard, Banknote, Store, ShieldCheck, Truck, Check } from 'lucide-react-native';
 
 export type PaymentMode = 'online' | 'cod' | 'cash_at_shop';
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   operatorCard: { flex: 1, minWidth: '47%', flexDirection: 'row', alignItems: 'center', padding: spacing[2], backgroundColor: colors.bg.subtle, borderRadius: radii.lg, borderWidth: 1.5, borderColor: colors.border.DEFAULT, gap: 8 },
   operatorLogo: { width: 26, height: 26, borderRadius: radii.sm },
   operatorName: { flex: 1, fontSize: 12 },
-  bold: { fontWeight: '700' },
+  bold: { fontFamily: typography.families.bold },
   checkCircle: { width: 15, height: 15, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },
   noticeCard: { backgroundColor: colors.bg.surface, borderRadius: radii.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.border.DEFAULT },
   noticeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },

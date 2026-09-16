@@ -2,14 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Sparkles, MapPin, Heart, Plus, Zap, TrendingUp, Star, Tag, Check } from 'lucide-react-native';
-import {
-  colors,
-  radii,
-  spacing,
-  AppText,
-  AppPressable,
-  useAccent,
-} from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { formatFCFA, getListingPriceRange } from '@daloa/utils';
 import { ScoredRecommendation } from '../../lib/recommendationEngine';
 
@@ -215,7 +208,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
   },
   badgePill: {
     paddingHorizontal: 8,
@@ -224,7 +217,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   scrollList: {
     paddingHorizontal: spacing[4],
@@ -269,7 +262,7 @@ const styles = StyleSheet.create({
   },
   reasonText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   favBtn: {
     position: 'absolute',
@@ -287,14 +280,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   priceText: {
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontVariant: ['tabular-nums'],
   },
   title: {
     fontSize: 12.5,
     lineHeight: 16,
     height: 32,
-    fontWeight: '600',
+    fontFamily: typography.families.semibold,
   },
   bottomRow: {
     flexDirection: 'row',
@@ -330,7 +323,7 @@ const styles = StyleSheet.create({
   },
   cartQtyText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: typography.families.extrabold,
     fontVariant: ['tabular-nums'],
   },
 });

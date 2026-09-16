@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { PRICING_CONFIG } from '@daloa/config';
 import { paymentService } from '@daloa/api';
-import { colors, radii, spacing, Button, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Button, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
 import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
@@ -67,13 +67,13 @@ export default function BecomeProScreen() {
       await new Promise((r) => setTimeout(r, 1500));
       await refreshProfile();
 
-      Alert.alert(
+      showAlert(
         'Paiement lancé ✅',
         'Dès la confirmation Mobile Money, votre Pass Vendeur Pro s’active automatiquement. Votre profil se mettra à jour dans un instant.',
         [{ text: 'Compris', onPress: () => router.replace('/(tabs)/profile' as any) }]
       );
     } catch (err: any) {
-      Alert.alert('Paiement impossible', err.message || 'Une erreur est survenue. Réessayez.');
+      showAlert('Paiement impossible', err.message || 'Une erreur est survenue. Réessayez.');
     } finally {
       setIsUpgrading(false);
     }

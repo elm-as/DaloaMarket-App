@@ -53,14 +53,14 @@ export const shadows = {
     elevation: 8,
   },
   glowMarket: {
-    shadowColor: '#F97316',
+    shadowColor: '#FF9800',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 6,
   },
   glowDelivery: {
-    shadowColor: '#06B6D4',
+    shadowColor: '#FF9800',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 12,

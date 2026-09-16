@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Check } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, AppText, useAccent, typography } from '@daloa/ui';
 
 interface CheckoutWizardBarProps {
   currentStep: number;
@@ -100,13 +100,13 @@ const styles = StyleSheet.create({
   },
   stepNum: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   label: {
     fontSize: 11,
   },
   boldLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   line: {
     flex: 1,

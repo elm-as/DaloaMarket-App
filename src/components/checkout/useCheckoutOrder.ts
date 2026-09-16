@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Alert, Platform, Linking } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { Haptics } from '@daloa/utils';
 import { ordersService, paymentService, analyticsService } from '@daloa/api';
 import { PaymentMode, MobileMoneyOperator } from './PaymentMethodSelector';
+import { showAlert } from '@daloa/ui';
 
 async function openPaymentGateway(paymentUrl: string) {
   if (Platform.OS === 'web') {
@@ -115,7 +116,7 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           if (orderId) {
             router.replace(`/order/${orderId}` as any);
           } else {
-            Alert.alert(
+            showAlert(
               'Paiement en cours de validation',
               'Dès la confirmation, vos commandes apparaîtront dans « Mes commandes ».',
               [{ text: 'Voir mes commandes', onPress: () => router.replace('/(tabs)/orders' as any) }]
@@ -191,7 +192,7 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         if (orderId) {
           router.replace(`/order/${orderId}` as any);
         } else {
-          Alert.alert(
+          showAlert(
             'Paiement en cours de validation',
             'Dès la confirmation Mobile Money, votre commande apparaîtra dans « Mes commandes ».',
             [{ text: 'Voir mes commandes', onPress: () => router.replace('/(tabs)/orders' as any) }]

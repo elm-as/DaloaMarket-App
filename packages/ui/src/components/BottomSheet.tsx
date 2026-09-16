@@ -107,7 +107,6 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: typography.sizes.lg,
     fontFamily: typography.families.bold,
-    fontWeight: typography.weights.bold,
   },
   closeBtn: {
     padding: 4,

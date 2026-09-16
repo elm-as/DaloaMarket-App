@@ -12,7 +12,8 @@ import { CartProvider } from '../src/context/CartContext';
 import { FavoritesProvider } from '../src/context/FavoritesContext';
 import { AppGate } from '../src/components/system/AppGate';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
-import { ThemeProvider, colors } from '@daloa/ui';
+import { useReferralCapture } from '../src/hooks/useReferralCapture';
+import { ThemeProvider, colors, AlertHost } from '@daloa/ui';
 
 function onAppStateChange(status: any) {
   if (Platform.OS !== 'web') {
@@ -34,6 +35,12 @@ function onAppStateChange(status: any) {
 /** Enregistre les push et gère les taps ; monté dans l'arbre Auth. */
 function PushRegistrar() {
   usePushNotifications();
+  return null;
+}
+
+/** Capture le code ambassadeur porté par le lien d'ouverture, avant toute navigation. */
+function ReferralCatcher() {
+  useReferralCapture();
   return null;
 }
 import {
@@ -90,6 +97,9 @@ export default function RootLayout() {
               <FavoritesProvider>
               <CartProvider>
               <PushRegistrar />
+              <ReferralCatcher />
+              {/* Hote des messages sur le web : sans lui, showAlert y est muet. */}
+              <AlertHost />
               <StatusBar style="dark" backgroundColor={colors.bg.surface} />
               <AppGate>
               <Stack

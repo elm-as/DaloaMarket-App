@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +24,7 @@ import {
   AppPressable,
   Button,
   useAccent,
+  showAlert,
 } from '@daloa/ui';
 import { Bike, ArrowLeft, UserPlus, X, Clock, CheckCircle, Sparkles, Truck, Smartphone } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
@@ -89,7 +89,7 @@ export default function AffiliationsScreen() {
     const phone = invitePhone.trim();
     if (!phone || !user?.id) return;
     if (phone.replace(/\D/g, '').length < 9) {
-      Alert.alert('Numéro invalide', 'Entrez un numéro ivoirien valide (ex: 0708091011).');
+      showAlert('Numéro invalide', 'Entrez un numéro ivoirien valide (ex: 0708091011).');
       return;
     }
 
@@ -101,19 +101,19 @@ export default function AffiliationsScreen() {
         Haptics.success();
         setInvitePhone('');
         refetch();
-        Alert.alert('Invitation envoyée !', result.message);
+        showAlert('Invitation envoyée !', result.message);
       } else {
-        Alert.alert('Impossible d\'inviter', result.message);
+        showAlert('Impossible d\'inviter', result.message);
       }
     } catch (err: any) {
-      Alert.alert('Erreur', err.message || 'Une erreur est survenue.');
+      showAlert('Erreur', err.message || 'Une erreur est survenue.');
     } finally {
       setIsInviting(false);
     }
   };
 
   const handleRemove = (affiliationId: string, name?: string) => {
-    Alert.alert(
+    showAlert(
       'Retirer ce livreur ?',
       `${name || 'Ce livreur'} ne sera plus affilié à votre boutique.`,
       [
@@ -128,7 +128,7 @@ export default function AffiliationsScreen() {
               await affiliationsService.removeAffiliation(affiliationId);
               refetch();
             } catch (err: any) {
-              Alert.alert('Erreur', err.message || 'Impossible de retirer ce livreur.');
+              showAlert('Erreur', err.message || 'Impossible de retirer ce livreur.');
             } finally {
               setRemovingId(null);
             }
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
   },
   sectionLabel: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
     letterSpacing: 0.5,
   },
   // ─── Driver cards ───

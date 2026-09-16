@@ -86,6 +86,8 @@ export const deliveryStorageService = {
       cniUrl: string;
       selfieCniUrl: string;
       portraitLiveUrl?: string;
+      /** Permis de conduire. Distinct de la piece d'identite : voir licence_url. */
+      licenceUrl?: string | null;
     }
   ): Promise<void> {
     const { error } = await supabase
@@ -94,6 +96,7 @@ export const deliveryStorageService = {
         cni_url: payload.cniUrl,
         selfie_cni_url: payload.selfieCniUrl,
         portrait_live_url: payload.portraitLiveUrl || null,
+        licence_url: payload.licenceUrl || null,
         verification_status: 'pending',
       })
       .eq('id', driverId);

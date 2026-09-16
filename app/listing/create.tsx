@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { listingsService } from '@daloa/api';
-import { colors, spacing, Button, KeyboardScreen, ConfirmDialog } from '@daloa/ui';
+import { colors, spacing, Button, KeyboardScreen, ConfirmDialog, showAlert } from '@daloa/ui';
 import { ArrowRight, Check, CreditCard, MapPin } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
@@ -83,13 +83,13 @@ export default function ListingCreateScreen() {
   const handleNext = () => {
     Haptics.selection();
     if (currentStep === 1 && (!title.trim() || title.trim().length < 3)) {
-      Alert.alert('Titre requis', 'Veuillez saisir un titre d’au moins 3 caractères.');
+      showAlert('Titre requis', 'Veuillez saisir un titre d’au moins 3 caractères.');
       return;
     }
     if (currentStep === 2) {
       const num = parseFloat(price);
       if (isNaN(num) || num <= 0) {
-        Alert.alert('Prix invalide', 'Veuillez renseigner un prix valide en FCFA.');
+        showAlert('Prix invalide', 'Veuillez renseigner un prix valide en FCFA.');
         return;
       }
     }
@@ -104,7 +104,7 @@ export default function ListingCreateScreen() {
 
   const handlePublish = async () => {
     if (!isAuthenticated || !user) {
-      Alert.alert('Connexion requise', 'Veuillez vous connecter pour publier une annonce.', [
+      showAlert('Connexion requise', 'Veuillez vous connecter pour publier une annonce.', [
         { text: 'Se connecter', onPress: () => router.push('/auth/login' as any) },
       ]);
       return;

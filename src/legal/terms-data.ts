@@ -12,7 +12,7 @@ export interface LegalArticle {
   }[];
 }
 
-export const TERMS_LAST_UPDATE = '7 juillet 2026';
+export const TERMS_LAST_UPDATE = '16 septembre 2026';
 
 export const TERMS_ARTICLES: LegalArticle[] = [
   {
@@ -51,6 +51,7 @@ export const TERMS_ARTICLES: LegalArticle[] = [
     title: 'Compte utilisateur & Sécurité',
     summary: 'Exactitude des données, responsabilité des identifiants et suppression.',
     paragraphs: [
+      "La Plateforme est réservée aux personnes âgées d’au moins 16 ans. Un utilisateur mineur agit sous la responsabilité de son représentant légal, qui doit avoir donné son accord.",
       "Pour publier ou commander, vous devez créer un compte avec des informations exactes, complètes et à jour (nom, téléphone joignable, quartier à Daloa).",
       "Vous êtes entièrement responsable de la confidentialité de vos identifiants et de votre code OTP de validation de commande.",
       "DaloaMarket se réserve le droit de suspendre ou supprimer tout compte en cas de fraude, d'usurpation ou de violation des CGU.",
@@ -64,7 +65,7 @@ export const TERMS_ARTICLES: LegalArticle[] = [
     paragraphs: [
       'Les annonces doivent porter sur des biens licites en Côte d’Ivoire dont l’utilisateur est le propriétaire légitime.',
       'Chaque annonce doit afficher un prix réel en FCFA, des photos authentiques et récentes, et une description sincère de son état.',
-      'Les comptes Vendeurs Standards disposent de jusqu’à 10 annonces actives simultanément. Au-delà, le Pass Vendeur Pro est requis.',
+      'Pendant la phase de lancement, la publication d’annonces est gratuite et sans plafond, pour tous les comptes. Un plafond d’annonces actives pourra être rétabli à l’issue de cette phase pour les comptes Vendeurs Standards, la publication illimitée devenant un avantage du Pass Vendeur Pro ; les utilisateurs en seront informés au préalable.',
     ],
     bullets: [
       'Interdiction absolue : contrefaçons, objets volés ou sans facture',
@@ -81,8 +82,9 @@ export const TERMS_ARTICLES: LegalArticle[] = [
     summary: 'Blocage des fonds, validation OTP et reversement Mobile Money.',
     paragraphs: [
       'DaloaMarket propose un paiement sécurisé tiers de confiance (escrow) : l’acheteur règle par Mobile Money (Wave, Orange, MTN, Moov). Les fonds sont bloqués jusqu’à la livraison effective.',
-      'Frais de service acheteur : 2% du montant des articles. Ces frais couvrent la sécurisation du séquestre bancaire, la garantie anti-fraude et le fonctionnement de l’infrastructure locale.',
-      'Commission vendeur : 3,5% en compte standard, réduite à 2,5% pour les membres Pass Vendeur Pro.',
+      'Pour être parfaitement clair : DaloaMarket n’est pas un établissement de paiement et ne détient pas de compte de cantonnement bancaire. Les sommes sont détenues par Money Fusion, prestataire agréé, jusqu’au déblocage. Le mot « séquestre » décrit ce blocage technique, et non un compte séparé ouvert par DaloaMarket.',
+      'Frais de service acheteur : 2% du montant des articles. Ces frais couvrent la sécurisation du paiement, la garantie anti-fraude et le fonctionnement de l’infrastructure locale. Le détail est affiché ligne par ligne avant validation de la commande ; aucun frais n’est ajouté ensuite.',
+      'Commission vendeur : pendant la phase de lancement, aucune commission n’est prélevée sur les ventes — le vendeur reçoit l’intégralité du prix de son article. À l’issue de cette phase, la commission sera de 3,5% en compte standard et de 2,5% pour les membres Pass Vendeur Pro. Ce changement sera annoncé avant son entrée en vigueur.',
       'La libération des fonds au vendeur est conditionnée à la saisie du code secret OTP remis par l’acheteur lors de la remise physique du colis.',
     ],
   },
@@ -104,7 +106,8 @@ export const TERMS_ARTICLES: LegalArticle[] = [
     summary: 'Avantages Pro, badge certifié, livreurs affiliés et options Boost.',
     paragraphs: [
       'Le Pass Vendeur Pro est proposé à 2 500 FCFA / mois ou 25 000 FCFA / an (2 mois offerts).',
-      'Il confère la publication illimitée, le badge Vendeur Pro vérifié, la commission réduite à 2,5%, et la gestion de coursiers affiliés dédiés.',
+      'Il confère le badge Vendeur Pro vérifié, une priorité de classement et la commission réduite à 2,5% lorsque la grille de commission entrera en vigueur.',
+      'Pendant la phase de lancement, la publication illimitée, le paiement à la livraison, le retrait sur place et l’affiliation de coursiers sont ouverts à tous les vendeurs, Pro ou non. Ces fonctionnalités redeviendront des avantages réservés au Pass Vendeur Pro à l’issue de cette phase.',
       'Options de visibilité à la carte : Boost Vedette 7 jours (500 FCFA) et Bump de tête de liste (200 FCFA).',
     ],
   },

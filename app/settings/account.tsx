@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase, authService } from '@daloa/api';
-import { colors, radii, spacing, Input, Button, AppText, AppPressable, Avatar, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, Input, Button, AppText, AppPressable, Avatar, useAccent, typography } from '@daloa/ui';
 import { ArrowLeft, Camera, User, Phone, MapPin, ChevronDown, CheckCircle2, AlertCircle } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
   },
   fieldGroup: { gap: 4 },
-  label: { fontWeight: '700', fontSize: 11, textTransform: 'uppercase' },
+  label: { fontFamily: typography.families.bold, fontSize: 11, textTransform: 'uppercase' },
   districtSelector: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Search, Tag } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent, ConfirmDialog, EmptyState, Skeleton } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, ConfirmDialog, EmptyState, Skeleton, typography } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { supabase, listingsService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   createBtnText: {
-    fontWeight: '700',
+    fontFamily: typography.families.bold,
   },
   searchWrap: {
     flexDirection: 'row',
