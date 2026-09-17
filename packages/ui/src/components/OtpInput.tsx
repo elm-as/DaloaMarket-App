@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, TextInput, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, TextInput, Text, StyleSheet, Pressable } from 'react-native';
 import { colors, radii, spacing, typography } from '../tokens';
 import { Haptics } from '@daloa/utils';
 
@@ -8,20 +8,23 @@ export interface OtpInputProps {
   value: string;
   onChange: (code: string) => void;
   isError?: boolean;
+  autoFocus?: boolean;
 }
 
 export const OtpInput: React.FC<OtpInputProps> = ({
-  length = 4,
+  length = 6,
   value,
   onChange,
   isError = false,
+  autoFocus = true,
 }) => {
   const inputRef = useRef<TextInput>(null);
   const [isFocused, setIsFocused] = useState(false);
 
   const digits = value.split('');
+  const isSixDigits = length >= 6;
 
-  const handleContainerPress = () => {
+  const handleFocus = () => {
     inputRef.current?.focus();
   };
 
@@ -32,22 +35,12 @@ export const OtpInput: React.FC<OtpInputProps> = ({
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={1}
-      onPress={handleContainerPress}
+    <Pressable
+      onPress={handleFocus}
       style={styles.container}
+      accessible={true}
+      accessibilityLabel={`Champ de saisie code secret OTP à ${length} chiffres`}
     >
-      <TextInput
-        ref={inputRef}
-        value={value}
-        onChangeText={handleChangeText}
-        keyboardType="number-pad"
-        maxLength={length}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        style={styles.hiddenInput}
-        autoFocus
-      />
       <View style={styles.boxesContainer}>
         {Array.from({ length }).map((_, index) => {
           const digit = digits[index] || '';
@@ -59,17 +52,44 @@ export const OtpInput: React.FC<OtpInputProps> = ({
               key={index}
               style={[
                 styles.box,
+                isSixDigits && styles.boxSixDigits,
                 isFilled && styles.boxFilled,
                 isCurrent && styles.boxCurrent,
                 isError && styles.boxError,
               ]}
             >
-              <Text style={styles.digitText}>{digit}</Text>
+              <Text
+                style={[
+                  styles.digitText,
+                  isSixDigits && styles.digitTextSixDigits,
+                ]}
+              >
+                {digit}
+              </Text>
             </View>
           );
         })}
+
+        {/* 
+          Surcouche TextInput plein cadre :
+          Sur Android dans un BottomSheet, un champ 1x1 masqué empêche le focus natif.
+          Couvrir l'ensemble des cases avec StyleSheet.absoluteFillObject et opacity: 0.01
+          permet à l'OS Android de capter directement le tap et d'ouvrir le clavier numérique.
+        */}
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={handleChangeText}
+          keyboardType="number-pad"
+          maxLength={length}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          caretHidden={true}
+          autoFocus={autoFocus}
+          style={styles.overlayInput}
+        />
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
@@ -77,20 +97,24 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: spacing[3],
     alignItems: 'center',
-  },
-  hiddenInput: {
-    position: 'absolute',
-    opacity: 0,
-    width: 1,
-    height: 1,
+    width: '100%',
   },
   boxesContainer: {
     flexDirection: 'row',
-    gap: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    gap: 8,
+  },
+  overlayInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.01,
+    color: 'transparent',
+    backgroundColor: 'transparent',
   },
   box: {
-    width: 54,
-    height: 60,
+    width: 52,
+    height: 58,
     borderRadius: radii.xl,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
@@ -102,6 +126,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 1,
+  },
+  boxSixDigits: {
+    width: 44,
+    height: 52,
+    borderRadius: radii.lg,
   },
   boxFilled: {
     borderColor: '#9CA3AF',
@@ -118,5 +147,9 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: typography.sizes['3xl'],
     fontFamily: typography.families.bold,
+    fontVariant: ['tabular-nums'],
+  },
+  digitTextSixDigits: {
+    fontSize: typography.sizes['2xl'],
   },
 });

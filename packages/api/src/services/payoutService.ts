@@ -50,7 +50,15 @@ export const payoutService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map((p: any) => ({
+      ...p,
+      amount: p.amount ?? 0,
+      net_amount: p.amount ?? 0,
+      phone: p.recipient_phone || '',
+      recipient_phone: p.recipient_phone || '',
+      network: p.withdraw_mode || 'mobile_money',
+      withdraw_mode: p.withdraw_mode || 'mobile_money',
+    }));
   },
 
   /**
@@ -60,34 +68,34 @@ export const payoutService = {
     const [deliveredRes, escrowRes, confirmedPayoutsRes, pendingPayoutsRes] = await Promise.all([
       supabase
         .from('orders')
-        .select('product_amount, seller_fee')
+        .select('product_amount, platform_commission')
         .eq('seller_id', userId)
         .eq('status', 'delivered'),
       supabase
         .from('orders')
-        .select('product_amount, seller_fee')
+        .select('product_amount, platform_commission')
         .eq('seller_id', userId)
         .in('status', ['awaiting_pickup', 'picked_up', 'in_transit', 'pending_payment']),
       supabase
         .from('payouts')
-        .select('net_amount')
+        .select('amount')
         .eq('user_id', userId)
         .eq('status', 'confirmed'),
       supabase
         .from('payouts')
-        .select('net_amount')
+        .select('amount')
         .eq('user_id', userId)
         .eq('status', 'pending'),
     ]);
 
     const totalEarned = (deliveredRes.data || []).reduce(
-      (s, o) => s + Math.max(0, (o.product_amount || 0) - (o.seller_fee || 0)),
+      (s: number, o: any) => s + Math.max(0, (o.product_amount || 0) - (o.platform_commission || 0)),
       0
     );
-    const totalPaidOut = (confirmedPayoutsRes.data || []).reduce((s, p) => s + (p.net_amount || 0), 0);
-    const totalPendingPayout = (pendingPayoutsRes.data || []).reduce((s, p) => s + (p.net_amount || 0), 0);
+    const totalPaidOut = (confirmedPayoutsRes.data || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
+    const totalPendingPayout = (pendingPayoutsRes.data || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
     const escrow = (escrowRes.data || []).reduce(
-      (s, o) => s + Math.max(0, (o.product_amount || 0) - (o.seller_fee || 0)),
+      (s: number, o: any) => s + Math.max(0, (o.product_amount || 0) - (o.platform_commission || 0)),
       0
     );
 

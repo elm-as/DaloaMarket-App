@@ -172,22 +172,28 @@ export default function RevenueScreen() {
             description="Vos retraits Mobile Money apparaîtront ici une fois vos premières ventes livrées."
           />
         ) : (
-          payouts.map((p) => (
-            <View key={p.id} style={styles.payoutItem}>
-              <View style={styles.payoutLeft}>
-                <AppText variant="bodyStrong">
-                  {p.network.toUpperCase()} · {p.phone}
-                </AppText>
-                <AppText variant="caption" color={colors.text.subtle}>
-                  {formatDate(p.created_at, true)}
-                </AppText>
+          payouts.map((p: any) => {
+            const operator = String(p.withdraw_mode || p.network || 'Mobile Money').toUpperCase();
+            const phone = p.recipient_phone || p.phone || '';
+            const amount = p.amount ?? p.net_amount ?? 0;
+
+            return (
+              <View key={p.id} style={styles.payoutItem}>
+                <View style={styles.payoutLeft}>
+                  <AppText variant="bodyStrong">
+                    {operator}{phone ? ` · ${phone}` : ''}
+                  </AppText>
+                  <AppText variant="caption" color={colors.text.subtle}>
+                    {formatDate(p.created_at, true)}
+                  </AppText>
+                </View>
+                <View style={styles.payoutRight}>
+                  <CurrencyText amount={amount} size="base" weight="bold" color={colors.status.successDark} />
+                  <StatusPill status={p.status} size="sm" />
+                </View>
               </View>
-              <View style={styles.payoutRight}>
-                <CurrencyText amount={p.net_amount} size="base" weight="bold" color={colors.status.successDark} />
-                <StatusPill status={p.status} size="sm" />
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
 
         <View style={{ height: insets.bottom + spacing[8] }} />

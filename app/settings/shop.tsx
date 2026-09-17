@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Switch } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useAuth } from '../../src/context/AuthContext';
-import { supabase, decodeBase64ToArrayBuffer } from '@daloa/api';
-import { DALOA_CENTER, PRICING_CONFIG } from '@daloa/config';
+import { supabase } from '@daloa/api';
+import { DALOA_CENTER } from '@daloa/config';
 import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { ArrowLeft, MapPin, Check, ChevronDown, Palette, AlertCircle, CheckCircle2, Truck } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
@@ -16,6 +16,8 @@ import { ShopLocationMap } from '../../src/components/settings/ShopLocationMap';
 import { DistrictPickerSheet } from '../../src/components/settings/DistrictPickerSheet';
 import { ShopHeaderBanner } from '../../src/components/settings/ShopHeaderBanner';
 import { ShopProGateCard } from '../../src/components/settings/ShopProGateCard';
+import { useShopSlugAvailability } from '../../src/components/settings/useShopSlugAvailability';
+import { uploadShopAsset } from '../../src/components/settings/uploadShopAsset';
 import { usePhase } from '../../src/context/PhaseContext';
 
 const THEME_COLORS = [
@@ -23,45 +25,6 @@ const THEME_COLORS = [
   { value: '#10B981', label: 'Vert' }, { value: '#8B5CF6', label: 'Violet' },
   { value: '#EF4444', label: 'Rouge' }, { value: '#1F2937', label: 'Anthracite' },
 ];
-
-function generateSlug(text: string): string {
-  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
-/**
- * Meme contrainte que pour les photos d'annonces : en React Native,
- * `fetch(file://...).blob()` renvoie un corps vide et rien n'arrive dans le bucket.
- * On televerse depuis le base64 fourni par le picker (`base64: true`).
- */
-async function uploadToStorage(
-  userId: string,
-  asset: { uri: string; base64?: string | null; mimeType?: string | null },
-  bucket: string
-): Promise<string | null> {
-  let mimeType = asset.mimeType || '';
-  let body: ArrayBuffer | Blob;
-
-  if (asset.base64) {
-    body = decodeBase64ToArrayBuffer(asset.base64);
-    if (!mimeType) {
-      mimeType = asset.uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-    }
-  } else {
-    const response = await fetch(asset.uri);
-    const blob = await response.blob();
-    if (!blob.size) {
-      throw new Error("L'image n'a pas pu être lue sur l'appareil. Réessayez.");
-    }
-    body = blob;
-    mimeType = mimeType || blob.type || 'image/jpeg';
-  }
-
-  const ext = mimeType.includes('png') ? 'png' : 'jpg';
-  const path = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, body, { contentType: mimeType, upsert: true });
-  if (error) throw error;
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-}
 
 export default function ShopSettingsScreen() {
   const router = useRouter();
@@ -91,16 +54,13 @@ export default function ShopSettingsScreen() {
   const [districtSheetVisible, setDistrictSheetVisible] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const slugCheck = useShopSlugAvailability(shopSlug || shopName, user?.id, profile?.shop_slug);
+
   useEffect(() => {
     if (!user?.id) return;
-    (supabase as any)
-      .from('seller_delivery_settings')
-      .select('cash_on_delivery_enabled')
-      .eq('seller_id', user.id)
-      .maybeSingle()
-      .then(({ data }: any) => {
-        if (data) setCashOnDelivery(Boolean(data.cash_on_delivery_enabled));
-      });
+    (supabase as any).from('seller_delivery_settings').select('cash_on_delivery_enabled').eq('seller_id', user.id).maybeSingle().then(({ data }: any) => {
+      if (data) setCashOnDelivery(Boolean(data.cash_on_delivery_enabled));
+    });
   }, [user?.id]);
 
   const handleBannerAction = async () => {
@@ -114,7 +74,7 @@ export default function ShopSettingsScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.85, base64: true });
       if (result.canceled || !result.assets[0] || !user?.id) return;
       setUploadingBanner(true);
-      const url = await uploadToStorage(user.id, result.assets[0], 'avatars');
+      const url = await uploadShopAsset(user.id, result.assets[0], 'avatars');
       if (url) {
         setBannerUrl(url);
         await supabase.from('users').update({ shop_banner_url: url }).eq('id', user.id);
@@ -139,7 +99,7 @@ export default function ShopSettingsScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [1, 1], quality: 0.85, base64: true });
       if (result.canceled || !result.assets[0] || !user?.id) return;
       setUploadingLogo(true);
-      const url = await uploadToStorage(user.id, result.assets[0], 'avatars');
+      const url = await uploadShopAsset(user.id, result.assets[0], 'avatars');
       if (url) {
         setLogoUrl(url);
         await supabase.from('users').update({ shop_logo_url: url }).eq('id', user.id);
@@ -169,10 +129,17 @@ export default function ShopSettingsScreen() {
 
   const handleSave = async () => {
     if (!user?.id) return;
+    if (slugCheck.isTaken) {
+      setFeedback({
+        type: 'error',
+        text: 'Cet identifiant URL est déjà utilisé par une autre boutique. Veuillez en choisir un autre.',
+      });
+      return;
+    }
     try {
       setIsSaving(true);
       setFeedback(null);
-      const cleanSlug = generateSlug(shopSlug || shopName);
+      const cleanSlug = slugCheck.cleanSlug;
 
       const updates: any = {
         district: district || 'Daloa',
@@ -202,7 +169,15 @@ export default function ShopSettingsScreen() {
       Haptics.success();
       setFeedback({ type: 'success', text: 'Paramètres enregistrés avec succès !' });
     } catch (err: any) {
-      setFeedback({ type: 'error', text: err?.message || 'Erreur lors de l’enregistrement.' });
+      let text = err?.message || 'Erreur lors de l’enregistrement.';
+      if (
+        text.includes('users_shop_slug_key') ||
+        text.includes('unique constraint') ||
+        text.includes('duplicate key')
+      ) {
+        text = 'Cet identifiant URL (slug) est déjà utilisé par une autre boutique. Veuillez en choisir un autre.';
+      }
+      setFeedback({ type: 'error', text });
     } finally {
       setIsSaving(false);
     }
@@ -253,7 +228,31 @@ export default function ShopSettingsScreen() {
           <View style={styles.sectionCard}>
             <AppText variant="overline" color={colors.text.muted}>IDENTITÉ DE LA VITRINE</AppText>
             <Input label="Nom commercial *" placeholder="Ex: Boutique Élégance Daloa" value={shopName} onChangeText={setShopName} />
-            <Input label="Identifiant URL (slug unique) *" placeholder="ex: elegance-daloa" value={shopSlug} onChangeText={setShopSlug} autoCapitalize="none" helperText={`daloamarket.com/shop/${shopSlug || 'votre-nom'}`} />
+            <Input
+              label="Identifiant URL (slug unique) *"
+              placeholder="ex: elegance-daloa"
+              value={shopSlug}
+              onChangeText={setShopSlug}
+              autoCapitalize="none"
+              helperText={`daloamarket.com/shop/${slugCheck.cleanSlug || 'votre-nom'}`}
+            />
+            {slugCheck.isChecking && (
+              <View style={styles.slugFeedbackRow}>
+                <AppText variant="caption" color={colors.text.muted}>Vérification de la disponibilité...</AppText>
+              </View>
+            )}
+            {slugCheck.isTaken && (
+              <View style={styles.slugFeedbackRow}>
+                <AlertCircle size={14} color={colors.status.errorDark} />
+                <AppText variant="caption" color={colors.status.errorDark} style={styles.flex1}>{slugCheck.message}</AppText>
+              </View>
+            )}
+            {slugCheck.isAvailable && (
+              <View style={styles.slugFeedbackRow}>
+                <CheckCircle2 size={14} color={colors.status.successDark} />
+                <AppText variant="caption" color={colors.status.successDark} style={styles.flex1}>{slugCheck.message}</AppText>
+              </View>
+            )}
             <Input label="Description & spécialité" placeholder="Présentez votre boutique, spécialités et garanties..." value={shopDescription} onChangeText={setShopDescription} multiline numberOfLines={3} inputStyle={styles.textArea} maxLength={200} />
 
             <View style={styles.colorSection}>
@@ -346,4 +345,5 @@ const styles = StyleSheet.create({
   codDeliverersText: { fontFamily: typography.families.extrabold },
   feedbackCard: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing[3], borderRadius: radii.lg },
   feedbackSuccess: { backgroundColor: colors.status.successLight }, feedbackError: { backgroundColor: colors.status.errorLight }, flex1: { flex: 1 },
+  slugFeedbackRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 },
 });

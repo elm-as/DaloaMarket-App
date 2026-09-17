@@ -100,28 +100,17 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           if (!result.paymentUrl) throw new Error('Lien de paiement indisponible. Réessayez.');
 
           Haptics.success();
-          params.clearCart();
-          await openPaymentGateway(result.paymentUrl);
-          if (Platform.OS === 'web') return;
+          if (Platform.OS === 'web') {
+            await openPaymentGateway(result.paymentUrl);
+            return;
+          }
 
-          let orderId: string | null = null;
+          // Redirection fluide vers l'écran de chargement dédié.
+          // Le panier sera vidé par PaymentSuccessScreen dès confirmation du paiement.
           if (result.transactionId) {
-            for (let i = 0; i < 4 && !orderId; i++) {
-              const check = await paymentService.checkPaymentByTransaction(result.transactionId);
-              orderId = check.orderId;
-              if (!orderId) await new Promise((r) => setTimeout(r, 1500));
-            }
+            router.replace(`/payment/success?transactionId=${encodeURIComponent(result.transactionId)}&fromCart=1` as any);
           }
-          params.clearCart();
-          if (orderId) {
-            router.replace(`/order/${orderId}` as any);
-          } else {
-            showAlert(
-              'Paiement en cours de validation',
-              'Dès la confirmation, vos commandes apparaîtront dans « Mes commandes ».',
-              [{ text: 'Voir mes commandes', onPress: () => router.replace('/(tabs)/orders' as any) }]
-            );
-          }
+          await openPaymentGateway(result.paymentUrl);
           return;
         }
 
@@ -181,27 +170,15 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         });
 
         Haptics.success();
-        await openPaymentGateway(result.paymentUrl);
-        if (Platform.OS === 'web') return;
+        if (Platform.OS === 'web') {
+          await openPaymentGateway(result.paymentUrl);
+          return;
+        }
 
-        let orderId: string | null = null;
         if (result.transactionId) {
-          for (let i = 0; i < 4 && !orderId; i++) {
-            const check = await paymentService.checkPaymentByTransaction(result.transactionId);
-            orderId = check.orderId;
-            if (!orderId) await new Promise((r) => setTimeout(r, 1500));
-          }
+          router.replace(`/payment/success?transactionId=${encodeURIComponent(result.transactionId)}&fromCart=0` as any);
         }
-
-        if (orderId) {
-          router.replace(`/order/${orderId}` as any);
-        } else {
-          showAlert(
-            'Paiement en cours de validation',
-            'Dès la confirmation Mobile Money, votre commande apparaîtra dans « Mes commandes ».',
-            [{ text: 'Voir mes commandes', onPress: () => router.replace('/(tabs)/orders' as any) }]
-          );
-        }
+        await openPaymentGateway(result.paymentUrl);
         return;
       }
 
@@ -237,7 +214,13 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
       Haptics.success();
       router.replace(`/order/${order.id}` as any);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Échec de la commande. Veuillez réessayer.');
+      let msg = err?.message || 'Échec de la commande. Veuillez réessayer.';
+      if (msg.includes('insufficient_stock') || msg.includes('stock')) {
+        msg = 'Le stock pour cet article est insuffisant pour valider votre commande.';
+      } else if (msg.includes('network') || msg.includes('Failed to fetch')) {
+        msg = 'Problème de connexion réseau. Veuillez vérifier votre connexion et réessayer.';
+      }
+      setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
     }

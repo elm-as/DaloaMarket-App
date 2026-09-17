@@ -184,7 +184,13 @@ export default function ListingCreateScreen() {
       setCreatedListingId(created.id);
       setShowSuccessDialog(true);
     } catch (err: any) {
-      setErrorDialog(err.message || 'Échec de la publication de votre annonce');
+      let msg = err?.message || 'Échec de la publication de votre annonce.';
+      if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
+        msg = 'Une annonce similaire existe déjà avec ces caractéristiques.';
+      } else if (msg.includes('Failed to fetch') || msg.includes('Network') || msg.includes('timeout')) {
+        msg = 'Connexion internet faible ou interrompue. Veuillez vérifier votre réseau puis réessayer.';
+      }
+      setErrorDialog(msg);
     } finally {
       setIsSubmitting(false);
     }
