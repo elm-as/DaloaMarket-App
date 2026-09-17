@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { colors, radii, spacing, AppText, AppPressable, useAccent, KeyboardScree
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { calculateOrderBreakdown, PRICING_CONFIG } from '@daloa/config';
+import { Haptics } from '@daloa/utils';
 import { useListingDetail, analyticsService, useSystemSettings } from '@daloa/api';
 import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -76,24 +77,38 @@ export default function CheckoutScreen() {
   // Coordonnées résolues du vendeur
   const sellerCoords = useMemo(() => resolveSellerLocation(listing), [listing]);
 
-  // Localisation automatique de l'acheteur via le GPS du téléphone
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          if (active && loc?.coords) {
-            setDeliveryCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-          }
+  const [isLocatingGps, setIsLocatingGps] = useState(false);
+
+  const handleRequestGps = useCallback(async (isSilent = false) => {
+    try {
+      if (!isSilent) setIsLocatingGps(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        if (!isSilent) {
+          setErrorMsg('Veuillez autoriser l’accès GPS pour que le coursier puisse vous livrer.');
         }
-      } catch {
-        // silencieux
+        return;
       }
-    })();
-    return () => { active = false; };
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (loc?.coords) {
+        setDeliveryCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        setErrorMsg(null);
+        Haptics.success();
+      }
+    } catch {
+      if (!isSilent) {
+        setErrorMsg('Position GPS introuvable. Vérifiez que la localisation de votre appareil est activée.');
+      }
+    } finally {
+      if (!isSilent) setIsLocatingGps(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (deliveryMode === 'delivery' && !deliveryCoords) {
+      handleRequestGps(true);
+    }
+  }, [deliveryMode, handleRequestGps]);
 
   // Calcul dynamique de la distance via Mapbox dès que les positions vendeur ou acheteur changent
   useEffect(() => {
@@ -262,11 +277,19 @@ export default function CheckoutScreen() {
               onBuyerPhoneChange={setBuyerPhone}
               shopName={listing ? (listing.seller?.shop_name || listing.seller?.full_name) : undefined}
               sellerDistrict={listing?.seller?.district || listing?.district}
+              onLocateGps={() => handleRequestGps(false)}
+              isLocatingGps={isLocatingGps}
               onBack={() => setStep(1)}
               onNext={() => {
-                if (deliveryMode === 'delivery' && !deliveryAddress.trim()) {
-                  setErrorMsg('Veuillez préciser votre repère ou adresse de livraison.');
-                  return;
+                if (deliveryMode === 'delivery') {
+                  if (!deliveryCoords?.latitude || !deliveryCoords?.longitude) {
+                    setErrorMsg('La position GPS est obligatoire pour la livraison. Veuillez activer votre GPS.');
+                    return;
+                  }
+                  if (!deliveryAddress.trim()) {
+                    setErrorMsg('Veuillez préciser votre repère ou adresse de livraison.');
+                    return;
+                  }
                 }
                 if (!buyerPhone.trim() || buyerPhone.length < 8) {
                   setErrorMsg('Veuillez renseigner un numéro de téléphone de contact valide.');

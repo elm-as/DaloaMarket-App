@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { MapPin, ChevronDown, Store, ArrowLeft, ArrowRight, Phone } from 'lucide-react-native';
+import { MapPin, ChevronDown, Store, ArrowLeft, ArrowRight, Phone, CheckCircle2, AlertTriangle, Navigation } from 'lucide-react-native';
 import { DeliveryLocationMap } from './DeliveryLocationMap';
 import { Haptics } from '@daloa/utils';
 
@@ -19,6 +19,8 @@ interface CheckoutStepLocationProps {
   onBuyerPhoneChange: (phone: string) => void;
   shopName?: string | null;
   sellerDistrict?: string | null;
+  onLocateGps?: () => void;
+  isLocatingGps?: boolean;
   onBack: () => void;
   onNext: () => void;
 }
@@ -37,6 +39,8 @@ export function CheckoutStepLocation({
   onBuyerPhoneChange,
   shopName,
   sellerDistrict,
+  onLocateGps,
+  isLocatingGps,
   onBack,
   onNext,
 }: CheckoutStepLocationProps) {
@@ -66,6 +70,46 @@ export function CheckoutStepLocation({
               </AppText>
               <ChevronDown size={18} color={colors.text.subtle} />
             </AppPressable>
+          </View>
+
+          {/* Statut GPS obligatoire pour la livraison */}
+          <View style={[styles.gpsStatusCard, deliveryCoords ? styles.gpsCardSuccess : styles.gpsCardAlert]}>
+            <View style={[styles.gpsIconCircle, { backgroundColor: deliveryCoords ? colors.status.successLight : '#FEE2E2' }]}>
+              {deliveryCoords ? (
+                <CheckCircle2 size={18} color="#059669" />
+              ) : (
+                <AlertTriangle size={18} color="#DC2626" />
+              )}
+            </View>
+            <View style={styles.flex1}>
+              <AppText variant="bodyStrong" color={deliveryCoords ? '#065F46' : '#991B1B'}>
+                {deliveryCoords ? 'Position GPS verrouillée' : 'GPS obligatoire pour la livraison'}
+              </AppText>
+              <AppText variant="caption" color={deliveryCoords ? '#047857' : '#B91C1C'} style={{ marginTop: 2 }}>
+                {deliveryCoords
+                  ? `Coordonnées : ${deliveryCoords.latitude.toFixed(4)}, ${deliveryCoords.longitude.toFixed(4)}`
+                  : 'Activez votre GPS pour que le livreur reçoive votre position exacte.'}
+              </AppText>
+            </View>
+            {!deliveryCoords && onLocateGps && (
+              <AppPressable
+                haptic="selection"
+                onPress={onLocateGps}
+                disabled={isLocatingGps}
+                style={[styles.activateGpsBtn, { backgroundColor: accent.DEFAULT }]}
+              >
+                {isLocatingGps ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Navigation size={13} color="#FFF" />
+                    <AppText variant="caption" color="#FFF" style={styles.activateGpsText}>
+                      Activer
+                    </AppText>
+                  </>
+                )}
+              </AppPressable>
+            )}
           </View>
 
           {/* Carte interactive Leaflet */}
@@ -233,5 +277,39 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+  },
+  gpsStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing[3],
+    borderRadius: radii.xl,
+    borderWidth: 1.5,
+    gap: spacing[3],
+  },
+  gpsCardSuccess: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  gpsCardAlert: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  gpsIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activateGpsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radii.lg,
+  },
+  activateGpsText: {
+    fontFamily: typography.families.extrabold,
   },
 });

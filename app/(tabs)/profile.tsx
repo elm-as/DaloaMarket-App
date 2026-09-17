@@ -212,6 +212,7 @@ export default function ProfileScreen() {
           hasListings={stats.activeCount > 0}
           hasShopGps={hasShopGps}
           hasPayoutAccount={hasPayoutAccount}
+          isSeller={isPro || Boolean(profile?.shop_name) || Boolean((profile as any)?.payout_network)}
           onDefineGps={() => router.push('/settings/shop' as any)}
           onSetupPayout={() => router.push('/settings/payout' as any)}
         />

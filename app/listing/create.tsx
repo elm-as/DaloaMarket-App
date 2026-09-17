@@ -55,7 +55,7 @@ export default function ListingCreateScreen() {
   }
 
   const hasPayoutInfo = Boolean((profile as any)?.payout_network && (profile as any)?.payout_number);
-  const hasShopLocation = Boolean(profile?.district && (profile as any)?.shop_latitude != null);
+  const hasShopLocation = Boolean(profile?.district && (profile as any)?.shop_latitude != null && (profile as any)?.shop_longitude != null);
 
   if (!hasPayoutInfo) {
     return (
