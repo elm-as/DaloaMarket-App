@@ -14,9 +14,13 @@ import {
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 import { UserOrderCard } from '../../src/components/orders/UserOrderCard';
 
+// Les `id` sont comparés à `orders.status` : `awaiting_pickup` appartient à
+// `delivery_assignments` et ne s'y trouve jamais, ce filtre ne renvoyait donc
+// jamais aucune commande.
 const STATUS_FILTERS = [
   { id: 'all', label: 'Toutes' },
-  { id: 'awaiting_pickup', label: 'En attente' },
+  { id: 'pending', label: 'À payer' },
+  { id: 'paid', label: 'En préparation' },
   { id: 'in_transit', label: 'En livraison' },
   { id: 'delivered', label: 'Livrées' },
 ];

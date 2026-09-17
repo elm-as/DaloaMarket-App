@@ -6,9 +6,20 @@ import { Camera, Trash2 } from 'lucide-react-native';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 
+/**
+ * Une photo choisie sur l'appareil. `base64` est indispensable au televersement :
+ * en React Native, `fetch(file://...).blob()` renvoie un corps vide, donc l'upload
+ * doit passer par un ArrayBuffer (cf. `listingsService.uploadImage`).
+ */
+export interface PickedPhoto {
+  uri: string;
+  base64?: string | null;
+  mimeType?: string | null;
+}
+
 interface StepMediaTitleProps {
-  photos: string[];
-  setPhotos: React.Dispatch<React.SetStateAction<string[]>>;
+  photos: PickedPhoto[];
+  setPhotos: React.Dispatch<React.SetStateAction<PickedPhoto[]>>;
   title: string;
   setTitle: (t: string) => void;
   description: string;
@@ -31,10 +42,16 @@ export const StepMediaTitle: React.FC<StepMediaTitleProps> = ({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       quality: 0.8,
+      // Sans base64, l'upload echoue silencieusement sur Android.
+      base64: true,
     });
     if (!result.canceled && result.assets) {
-      const uris = result.assets.map((a) => a.uri);
-      setPhotos((prev) => [...prev, ...uris].slice(0, 5));
+      const picked: PickedPhoto[] = result.assets.map((a) => ({
+        uri: a.uri,
+        base64: a.base64 ?? null,
+        mimeType: a.mimeType ?? null,
+      }));
+      setPhotos((prev) => [...prev, ...picked].slice(0, 5));
     }
   };
 
@@ -70,7 +87,7 @@ export const StepMediaTitle: React.FC<StepMediaTitleProps> = ({
         <View style={styles.photosRow}>
           {/* Grande vignette principale */}
           <View style={styles.mainThumbWrapper}>
-            <Image source={{ uri: photos[0] }} style={styles.mainThumb} contentFit="cover" transition={150} />
+            <Image source={{ uri: photos[0].uri }} style={styles.mainThumb} contentFit="cover" transition={150} />
             <View style={[styles.mainBadge, { backgroundColor: accent.DEFAULT }]}>
               <AppText variant="overline" color={colors.text.inverse}>Principale</AppText>
             </View>
@@ -81,9 +98,9 @@ export const StepMediaTitle: React.FC<StepMediaTitleProps> = ({
 
           {/* Petites vignettes + bouton ajout */}
           <View style={styles.thumbsCol}>
-            {photos.slice(1).map((uri, i) => (
+            {photos.slice(1).map((photo, i) => (
               <View key={i + 1} style={styles.smallThumbWrapper}>
-                <Image source={{ uri }} style={styles.smallThumb} contentFit="cover" transition={150} />
+                <Image source={{ uri: photo.uri }} style={styles.smallThumb} contentFit="cover" transition={150} />
                 <AppPressable haptic="none" onPress={() => handleRemove(i + 1)} style={styles.removeBtn}>
                   <Trash2 size={10} color={colors.text.inverse} />
                 </AppPressable>

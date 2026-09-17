@@ -8,6 +8,7 @@ import { systemSettingsService } from './systemSettingsService';
 const SELLER_RPC_ERRORS: Record<string, string> = {
   unauthorized: "Vous n'êtes pas autorisé à effectuer cette action sur cette commande.",
   order_not_found_or_unauthorized: 'Commande introuvable ou non rattachée à votre boutique.',
+  order_not_found: 'Commande introuvable ou non rattachée à votre boutique.',
   assignment_not_found: 'Aucune course rattachée à cette commande.',
   invalid_status: "Cette commande n'est plus dans un état permettant cette action.",
   locked: 'Trop de tentatives : la commande est passée en litige.',
@@ -103,7 +104,10 @@ export const ordersService = {
       reserve_fee: Math.round(breakdown.buyerServiceFee),
       total_amount: Math.round(breakdown.totalAmount),
       status: 'pending',
-      delivery_mode: payload.delivery_mode === 'pickup' ? 'pickup' : 'delivery',
+      // `pickup_point` est la valeur canonique, celle qu'ecrit le web. En ecrivant
+      // `pickup`, les commandes retrait creees sur mobile n'etaient reconnues que
+      // par le mobile. Les deux valeurs restent acceptees en lecture.
+      delivery_mode: payload.delivery_mode === 'pickup' ? 'pickup_point' : 'delivery',
       payment_method: payload.payment_method,
       delivery_address: fullAddress,
       delivery_lat: payload.delivery_lat || null,
@@ -235,7 +239,7 @@ export const ordersService = {
           reserve_fee: Math.round(breakdown.buyerServiceFee),
           total_amount: Math.round(breakdown.totalAmount),
           status: 'pending',
-          delivery_mode: opts.deliveryMode === 'pickup' ? 'pickup' : 'delivery',
+          delivery_mode: opts.deliveryMode === 'pickup' ? 'pickup_point' : 'delivery',
           payment_method: opts.paymentMethod,
           delivery_address: opts.fullAddress,
           delivery_lat: opts.deliveryLat || null,
@@ -402,6 +406,42 @@ export const ordersService = {
       .eq('id', orderId);
 
     if (error) throw error;
+  },
+
+  /**
+   * Vendeur : marque un colis payé à la livraison comme expédié.
+   *
+   * Contrepartie mobile de `SellerSection.handleDispatchCodOrder` du web. En COD il
+   * n'y a ni séquestre ni course coursier : le vendeur pilote lui-même le passage
+   * en `in_transit`, puis valide l'encaissement via `complete_pickup_order`.
+   */
+  async dispatchCodOrder(orderId: string): Promise<void> {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'in_transit' })
+      .eq('id', orderId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Vendeur : annule une commande faute de stock (« je n'ai plus le produit »).
+   *
+   * Contrepartie mobile de `SellerSection.handleCancelUnavailable` côté web.
+   * Elle manquait entièrement à l'app : un vendeur mobile n'avait aucun moyen de
+   * libérer une commande qu'il ne pouvait pas honorer. La RPC annule aussi la
+   * course rattachée, ce qu'un simple UPDATE sur `orders` ne fait pas.
+   */
+  async cancelOrderUnavailable(orderId: string): Promise<void> {
+    const { data, error } = await supabase.rpc('cancel_order_unavailable', {
+      p_order_id: orderId,
+    });
+    if (error) throw error;
+
+    const res = data as { success?: boolean; reason?: string; current_status?: string } | null;
+    if (res && res.success === false) {
+      throw new Error(SELLER_RPC_ERRORS[res.reason || ''] || res.reason || 'Annulation impossible.');
+    }
   },
 
   /**

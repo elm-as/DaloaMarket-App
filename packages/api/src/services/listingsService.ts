@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { decodeBase64ToArrayBuffer } from '../lib/base64';
 import { ListingFull, ListingFilters, ListingCreateInput, ListingVariant } from '@daloa/types';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -236,29 +237,62 @@ export const listingsService = {
   },
 
   /**
-   * Téléverse une photo vers Supabase Storage
+   * Téléverse une photo d'annonce vers Supabase Storage (bucket `listings`).
+   *
+   * `fetch(uri).blob()` ne fonctionne pas de façon fiable en React Native : sur une
+   * URI locale (`file://`, `content://`) le corps remonte vide ou tronqué, et rien
+   * n'atterrit dans le bucket. `authService.uploadAvatar` avait déjà été migré vers
+   * un ArrayBuffer pour cette raison ; on fait de même ici. Le `base64` fourni par
+   * `expo-image-picker` (`base64: true`) est le chemin nominal sur mobile ; le repli
+   * `fetch().blob()` ne sert plus qu'au web, où il est correct.
    */
-  async uploadImage(uri: string, folder = 'general'): Promise<string> {
-    try {
+  async uploadImage(
+    input: string | { uri: string; base64?: string | null; mimeType?: string | null },
+    folder = 'general'
+  ): Promise<string> {
+    const photo = typeof input === 'string' ? { uri: input } : input;
+    const uri = photo.uri;
+    const base64 = 'base64' in photo ? photo.base64 : null;
+
+    let contentType = ('mimeType' in photo && photo.mimeType) || '';
+    let body: ArrayBuffer | Blob;
+
+    if (base64) {
+      body = decodeBase64ToArrayBuffer(base64);
+      if (!contentType) {
+        contentType = uri.toLowerCase().endsWith('.png')
+          ? 'image/png'
+          : uri.toLowerCase().endsWith('.webp')
+          ? 'image/webp'
+          : 'image/jpeg';
+      }
+    } else {
       const response = await fetch(uri);
       const blob = await response.blob();
-      const contentType = blob.type || 'image/jpeg';
-      const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
-      const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-
-      const { data, error } = await supabase.storage.from('listings').upload(filename, blob, {
-        contentType,
-        upsert: false,
-      });
-
-      if (error) throw error;
-
-      const { data: publicUrlData } = supabase.storage.from('listings').getPublicUrl(data.path);
-      return publicUrlData.publicUrl;
-    } catch (err) {
-      console.error('Erreur upload image:', err);
-      throw err;
+      if (!blob.size) {
+        throw new Error(
+          "La photo n'a pas pu être lue sur l'appareil. Reprenez-la puis réessayez."
+        );
+      }
+      body = blob;
+      contentType = contentType || blob.type || 'image/jpeg';
     }
+
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+    const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+    const { data, error } = await supabase.storage.from('listings').upload(filename, body, {
+      contentType,
+      upsert: false,
+    });
+
+    if (error) {
+      console.error('Erreur upload image:', error);
+      throw error;
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('listings').getPublicUrl(data.path);
+    return publicUrlData.publicUrl;
   },
 
   /**
@@ -284,26 +318,75 @@ export const listingsService = {
   },
 
   /**
-   * Marque une annonce comme vendue
+   * Marque une annonce comme vendue.
+   *
+   * Passe par la RPC : `listings.status` est protégé contre les écritures directes
+   * des clients (`protect_listings_columns`), un `.update()` ne changeait rien tout
+   * en ne renvoyant aucune erreur.
    */
   async markListingAsSold(listingId: string): Promise<void> {
-    const { error } = await supabase
-      .from('listings')
-      .update({ status: 'sold' })
-      .eq('id', listingId);
+    const { data, error } = await supabase.rpc('mark_listing_as_sold', {
+      p_listing_id: listingId,
+    });
 
     if (error) throw error;
+    if (data && data.success === false) {
+      throw new Error(data.reason || 'Impossible de marquer cette annonce comme vendue.');
+    }
   },
 
   /**
    * Remet en vente une annonce précédemment vendue
    */
-  async markListingAsActive(listingId: string): Promise<void> {
-    const { error } = await supabase
-      .from('listings')
-      .update({ status: 'active' })
-      .eq('id', listingId);
+  /**
+   * Remet une annonce en vente.
+   *
+   * Le stock est obligatoire : le trigger `manage_listing_stock_on_order` met
+   * `stock` à 0 en même temps qu'il passe l'annonce en `sold`. Repasser le seul
+   * `status` à `active` laissait l'annonce visible dans le fil, ajoutable au panier,
+   * puis éjectée en « rupture de stock » à l'ouverture du panier.
+   *
+   * Passe par une RPC pour la même raison que `markListingAsSold` : `status` est
+   * protégé côté base. Le serveur recalcule le stock total depuis les variantes.
+   *
+   * `variantStocks` est indexé par `variant.id`, ou par la position de la variante
+   * quand l'id est absent — la feuille de restock construit sa clé de la même façon.
+   */
+  async markListingAsActive(
+    listingId: string,
+    stock: number,
+    variantStocks?: Record<string, number>
+  ): Promise<void> {
+    let variants: ListingVariant[] | null = null;
+
+    if (variantStocks && Object.keys(variantStocks).length > 0) {
+      const { data: current, error: readErr } = await supabase
+        .from('listings')
+        .select('variants')
+        .eq('id', listingId)
+        .single();
+
+      if (readErr) throw readErr;
+
+      variants = ((current?.variants as ListingVariant[]) || []).map((v, i) => ({
+        ...v,
+        stock: variantStocks[v.id ?? String(i)] ?? v.stock ?? 0,
+      }));
+    }
+
+    const { data, error } = await supabase.rpc('relist_listing', {
+      p_listing_id: listingId,
+      p_stock: Math.max(1, Math.floor(stock || 0)),
+      p_variants: variants,
+    });
 
     if (error) throw error;
+    if (data && data.success === false) {
+      throw new Error(
+        data.reason === 'stock_required'
+          ? 'Indiquez au moins une unité en stock.'
+          : data.reason || 'Remise en vente impossible.'
+      );
+    }
   },
 };

@@ -1,25 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '@daloa/api';
 import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import {
-  ArrowLeft,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Smartphone,
-  Check,
-} from 'lucide-react-native';
+import { ArrowLeft, ShieldCheck, CheckCircle2, AlertCircle, Smartphone, Check } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';

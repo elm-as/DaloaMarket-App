@@ -11,7 +11,11 @@ export type StatusPillType =
   | 'delivered'
   | 'disputed'
   | 'cancelled'
-  | 'paid';
+  | 'pending'
+  | 'paid'
+  | 'completed'
+  | 'auto_released'
+  | 'pending_seller_confirmation';
 
 export interface StatusPillProps {
   status: StatusPillType | string;
@@ -24,6 +28,8 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, size = 'm
   const getStatusConfig = () => {
     switch (status) {
       case 'delivered':
+      case 'completed':
+      case 'auto_released':
         return {
           bg: colors.status.successLight,
           text: colors.status.successDark,
@@ -52,11 +58,29 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, size = 'm
           defaultLabel: 'En attente ramassage',
           dotColor: colors.primary[600],
         };
+      // `pending` est la valeur reellement ecrite dans `orders.status` ;
+      // `pending_payment` n'existe dans aucun chemin d'ecriture mais reste accepte
+      // pour les anciens appels.
+      case 'pending':
       case 'pending_payment':
         return {
           bg: colors.status.warningLight,
           text: colors.status.warningDark,
           defaultLabel: 'Paiement en attente',
+          dotColor: colors.status.warning,
+        };
+      case 'paid':
+        return {
+          bg: colors.status.infoLight,
+          text: colors.status.infoDark,
+          defaultLabel: 'Paiement securise',
+          dotColor: colors.status.info,
+        };
+      case 'pending_seller_confirmation':
+        return {
+          bg: colors.status.warningLight,
+          text: colors.status.warningDark,
+          defaultLabel: 'En attente du vendeur',
           dotColor: colors.status.warning,
         };
       case 'disputed':
@@ -74,10 +98,11 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, size = 'm
           dotColor: colors.grey[400],
         };
       default:
+        // Ne jamais afficher le code brut : un statut inconnu reste lisible.
         return {
           bg: colors.bg.subtle,
           text: colors.text.body,
-          defaultLabel: status,
+          defaultLabel: 'En cours',
           dotColor: colors.grey[400],
         };
     }

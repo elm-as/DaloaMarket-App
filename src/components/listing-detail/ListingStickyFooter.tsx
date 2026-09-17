@@ -16,6 +16,8 @@ interface ListingStickyFooterProps {
   isOwner?: boolean;
   onEditListing?: () => void;
   onManageListing?: () => void;
+  /** `null` = achetable ; sinon l'annonce est vendue ou épuisée. */
+  unavailableReason?: 'sold' | 'out_of_stock' | null;
 }
 
 export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
@@ -30,6 +32,7 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
   isOwner = false,
   onEditListing,
   onManageListing,
+  unavailableReason = null,
 }) => {
   const insets = useSafeAreaInsets();
   const accent = useAccent();
@@ -73,6 +76,23 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
               Modifier
             </AppText>
           </AppPressable>
+        </View>
+      </View>
+    );
+  }
+
+  // La barre d'achat restait active sur une annonce à stock 0 : l'article partait
+  // au panier puis en était éjecté en « rupture de stock » à l'ouverture.
+  if (unavailableReason) {
+    return (
+      <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing[3]) }]}>
+        <View style={styles.unavailableBox}>
+          <Lock size={16} color={colors.text.muted} />
+          <AppText variant="bodyStrong" color={colors.text.muted}>
+            {unavailableReason === 'sold'
+              ? 'Article vendu — indisponible'
+              : 'Article épuisé pour le moment'}
+          </AppText>
         </View>
       </View>
     );
@@ -190,6 +210,15 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
 };
 
 const styles = StyleSheet.create({
+  unavailableBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[4],
+    borderRadius: radii.xl,
+    backgroundColor: colors.bg.subtle,
+  },
   bar: {
     paddingHorizontal: spacing[3],
     paddingTop: spacing[2],

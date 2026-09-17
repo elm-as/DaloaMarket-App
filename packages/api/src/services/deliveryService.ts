@@ -131,21 +131,14 @@ export const deliveryService = {
       p_delivery_person_id: driverId,
     });
 
-    if (error) {
-      // Fallback si la RPC n'est pas encore migrée sur l'instance Supabase
-      const { error: updateError } = await supabase
-        .from('delivery_assignments')
-        .update({
-          delivery_person_id: driverId,
-          status: 'accepted',
-          accepted_at: new Date().toISOString(),
-        })
-        .eq('id', assignmentId)
-        .is('delivery_person_id', null);
-
-      if (updateError) throw updateError;
-      return;
-    }
+    // Le repli qui existait ici a été retiré volontairement.
+    // Il rejouait l'acceptation par un UPDATE direct filtré sur
+    // `.is('delivery_person_id', null)` : aucune policy RLS UPDATE ne couvre une
+    // ligne sans livreur assigné, donc PostgREST renvoyait 0 ligne modifiée *sans
+    // erreur*. La promesse résolvait, l'app naviguait vers l'écran de course, et
+    // la course restait en réalité disponible pour tout le monde.
+    // `accept_delivery_assignment` est désormais le seul chemin.
+    if (error) throw error;
 
     if (data && typeof data === 'object' && 'success' in (data as any) && !(data as any).success) {
       throw new Error((data as any).reason || 'Cette course a déjà été acceptée par un autre livreur.');

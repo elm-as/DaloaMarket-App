@@ -8,6 +8,7 @@ import { supabase, listingsService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { safeBack } from '../../src/utils/navigation';
 import { SellerListingCard } from '../../src/components/seller/SellerListingCard';
+import { RestockSheet } from '../../src/components/seller/RestockSheet';
 
 export default function MyListingsScreen() {
   const router = useRouter();
@@ -59,10 +60,18 @@ export default function MyListingsScreen() {
     () => listings.filter((l) => l.status === 'active').length,
     [listings]
   );
-  const soldCount = useMemo(
-    () => listings.filter((l) => l.status === 'sold').length,
-    [listings]
-  );
+  // Compteur de ventes lu dans `orders` : adossé à `listings.status`, il baissait
+  // dès qu'une annonce vendue était remise en vente après restock.
+  const [soldCount, setSoldCount] = useState(0);
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('seller_id', user.id)
+      .in('status', ['delivered', 'completed'])
+      .then(({ count }) => setSoldCount(count || 0));
+  }, [user?.id]);
 
   const displayedListings = useMemo(() => {
     let list = listings.filter((l) =>
@@ -85,8 +94,6 @@ export default function MyListingsScreen() {
       setIsActionLoading(true);
       if (confirmAction === 'sell') {
         await listingsService.markListingAsSold(targetListing.id);
-      } else if (confirmAction === 'reactivate') {
-        await listingsService.markListingAsActive(targetListing.id);
       } else if (confirmAction === 'delete') {
         await listingsService.deleteListing(targetListing.id);
       }
@@ -96,6 +103,22 @@ export default function MyListingsScreen() {
       await fetchMyListings();
     } catch (err) {
       console.warn('Erreur exécution action annonce:', err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRestock = async (stock: number, variantStocks?: Record<string, number>) => {
+    if (!targetListing) return;
+    try {
+      setIsActionLoading(true);
+      await listingsService.markListingAsActive(targetListing.id, stock, variantStocks);
+      Haptics.success();
+      setConfirmAction(null);
+      setTargetListing(null);
+      await fetchMyListings();
+    } catch (err) {
+      console.warn('Erreur remise en vente:', err);
     } finally {
       setIsActionLoading(false);
     }
@@ -227,16 +250,13 @@ export default function MyListingsScreen() {
         }}
       />
 
-      {/* Modale confirmation Remettre en vente */}
-      <ConfirmDialog
+      {/* Remettre en vente : on demande le stock, sinon l'annonce revient a 0 */}
+      <RestockSheet
         visible={confirmAction === 'reactivate'}
-        type="info"
-        title="Remettre en vente"
-        message={`Voulez-vous réactiver "${targetListing?.title}" dans le catalogue DaloaMarket ?`}
-        confirmText="Remettre en vente"
-        cancelText="Annuler"
+        listingTitle={targetListing?.title}
+        variants={targetListing?.variants}
         isLoading={isActionLoading}
-        onConfirm={handleExecuteAction}
+        onConfirm={handleRestock}
         onCancel={() => {
           setConfirmAction(null);
           setTargetListing(null);
@@ -278,13 +298,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
-  backBtn: {
-    padding: spacing[1],
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-  },
+  backBtn: { padding: spacing[1] },
+  headerTitle: { flex: 1, textAlign: 'center' },
   createBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,9 +308,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: radii.full,
   },
-  createBtnText: {
-    fontFamily: typography.families.bold,
-  },
+  createBtnText: { fontFamily: typography.families.bold },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,11 +322,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.text.DEFAULT,
-  },
+  searchInput: { flex: 1, fontSize: 13, color: colors.text.DEFAULT },
   tabsRow: {
     flexDirection: 'row',
     backgroundColor: colors.bg.surface,
@@ -321,17 +330,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border.subtle,
     marginTop: spacing[3],
   },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing[3],
-  },
-  loadingList: {
-    padding: spacing[4],
-    gap: spacing[3],
-  },
-  listContent: {
-    padding: spacing[4],
-    gap: spacing[3],
-  },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: spacing[3] },
+  loadingList: { padding: spacing[4], gap: spacing[3] },
+  listContent: { padding: spacing[4], gap: spacing[3] },
 });

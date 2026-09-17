@@ -1,12 +1,12 @@
 import { supabase } from '../supabase';
 import { Coordinates } from '@daloa/types';
-import { isWithinOtpProximity } from '@daloa/utils';
 
 export interface VerifyPickupParams {
   assignmentId: string;
   enteredOtp: string;
   photoUrl: string;
   driverCoords: Coordinates;
+  /** @deprecated N'est plus utilisé : le contrôle de proximité GPS a été retiré. */
   targetCoords?: Coordinates | null;
 }
 
@@ -15,6 +15,7 @@ export interface VerifyDeliveryParams {
   enteredOtp: string;
   photoUrl: string;
   driverCoords: Coordinates;
+  /** @deprecated N'est plus utilisé : le contrôle de proximité GPS a été retiré. */
   targetCoords?: Coordinates | null;
 }
 
@@ -33,19 +34,12 @@ export const deliveryVerificationService = {
   async verifyPickup(params: VerifyPickupParams): Promise<VerificationResult> {
     const trimmedOtp = params.enteredOtp.trim();
 
-    // 1. Validation GPS bloquante côté client si les coordonnées cibles sont fournies
-    let distanceMeters: number | null = null;
-    if (params.targetCoords) {
-      const prox = isWithinOtpProximity(params.driverCoords, params.targetCoords);
-      if (!prox.isWithin) {
-        throw new Error(
-          `Distance GPS excessive (${prox.distanceMeters}m). Rapprochez-vous à moins de 100m du vendeur pour valider.`
-        );
-      }
-      distanceMeters = prox.distanceMeters;
-    }
+    // Le blocage GPS client (100 m) a été retiré : il était plus strict que le
+    // serveur et refusait des ramassages légitimes dès que les coordonnées de la
+    // boutique étaient approximatives. L'OTP vendeur est la preuve de présence.
+    // Les coordonnées restent transmises à la RPC, qui les archive.
 
-    // 2. Tentative via fonction RPC Postgres atomique
+    // Tentative via fonction RPC Postgres atomique
     try {
       const { data: rpcData, error: rpcError } = await supabase.rpc('verify_pickup', {
         p_assignment_id: params.assignmentId,
@@ -107,20 +101,11 @@ export const deliveryVerificationService = {
   async verifyDelivery(params: VerifyDeliveryParams): Promise<VerificationResult> {
     const trimmedOtp = params.enteredOtp.trim();
 
-    // 1. Validation GPS bloquante côté client si les coordonnées cibles sont fournies
-    let distanceMeters: number | null = null;
-    if (params.targetCoords) {
-      const prox = isWithinOtpProximity(params.driverCoords, params.targetCoords);
-      if (!prox.isWithin) {
-        throw new Error(
-          `Distance GPS excessive (${prox.distanceMeters}m). Rapprochez-vous à moins de 100m de l'acheteur pour valider.`
-        );
-      }
-      distanceMeters = prox.distanceMeters;
-    }
+    // Blocage GPS client retiré, comme pour le ramassage : c'est l'OTP acheteur
+    // qui atteste la remise. La distance est archivée côté serveur pour l'audit.
 
-    // 2. Tentative via fonction RPC Postgres atomique
-    try {
+    // Tentative via fonction RPC Postgres atomique
+    {
       const { data: rpcData, error: rpcError } = await supabase.rpc('verify_delivery', {
         p_assignment_id: params.assignmentId,
         p_otp: trimmedOtp,
@@ -155,94 +140,41 @@ export const deliveryVerificationService = {
           message: 'Livraison validée avec succès ! Les fonds sont débloqués.',
         };
       }
-    } catch (rpcErr: any) {
-      if (rpcErr.message && !rpcErr.message.includes('function') && !rpcErr.message.includes('schema')) {
-        throw rpcErr;
-      }
-      console.warn('RPC verify_delivery non disponible, exécution du contrôle sécurisé:', rpcErr);
+
+      // Erreur transport/permission : on remonte, on ne contourne pas.
+      if (rpcError) throw rpcError;
+      throw new Error('Réponse inattendue du serveur lors de la vérification de la livraison.');
     }
 
-    // 3. Fallback sécurisé en cas d'indisponibilité de la fonction RPC
-    const { data: assignment, error } = await supabase
-      .from('delivery_assignments')
-      .select('delivery_otp, delivery_otp_attempts, order_id')
-      .eq('id', params.assignmentId)
-      .single();
-
-    if (error || !assignment) {
-      throw new Error('Assignation de livraison introuvable');
-    }
-
-    if (assignment.delivery_otp.trim() !== trimmedOtp) {
-      const nextAttempts = (assignment.delivery_otp_attempts || 0) + 1;
-      const isLocked = nextAttempts >= 3;
-
-      await supabase
-        .from('delivery_assignments')
-        .update({
-          delivery_otp_attempts: nextAttempts,
-          ...(isLocked
-            ? { status: 'disputed', dispute_reason: 'too_many_otp_attempts', disputed_at: new Date().toISOString() }
-            : {}),
-        })
-        .eq('id', params.assignmentId);
-
-      if (isLocked) {
-        throw new Error('Nombre maximal d’essais dépassé. La course est passée en litige.');
-      }
-      throw new Error(`Code OTP Client incorrect (${nextAttempts}/3). Demandez le code à l’acheteur.`);
-    }
-
-    const { error: updateErr } = await supabase
-      .from('delivery_assignments')
-      .update({
-        status: 'delivered',
-        delivered_at: new Date().toISOString(),
-        delivery_photo_url: params.photoUrl,
-        delivery_gps: params.driverCoords,
-        delivery_gps_distance_m: distanceMeters,
-      })
-      .eq('id', params.assignmentId);
-
-    if (updateErr) throw updateErr;
-
-    // Mise à jour de la commande
-    await supabase
-      .from('orders')
-      .update({ status: 'delivered' })
-      .eq('id', assignment.order_id);
-
-    return {
-      success: true,
-      message: 'Livraison validée avec succès ! Les fonds sont débloqués.',
-    };
+    // Le repli qui existait ici a été retiré volontairement, pour les mêmes raisons
+    // que celui de `verifyPickup`, plus une troisième :
+    //  1. il lisait `delivery_otp` en base puis comparait le code en JavaScript. Le
+    //     livreur, qui a accès à la ligne via RLS, pouvait donc lire le code attendu
+    //     et valider une livraison sans jamais voir l'acheteur ;
+    //  2. il s'activait silencieusement sur une simple erreur de permission ;
+    //  3. il écrivait `status = 'delivered'` en direct, court-circuitant
+    //     `create_seller_payout`, `create_delivery_payout` et `record_cod_receivable` :
+    //     la course passait « livrée » sans qu'aucun virement ne soit programmé.
+    // `verify_delivery` contrôle l'identité de l'appelant, l'OTP, les tentatives, et
+    // déclenche les virements : elle est désormais le seul chemin.
   },
 
   /**
    * Signale un incident / litige sur une livraison
    */
   async reportIncident(assignmentId: string, reason: string): Promise<void> {
-    try {
-      const { data, error } = await supabase.rpc('report_delivery_dispute', {
-        p_assignment_id: assignmentId,
-        p_reason: reason,
-      });
-      if (!error && data?.success) {
-        return;
-      }
-    } catch {
-      // Poursuivre avec la mise à jour directe si RPC indisponible
-    }
-
-    const { error } = await supabase
-      .from('delivery_assignments')
-      .update({
-        status: 'disputed',
-        dispute_reason: reason,
-        disputed_at: new Date().toISOString(),
-      })
-      .eq('id', assignmentId);
+    // Pas de repli en UPDATE direct : `delivery_assignments` refuse les écritures
+    // directes sur `status` (trigger `protect_delivery_assignments_columns`), donc
+    // le repli ne modifiait rien tout en signalant un succès. La RPC bascule aussi
+    // la commande en litige, ce que l'UPDATE ne faisait pas.
+    const { data, error } = await supabase.rpc('report_delivery_dispute', {
+      p_assignment_id: assignmentId,
+      p_reason: reason,
+    });
 
     if (error) throw error;
+    if (data && !data.success) {
+      throw new Error(data.reason || 'Signalement du litige refusé par le serveur.');
+    }
   },
 };

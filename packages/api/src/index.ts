@@ -1,4 +1,5 @@
 export * from './supabase';
+export * from './lib/base64';
 export * from './services/authService';
 export * from './services/listingsService';
 export * from './services/ordersService';

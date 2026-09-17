@@ -27,30 +27,39 @@ import {
   PartyPopper,
   MapPin,
   ShieldCheck,
+  Store,
 } from 'lucide-react-native';
-import { formatDate, formatFCFA, Haptics } from '@daloa/utils';
+import { formatDate, formatFCFA, Haptics, isPickupMode } from '@daloa/utils';
 
 /* ─── helpers ─────────────────────────────────────────────────────── */
 
+/**
+ * Libellés alignés sur la contrainte CHECK de `orders.status` :
+ * pending | paid | in_transit | delivered | completed | cancelled | disputed.
+ *
+ * Les `case` précédents portaient sur `pending_payment`, `paid_escrow`,
+ * `awaiting_pickup`, `picked_up` — des valeurs qui ne sont écrites nulle part
+ * (`awaiting_pickup` et `picked_up` appartiennent à `delivery_assignments`).
+ * Résultat : les deux statuts les plus fréquents, `pending` et `paid`, tombaient
+ * sur le `default` et s'affichaient en anglais brut.
+ */
 function getStatusMeta(status: string, accent: any) {
   switch (status) {
-    case 'pending_payment':
+    case 'pending':
       return {
         label: 'En attente de paiement',
         bg: colors.status.warningLight,
         text: colors.status.warningDark,
         border: colors.status.warningBorder,
       };
-    case 'paid_escrow':
-    case 'awaiting_pickup':
+    case 'paid':
       return {
-        label: 'Séquestre payé',
+        label: 'Paiement sécurisé',
         bg: colors.status.infoLight,
         text: colors.status.infoDark,
         border: colors.status.infoBorder,
       };
     case 'in_transit':
-    case 'picked_up':
       return {
         label: 'En livraison',
         bg: accent[50],
@@ -58,11 +67,19 @@ function getStatusMeta(status: string, accent: any) {
         border: accent[200],
       };
     case 'delivered':
+    case 'completed':
       return {
-        label: 'Livré',
+        label: 'Livrée',
         bg: colors.status.successLight,
         text: colors.status.successDark,
         border: colors.status.successBorder,
+      };
+    case 'disputed':
+      return {
+        label: 'Litige en cours',
+        bg: colors.status.warningLight,
+        text: colors.status.warningDark,
+        border: colors.status.warningBorder,
       };
     case 'cancelled':
       return {
@@ -72,7 +89,12 @@ function getStatusMeta(status: string, accent: any) {
         border: colors.status.errorBorder,
       };
     default:
-      return { label: status, bg: colors.bg.subtle, text: colors.text.body, border: colors.border.DEFAULT };
+      return {
+        label: 'En cours',
+        bg: colors.bg.subtle,
+        text: colors.text.body,
+        border: colors.border.DEFAULT,
+      };
   }
 }
 
@@ -212,6 +234,76 @@ export default function OrderTrackingScreen() {
     }
   };
 
+  /** Pendant mobile de `SellerSection.handleDispatchCodOrder` du web (scénario COD). */
+  const handleDispatchCod = async () => {
+    try {
+      setIsSellerActing(true);
+      await ordersService.dispatchCodOrder(order!.id);
+      Haptics.success();
+      refetch();
+      showAlert('Colis expédié', "L'acheteur est informé que sa commande est en route.");
+    } catch (err: any) {
+      showAlert('Erreur', err.message || 'Mise à jour impossible.');
+    } finally {
+      setIsSellerActing(false);
+    }
+  };
+
+  /** Pendant mobile de `SellerSection.handleConfirmDirectHandover` du web (encaissement COD). */
+  const handleConfirmCodHandover = () => {
+    showAlert(
+      'Confirmer la remise ?',
+      `Confirmez-vous avoir remis le colis et encaissé ${formatFCFA(order!.total_amount)} ?`,
+      [
+        { text: 'Pas encore', style: 'cancel' },
+        {
+          text: 'Oui, encaissé',
+          onPress: async () => {
+            try {
+              setIsSellerActing(true);
+              await ordersService.completePickupOrder(order!.id);
+              Haptics.success();
+              refetch();
+              showAlert('Commande clôturée', 'La livraison et l’encaissement sont validés.');
+            } catch (err: any) {
+              showAlert('Erreur', err.message || 'Validation impossible.');
+            } finally {
+              setIsSellerActing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /** Pendant mobile de `SellerSection.handleCancelUnavailable` du web. */
+  const handleCancelUnavailable = () => {
+    showAlert(
+      "Annuler la commande ?",
+      "Prévenez l'acheteur : la commande sera annulée et la course libérée. Les annulations répétées pénalisent votre boutique.",
+      [
+        { text: 'Retour', style: 'cancel' },
+        {
+          text: "Je n'ai plus l'article",
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsSellerActing(true);
+              await ordersService.cancelOrderUnavailable(order!.id);
+              Haptics.warning();
+              refetch();
+              showAlert('Commande annulée', "L'acheteur a été informé et sera remboursé.");
+            } catch (err: any) {
+              showAlert('Erreur', err.message || 'Annulation impossible.');
+            } finally {
+              setIsSellerActing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleCompletePickup = async (withOtp: boolean) => {
     if (withOtp && enteredPickupOtp.trim().length < 4) {
       showAlert('Code incomplet', "Saisissez le code communiqué par l'acheteur.");
@@ -318,43 +410,106 @@ export default function OrderTrackingScreen() {
   const photoUrl = listing?.photos?.[0];
 
   /* Timeline steps */
-  const steps = [
-    {
-      key: 'paid',
-      label: 'Commande payée',
-      sub: 'Montant mis en séquestre sécurisé',
-      icon: CreditCard,
-      done: order.status !== 'pending_payment',
-    },
-    {
-      key: 'assigned',
-      label: 'Livreur assigné',
-      sub: 'DaloaDelivery prend en charge la commande',
-      icon: Bike,
-      done: Boolean(assignment?.delivery_person_id),
-    },
-    {
-      key: 'picked_up',
-      label: 'Colis récupéré',
-      sub: 'Le livreur a pris le colis chez le vendeur',
-      icon: Package,
-      done: ['picked_up', 'in_transit', 'delivered'].includes(assignment?.status ?? ''),
-    },
-    {
-      key: 'in_transit',
-      label: 'En acheminement',
-      sub: 'En route vers votre adresse de livraison',
-      icon: Truck,
-      done: ['in_transit', 'delivered'].includes(assignment?.status ?? ''),
-    },
-    {
-      key: 'delivered',
-      label: 'Livré & validé',
-      sub: 'Fonds débloqués vers le vendeur',
-      icon: PartyPopper,
-      done: order.status === 'delivered',
-    },
-  ];
+  /*
+   * Trois parcours distincts, comme sur le web (`OrderStatusTimeline`) :
+   * retrait en boutique, livraison payée à l'avance, livraison payée à la remise.
+   * Le même tableau servait auparavant à tous les modes, si bien qu'un retrait en
+   * boutique affichait « Livreur assigné » et « En acheminement » — des étapes qui
+   * n'arrivent jamais sans coursier. Le premier jalon parlait aussi de séquestre y
+   * compris pour des commandes qui n'en ont aucun.
+   */
+  const isPickup = isPickupMode(order.delivery_mode);
+  const isCod = order.payment_method === 'cod';
+  const isCashAtShop = order.payment_method === 'cash_at_shop';
+  const isDelivered = order.status === 'delivered' || order.status === 'completed';
+  // Aucun séquestre en COD ni en paiement boutique : afficher « séquestré » y était trompeur.
+  const amountLabel =
+    isCod || isCashAtShop ? 'Montant à régler' : 'Montant total séquestré';
+  const sellerConfirmed =
+    Boolean(assignment?.pickup_confirmed_by_seller) ||
+    !['pending_seller_confirmation', 'pending'].includes(assignment?.status ?? '');
+
+  const steps = isPickup
+    ? [
+        {
+          key: 'reserved',
+          label: 'Réservation enregistrée',
+          sub: isCashAtShop
+            ? 'Vous réglerez directement en boutique'
+            : 'Montant mis en séquestre sécurisé',
+          icon: CreditCard,
+          done: true,
+        },
+        {
+          key: 'seller_confirmed',
+          label: 'Article mis de côté',
+          sub: 'Le vendeur a confirmé la disponibilité',
+          icon: Package,
+          done: sellerConfirmed || order.status !== 'pending',
+        },
+        {
+          key: 'ready_pickup',
+          label: 'Prêt pour le retrait',
+          sub: 'Rendez-vous en boutique avec votre code',
+          icon: Store,
+          done: sellerConfirmed || order.status !== 'pending',
+        },
+        {
+          key: 'delivered',
+          label: 'Article retiré',
+          sub: isCashAtShop
+            ? 'Paiement encaissé en boutique'
+            : 'Fonds débloqués vers le vendeur',
+          icon: PartyPopper,
+          done: isDelivered,
+        },
+      ]
+    : [
+        {
+          key: 'paid',
+          label: isCod ? 'Commande enregistrée' : 'Commande payée',
+          sub: isCod
+            ? 'Vous réglerez à la remise du colis'
+            : 'Montant mis en séquestre sécurisé',
+          icon: CreditCard,
+          done: true,
+        },
+        {
+          key: 'seller_confirmed',
+          label: 'Vendeur prêt',
+          sub: 'Le colis est préparé et disponible',
+          icon: Package,
+          done: sellerConfirmed || ['in_transit', 'delivered', 'completed'].includes(order.status),
+        },
+        ...(isCod
+          ? []
+          : [
+              {
+                key: 'assigned',
+                label: 'Livreur assigné',
+                sub: 'Un coursier a accepté la course',
+                icon: Bike,
+                done: Boolean(assignment?.delivery_person_id),
+              },
+            ]),
+        {
+          key: 'in_transit',
+          label: 'En acheminement',
+          sub: 'En route vers votre adresse de livraison',
+          icon: Truck,
+          // `verify_pickup` écrit `in_transit`, jamais `picked_up`.
+          done:
+            ['picked_up', 'in_transit', 'delivered'].includes(assignment?.status ?? '') ||
+            ['in_transit', 'delivered', 'completed'].includes(order.status),
+        },
+        {
+          key: 'delivered',
+          label: isCod ? 'Livré & encaissé' : 'Livré & validé',
+          sub: isCod ? 'Paiement remis au livreur' : 'Fonds débloqués vers le vendeur',
+          icon: PartyPopper,
+          done: isDelivered,
+        },
+      ];
 
   const firstPendingIdx = steps.findIndex((s) => !s.done);
 
@@ -406,7 +561,7 @@ export default function OrderTrackingScreen() {
 
         {/* Total */}
         <View style={styles.heroTotal}>
-          <AppText variant="caption" color={accent[100]}>Montant total séquestré</AppText>
+          <AppText variant="caption" color={accent[100]}>{amountLabel}</AppText>
           <AppText variant="h2" color={colors.text.inverse} style={styles.tnum}>
             {formatFCFA(order.total_amount)}
           </AppText>
@@ -476,6 +631,8 @@ export default function OrderTrackingScreen() {
 
         {/* ── Actions vendeur : confirmation de disponibilité ── */}
         {isSeller &&
+          !isPickup &&
+          !isCod &&
           (assignment?.status === 'pending_seller_confirmation' ||
             assignment?.status === 'pending') && (
             <View style={styles.sellerActionCard}>
@@ -499,12 +656,70 @@ export default function OrderTrackingScreen() {
                 fullWidth
                 style={styles.verifyBtn}
               />
+              <Button
+                title="Je n'ai plus le produit — annuler"
+                variant="ghost"
+                size="sm"
+                disabled={isSellerActing}
+                onPress={handleCancelUnavailable}
+                fullWidth
+              />
+            </View>
+          )}
+
+        {/* ── Actions vendeur : paiement à la livraison (aucun séquestre, aucun coursier) ── */}
+        {isSeller &&
+          !isPickup &&
+          isCod &&
+          ['pending', 'paid', 'in_transit'].includes(order.status) && (
+            <View style={styles.sellerActionCard}>
+              <View style={styles.sellerActionHeader}>
+                <Truck size={18} color={accent[600]} />
+                <AppText variant="bodyStrong" color={accent[700]}>
+                  Paiement à la livraison
+                </AppText>
+              </View>
+              <AppText variant="caption" color={colors.text.muted}>
+                Préparez le colis pour {order.delivery_address || 'Daloa'} et encaissez{' '}
+                {formatFCFA(order.total_amount)} au moment de la remise.
+              </AppText>
+              {order.status === 'in_transit' ? (
+                <Button
+                  title={`Confirmer la remise & l'encaissement`}
+                  variant="success"
+                  size="md"
+                  loading={isSellerActing}
+                  onPress={handleConfirmCodHandover}
+                  leftIcon={<CheckCircle2 size={16} color={colors.text.inverse} />}
+                  fullWidth
+                  style={styles.verifyBtn}
+                />
+              ) : (
+                <Button
+                  title="Marquer le colis comme expédié"
+                  variant="market"
+                  size="md"
+                  loading={isSellerActing}
+                  onPress={handleDispatchCod}
+                  leftIcon={<Package size={16} color={colors.text.inverse} />}
+                  fullWidth
+                  style={styles.verifyBtn}
+                />
+              )}
+              <Button
+                title="Je n'ai plus le produit — annuler"
+                variant="ghost"
+                size="sm"
+                disabled={isSellerActing}
+                onPress={handleCancelUnavailable}
+                fullWidth
+              />
             </View>
           )}
 
         {/* ── Actions vendeur : validation du retrait en boutique ── */}
         {isSeller &&
-          order.delivery_mode === 'pickup' &&
+          isPickupMode(order.delivery_mode) &&
           order.status !== 'delivered' &&
           order.status !== 'cancelled' && (
             <View style={styles.sellerActionCard}>
@@ -750,7 +965,7 @@ export default function OrderTrackingScreen() {
           <SummaryRow label="Livraison à" value={order.delivery_address || '—'} />
           <View style={styles.divider} />
           <View style={styles.totalRow}>
-            <AppText variant="bodyStrong">Total séquestré</AppText>
+            <AppText variant="bodyStrong">{amountLabel}</AppText>
             <AppText variant="h2" color={accent[600]} style={styles.tnum}>
               {formatFCFA(order.total_amount)}
             </AppText>
@@ -759,8 +974,8 @@ export default function OrderTrackingScreen() {
 
         {/* ── Annulation acheteur (si le colis n'est pas encore ramassé) ── */}
         {!isSeller &&
-          ['pending', 'pending_payment', 'awaiting_pickup', 'paid_escrow'].includes(order.status) &&
-          !['picked_up', 'in_transit', 'delivered'].includes(assignment?.status ?? '') && (
+          !['cancelled', 'delivered', 'completed', 'disputed'].includes(order.status) &&
+          !['picked_up', 'in_transit', 'delivered', 'auto_released'].includes(assignment?.status ?? '') && (
             <AppPressable
               onPress={handleCancelOrder}
               disabled={isSubmitting}

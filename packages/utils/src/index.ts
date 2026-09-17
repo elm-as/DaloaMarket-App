@@ -4,3 +4,5 @@ export * from './validators';
 export * from './haptics';
 export * from './storage';
 export * from './censor';
+export * from './availability';
+export * from './media';

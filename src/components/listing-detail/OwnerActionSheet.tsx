@@ -6,6 +6,7 @@ import { Edit3, CheckCircle2, RotateCcw, Trash2, ExternalLink } from 'lucide-rea
 import { BottomSheet, ConfirmDialog, AppText, AppPressable, colors, radii, spacing, useAccent } from '@daloa/ui';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { listingsService } from '@daloa/api';
+import { RestockSheet, type RestockVariant } from '../seller/RestockSheet';
 
 export interface OwnerActionListing {
   id: string;
@@ -13,6 +14,8 @@ export interface OwnerActionListing {
   price: number;
   status?: string;
   photos?: string[];
+  /** Nécessaire pour demander le restock par option lors d'une remise en vente. */
+  variants?: RestockVariant[] | null;
 }
 
 interface OwnerActionSheetProps {
@@ -37,6 +40,7 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [showRestock, setShowRestock] = useState(false);
 
   if (!listing) return null;
 
@@ -49,18 +53,35 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
   };
 
   const handleToggleStatus = async () => {
+    // Remettre en vente exige une quantité : réactiver sans restock laissait
+    // `stock` à 0 et l'annonce se faisait éjecter du panier des acheteurs.
+    if (isSold) {
+      setShowRestock(true);
+      return;
+    }
     try {
       setIsUpdatingStatus(true);
-      if (isSold) {
-        await listingsService.markListingAsActive(listing.id);
-      } else {
-        await listingsService.markListingAsSold(listing.id);
-      }
+      await listingsService.markListingAsSold(listing.id);
       Haptics.success();
       onListingUpdated?.();
       onClose();
     } catch (err) {
       console.warn('Erreur mise à jour statut:', err);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleRestock = async (stock: number, variantStocks?: Record<string, number>) => {
+    try {
+      setIsUpdatingStatus(true);
+      await listingsService.markListingAsActive(listing.id, stock, variantStocks);
+      Haptics.success();
+      setShowRestock(false);
+      onListingUpdated?.();
+      onClose();
+    } catch (err) {
+      console.warn('Erreur remise en vente:', err);
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -211,6 +232,15 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
         isLoading={isDeleting}
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      <RestockSheet
+        visible={showRestock}
+        listingTitle={listing.title}
+        variants={listing.variants}
+        isLoading={isUpdatingStatus}
+        onConfirm={handleRestock}
+        onCancel={() => setShowRestock(false)}
       />
     </>
   );

@@ -6,7 +6,13 @@ import { colors, radii, spacing, typography } from '../tokens';
 import { useAccent } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
 import { AppPressable } from './AppPressable';
-import { formatFCFA, formatRelativeTime, getListingPriceRange } from '@daloa/utils';
+import {
+  formatFCFA,
+  formatRelativeTime,
+  getListingPriceRange,
+  getListingStock,
+  getUnavailabilityReason,
+} from '@daloa/utils';
 
 export interface ListingCardItem {
   id: string;
@@ -23,6 +29,7 @@ export interface ListingCardItem {
   isOwner?: boolean;
   acceptsDelivery?: boolean;
   stock?: number;
+  status?: string;
   isFavorite?: boolean;
   cartQty?: number;
   hasVariants?: boolean;
@@ -100,8 +107,14 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
   const photoUri = failedUrl === targetPhoto ? FALLBACK_PHOTO : targetPhoto;
 
   const cartQty = listing.cartQty || 0;
-  const maxStock = listing.stock ?? 1;
-  const isOutOfStock = maxStock <= 0;
+  // Source unique de disponibilité (statut + stock, variantes sommées) : la carte
+  // et la fiche produit divergeaient, avec en prime des valeurs par défaut
+  // différentes entre le web (`?? 0`) et le mobile (`?? 1`).
+  const unavailableReason = getUnavailabilityReason(listing);
+  const isOutOfStock = unavailableReason !== null;
+  // Quand ni `stock` ni variantes ne sont transmis, on ne bride pas le stepper.
+  const knownStock = getListingStock(listing);
+  const maxStock = isOutOfStock ? 0 : knownStock > 0 ? knownStock : 1;
 
   const handleAdd = (e?: any) => {
     e?.stopPropagation?.();
@@ -179,7 +192,7 @@ const ListingCardComponent: React.FC<ListingCardProps> = ({
         {isOutOfStock && (
           <View style={styles.outOfStockOverlay}>
             <AppText variant="label" style={styles.outOfStockText}>
-              Épuisé
+              {unavailableReason === 'sold' ? 'Vendu' : 'Épuisé'}
             </AppText>
           </View>
         )}

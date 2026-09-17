@@ -1,10 +1,10 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { KeyRound, ChevronRight } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { formatDate, formatFCFA } from '@daloa/utils';
+import { KeyRound, ChevronRight, Eye, EyeOff } from 'lucide-react-native';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { formatDate, formatFCFA, resolveListingPhoto, Haptics } from '@daloa/utils';
 
 interface UserOrderCardProps {
   order: any;
@@ -17,29 +17,36 @@ const FALLBACK_PHOTO =
 export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => {
   const router = useRouter();
   const accent = useAccent();
+  const [isOtpRevealed, setIsOtpRevealed] = useState(false);
 
+  // Domaine réel de `orders.status` (contrainte CHECK) : les anciens `case`
+  // portaient sur des valeurs jamais écrites, donc `pending` et `paid` — les plus
+  // fréquentes — s'affichaient en anglais brut dans la liste des commandes.
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pending_payment':
+      case 'pending':
         return { label: 'En attente', bg: colors.status.warningLight, text: colors.status.warningDark };
-      case 'paid_escrow':
-      case 'awaiting_pickup':
-        return { label: 'Séquestre payé', bg: colors.status.infoLight, text: colors.status.infoDark };
+      case 'paid':
+        return { label: 'Paiement sécurisé', bg: colors.status.infoLight, text: colors.status.infoDark };
       case 'in_transit':
-      case 'picked_up':
         return { label: 'En livraison', bg: accent[50], text: accent[700] };
       case 'delivered':
+      case 'completed':
         return { label: 'Livrée', bg: colors.status.successLight, text: colors.status.successDark };
+      case 'disputed':
+        return { label: 'Litige', bg: colors.status.warningLight, text: colors.status.warningDark };
       case 'cancelled':
         return { label: 'Annulée', bg: colors.status.errorLight, text: colors.status.errorDark };
       default:
-        return { label: status, bg: colors.bg.subtle, text: colors.text.body };
+        return { label: 'En cours', bg: colors.bg.subtle, text: colors.text.body };
     }
   };
 
   const badge = getStatusBadge(order.status);
   const listing = order.listing || order.order_items?.[0]?.listing;
-  const photo = listing?.photos?.[0] || FALLBACK_PHOTO;
+  // `photos[0]` pouvait être une URI locale d'appareil (téléversement échoué) :
+  // la vignette restait alors désespérément blanche.
+  const photo = resolveListingPhoto(listing?.photos, FALLBACK_PHOTO);
   const otherItemsCount = (order.order_items?.length || 1) - 1;
 
   return (
@@ -81,13 +88,40 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
 
       {/* Footer */}
       <View style={styles.cardFooter}>
+        {/*
+          Le code de réception était affiché en clair dans la liste, alors qu'il est
+          masqué partout ailleurs (web `BuyerSection`, écran de suivi mobile).
+          Quiconque jetait un œil à l'écran pouvait le lire, et il suffit à faire
+          valider une livraison. Il est désormais révélé à la demande, comme sur le web.
+        */}
         {role === 'buyer' && order.delivery_otp && (
-          <View style={[styles.otpPill, { backgroundColor: accent[50] }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={(e) => {
+              e.stopPropagation();
+              Haptics.selection();
+              setIsOtpRevealed((prev) => !prev);
+            }}
+            style={[styles.otpPill, { backgroundColor: accent[50] }]}
+            accessibilityRole="button"
+            accessibilityLabel={isOtpRevealed ? 'Masquer le code OTP' : 'Révéler le code OTP'}
+          >
             <KeyRound size={12} color={accent[600]} />
-            <AppText variant="caption" color={accent[700]} style={styles.tnum}>
-              OTP Réception: {order.delivery_otp}
+            <AppText
+              variant="caption"
+              color={accent[700]}
+              // `typography.families` n'expose pas de police monospace ; les chiffres
+              // tabulaires suffisent à aligner le code proprement.
+              style={isOtpRevealed ? { fontFamily: typography.families.bold, letterSpacing: 1.5 } : undefined}
+            >
+              {isOtpRevealed ? `Code : ${order.delivery_otp}` : 'Code : ••••'}
             </AppText>
-          </View>
+            {isOtpRevealed ? (
+              <EyeOff size={12} color={accent[600]} />
+            ) : (
+              <Eye size={12} color={accent[600]} />
+            )}
+          </TouchableOpacity>
         )}
         <View style={styles.detailsBtn}>
           <AppText variant="label" color={accent[600]}>

@@ -126,7 +126,9 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         }
 
         // COD / espèces : commandes groupées par vendeur
-        const codMethod = params.paymentMode === 'cod' ? 'cod' : 'cash';
+        // Le web ecrit et lit `cash_at_shop`. Ecrire `cash` rendait la commande
+        // orpheline cote vendeur web : aucune branche ne matchait, donc aucun bouton.
+        const codMethod = params.paymentMode === 'cod' ? 'cod' : 'cash_at_shop';
         const firstOrderId = await ordersService.createCartOrders(params.user.id, params.cartItems, {
           deliveryMode: params.deliveryMode,
           paymentMethod: codMethod,
@@ -204,7 +206,7 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
       }
 
       // ══ 3. COD / Retrait boutique (aucun paiement en ligne) ══
-      const effectivePaymentMethod = params.paymentMode === 'cod' ? 'cod' : 'cash';
+      const effectivePaymentMethod = params.paymentMode === 'cod' ? 'cod' : 'cash_at_shop';
       const order = await ordersService.createOrder(params.user.id, {
         listing_id: params.listingId!,
         variant_id: params.variantId || null,

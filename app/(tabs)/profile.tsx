@@ -47,11 +47,15 @@ export default function ProfileScreen() {
           .eq('user_id', user.id)
           .neq('status', 'deleted')
           .neq('status', 'sold'),
+        // Les ventes se comptent depuis `orders`, pas depuis `listings.status`.
+        // Adossé au statut de l'annonce, le compteur baissait dès que le vendeur
+        // remettait un article en vente après restock. Même source que
+        // `app/pro/stats.tsx` et que le web (`MyStatsPage`).
         supabase
-          .from('listings')
+          .from('orders')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'sold'),
+          .eq('seller_id', user.id)
+          .in('status', ['delivered', 'completed']),
         supabase
           .from('reviews')
           .select('*', { count: 'exact', head: true })

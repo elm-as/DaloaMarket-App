@@ -6,18 +6,35 @@ export type OrderRow = Database['public']['Tables']['orders']['Row'];
 export type OrderInsert = Database['public']['Tables']['orders']['Insert'];
 export type OrderUpdate = Database['public']['Tables']['orders']['Update'];
 
+/**
+ * Domaine réel de `orders.status`, aligné sur la contrainte CHECK en base.
+ *
+ * Ce type listait auparavant `pending_payment`, `preparing`, `awaiting_pickup`,
+ * `accepted`, `picked_up`, `refunded` — des valeurs qu'aucun chemin d'écriture ne
+ * produit (les quatre du milieu appartiennent à `delivery_assignments.status`).
+ * Les écrans mobiles s'étaient calés dessus et n'affichaient donc jamais le bon
+ * libellé pour `pending` et `paid`, les deux statuts les plus courants.
+ */
 export type OrderStatus =
-  | 'pending_payment'
+  | 'pending'
   | 'paid'
-  | 'preparing'
+  | 'in_transit'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled'
+  | 'disputed';
+
+/** Domaine de `delivery_assignments.status` — à ne pas confondre avec le précédent. */
+export type DeliveryAssignmentStatus =
+  | 'pending_seller_confirmation'
   | 'awaiting_pickup'
   | 'accepted'
   | 'picked_up'
   | 'in_transit'
   | 'delivered'
+  | 'auto_released'
   | 'disputed'
-  | 'cancelled'
-  | 'refunded';
+  | 'cancelled';
 
 export interface OrderWithDetails extends OrderRow {
   listing?: {

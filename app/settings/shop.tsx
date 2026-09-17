@@ -5,12 +5,10 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useAuth } from '../../src/context/AuthContext';
-import { supabase } from '@daloa/api';
+import { supabase, decodeBase64ToArrayBuffer } from '@daloa/api';
 import { DALOA_CENTER, PRICING_CONFIG } from '@daloa/config';
 import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import {
-  ArrowLeft, MapPin, Check, ChevronDown, Palette, AlertCircle, CheckCircle2, Truck,
-} from 'lucide-react-native';
+import { ArrowLeft, MapPin, Check, ChevronDown, Palette, AlertCircle, CheckCircle2, Truck } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
@@ -21,25 +19,46 @@ import { ShopProGateCard } from '../../src/components/settings/ShopProGateCard';
 import { usePhase } from '../../src/context/PhaseContext';
 
 const THEME_COLORS = [
-  { value: '#FF7F00', label: 'Orange' },
-  { value: '#0066CC', label: 'Bleu' },
-  { value: '#10B981', label: 'Vert' },
-  { value: '#8B5CF6', label: 'Violet' },
-  { value: '#EF4444', label: 'Rouge' },
-  { value: '#1F2937', label: 'Anthracite' },
+  { value: '#FF7F00', label: 'Orange' }, { value: '#0066CC', label: 'Bleu' },
+  { value: '#10B981', label: 'Vert' }, { value: '#8B5CF6', label: 'Violet' },
+  { value: '#EF4444', label: 'Rouge' }, { value: '#1F2937', label: 'Anthracite' },
 ];
 
 function generateSlug(text: string): string {
   return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-async function uploadToStorage(userId: string, uri: string, bucket: string): Promise<string | null> {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  const mimeType = blob.type || 'image/jpeg';
+/**
+ * Meme contrainte que pour les photos d'annonces : en React Native,
+ * `fetch(file://...).blob()` renvoie un corps vide et rien n'arrive dans le bucket.
+ * On televerse depuis le base64 fourni par le picker (`base64: true`).
+ */
+async function uploadToStorage(
+  userId: string,
+  asset: { uri: string; base64?: string | null; mimeType?: string | null },
+  bucket: string
+): Promise<string | null> {
+  let mimeType = asset.mimeType || '';
+  let body: ArrayBuffer | Blob;
+
+  if (asset.base64) {
+    body = decodeBase64ToArrayBuffer(asset.base64);
+    if (!mimeType) {
+      mimeType = asset.uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    }
+  } else {
+    const response = await fetch(asset.uri);
+    const blob = await response.blob();
+    if (!blob.size) {
+      throw new Error("L'image n'a pas pu être lue sur l'appareil. Réessayez.");
+    }
+    body = blob;
+    mimeType = mimeType || blob.type || 'image/jpeg';
+  }
+
   const ext = mimeType.includes('png') ? 'png' : 'jpg';
   const path = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, blob, { contentType: mimeType, upsert: true });
+  const { error } = await supabase.storage.from(bucket).upload(path, body, { contentType: mimeType, upsert: true });
   if (error) throw error;
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
@@ -92,10 +111,10 @@ export default function ShopSettingsScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') return;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.85 });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.85, base64: true });
       if (result.canceled || !result.assets[0] || !user?.id) return;
       setUploadingBanner(true);
-      const url = await uploadToStorage(user.id, result.assets[0].uri, 'avatars');
+      const url = await uploadToStorage(user.id, result.assets[0], 'avatars');
       if (url) {
         setBannerUrl(url);
         await supabase.from('users').update({ shop_banner_url: url }).eq('id', user.id);
@@ -117,10 +136,10 @@ export default function ShopSettingsScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') return;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [1, 1], quality: 0.85 });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [1, 1], quality: 0.85, base64: true });
       if (result.canceled || !result.assets[0] || !user?.id) return;
       setUploadingLogo(true);
-      const url = await uploadToStorage(user.id, result.assets[0].uri, 'avatars');
+      const url = await uploadToStorage(user.id, result.assets[0], 'avatars');
       if (url) {
         setLogoUrl(url);
         await supabase.from('users').update({ shop_logo_url: url }).eq('id', user.id);
@@ -326,7 +345,5 @@ const styles = StyleSheet.create({
   codDeliverersBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radii.md, borderWidth: 1 },
   codDeliverersText: { fontFamily: typography.families.extrabold },
   feedbackCard: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing[3], borderRadius: radii.lg },
-  feedbackSuccess: { backgroundColor: colors.status.successLight },
-  feedbackError: { backgroundColor: colors.status.errorLight },
-  flex1: { flex: 1 },
+  feedbackSuccess: { backgroundColor: colors.status.successLight }, feedbackError: { backgroundColor: colors.status.errorLight }, flex1: { flex: 1 },
 });

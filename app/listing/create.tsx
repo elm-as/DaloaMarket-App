@@ -6,11 +6,12 @@ import { listingsService } from '@daloa/api';
 import { colors, spacing, Button, KeyboardScreen, ConfirmDialog, showAlert } from '@daloa/ui';
 import { ArrowRight, Check, CreditCard, MapPin } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
+import { PRICING_CONFIG } from '@daloa/config';
 import { safeBack } from '../../src/utils/navigation';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
 import { RequirementGuardView } from '../../src/components/common/RequirementGuardView';
 import { WizardHero } from '../../src/components/create-wizard/WizardHero';
-import { StepMediaTitle } from '../../src/components/create-wizard/StepMediaTitle';
+import { StepMediaTitle, type PickedPhoto } from '../../src/components/create-wizard/StepMediaTitle';
 import { StepCategoryPricing } from '../../src/components/create-wizard/StepCategoryPricing';
 import { StepVariantsSection, DraftVariant } from '../../src/components/create-wizard/StepVariantsSection';
 import { StepLocationDelivery } from '../../src/components/create-wizard/StepLocationDelivery';
@@ -28,7 +29,7 @@ export default function ListingCreateScreen() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('fashion');
@@ -80,6 +81,27 @@ export default function ListingCreateScreen() {
     );
   }
 
+  /**
+   * Même règle que le web (`ListingCreatePage`) : prix de base et prix de chaque
+   * option au-dessus du minimum, et stock d'au moins 1 par option. Seul le prix de
+   * base était vérifié ici, et uniquement au passage à l'étape suivante — une
+   * variante à 50 F passait sans contrôle.
+   */
+  const validatePricing = (): string | null => {
+    const min = PRICING_CONFIG.marketplace.minListingPrice;
+    const num = parseFloat(price);
+    if (isNaN(num) || num < min) {
+      return `Le prix minimum d’une annonce est de ${min} FCFA.`;
+    }
+    if (variants.some((v) => v.price != null && v.price < min)) {
+      return `Chaque option doit être vendue au moins ${min} FCFA.`;
+    }
+    if (variants.some((v) => (v.stock ?? 0) < 1)) {
+      return 'Chaque option doit avoir un stock d’au moins 1.';
+    }
+    return null;
+  };
+
   const handleNext = () => {
     Haptics.selection();
     if (currentStep === 1 && (!title.trim() || title.trim().length < 3)) {
@@ -87,9 +109,9 @@ export default function ListingCreateScreen() {
       return;
     }
     if (currentStep === 2) {
-      const num = parseFloat(price);
-      if (isNaN(num) || num < 300) {
-        showAlert('Prix invalide', 'Le prix minimum d’une annonce est de 300 FCFA.');
+      const invalid = validatePricing();
+      if (invalid) {
+        showAlert('Prix invalide', invalid);
         return;
       }
     }
@@ -110,16 +132,31 @@ export default function ListingCreateScreen() {
       return;
     }
 
+    // Revalidation au moment de publier : l'utilisateur peut revenir en arrière
+    // et modifier un prix après avoir franchi l'étape 2.
+    const invalidPricing = validatePricing();
+    if (invalidPricing) {
+      showAlert('Prix invalide', invalidPricing);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const uploadedPhotos: string[] = [];
       for (const p of photos) {
-        if (p.startsWith('http')) {
-          uploadedPhotos.push(p);
-        } else {
-          const publicUrl = await listingsService.uploadImage(p, user.id);
-          uploadedPhotos.push(publicUrl);
+        const url = p.uri.startsWith('http')
+          ? p.uri
+          : await listingsService.uploadImage(p, user.id);
+
+        // Garde-fou : une URI locale (`file://`, `content://`) enregistree en base
+        // est illisible partout ailleurs — le web refuse meme de la charger
+        // (« Not allowed to load local resource »). Mieux vaut echouer ici.
+        if (!url.startsWith('http')) {
+          throw new Error(
+            "Une photo n'a pas pu être téléversée. Vérifiez votre connexion puis réessayez."
+          );
         }
+        uploadedPhotos.push(url);
       }
 
       const finalPhotos = uploadedPhotos.length > 0 ? uploadedPhotos : [FALLBACK_PHOTO];
@@ -213,7 +250,7 @@ export default function ListingCreateScreen() {
           )}
           {currentStep === 4 && (
             <StepSummaryPreview
-              photos={photos}
+              photos={photos.map((p) => p.uri)}
               title={title}
               price={price}
               originalPrice={originalPrice}

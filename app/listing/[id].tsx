@@ -10,7 +10,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { ListingVariant } from '@daloa/types';
 import { colors, radii, spacing, Skeleton, ListingCard, AppText, AppPressable, useAccent, useResponsive, typography, showAlert } from '@daloa/ui';
 import { Tag, MapPin, Truck, Check, Home, ChevronLeft } from 'lucide-react-native';
-import { formatFCFA, Haptics, getListingPriceRange } from '@daloa/utils';
+import { formatFCFA, Haptics, getListingPriceRange, getUnavailabilityReason } from '@daloa/utils';
 import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
 import { ListingSellerBox } from '../../src/components/listing-detail/ListingSellerBox';
 import { ListingStickyFooter } from '../../src/components/listing-detail/ListingStickyFooter';
@@ -502,6 +502,7 @@ export default function ListingDetailScreen() {
         isOwner={isOwner}
         onEditListing={() => router.push(`/listing/create?id=${listing.id}` as any)}
         onManageListing={() => setShowOwnerSheet(true)}
+        unavailableReason={isOwner ? null : getUnavailabilityReason(listing)}
       />
 
       {/* Feuille d'actions rapides propriétaire */}
