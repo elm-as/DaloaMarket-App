@@ -48,6 +48,12 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
   // la vignette restait alors désespérément blanche.
   const photo = resolveListingPhoto(listing?.photos, FALLBACK_PHOTO);
   const otherItemsCount = (order.order_items?.length || 1) - 1;
+  const deliveryOtp =
+    order.delivery_otp ||
+    order.delivery_assignment?.delivery_otp ||
+    order.delivery_assignments?.[0]?.delivery_otp;
+  const isPendingDelivery =
+    !['delivered', 'completed', 'cancelled', 'disputed'].includes(order.status);
 
   return (
     <AppPressable onPress={() => router.push(`/order/${order.id}` as any)} style={styles.card} accessibilityLabel={`Commande ${order.id.slice(0, 8)}`}>
@@ -89,12 +95,11 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
       {/* Footer */}
       <View style={styles.cardFooter}>
         {/*
-          Le code de réception était affiché en clair dans la liste, alors qu'il est
-          masqué partout ailleurs (web `BuyerSection`, écran de suivi mobile).
-          Quiconque jetait un œil à l'écran pouvait le lire, et il suffit à faire
-          valider une livraison. Il est désormais révélé à la demande, comme sur le web.
+          Le code de réception était masqué si order.delivery_otp était vide car il
+          réside dans order.delivery_assignment.delivery_otp. On le résout proprement
+          et on ne l'affiche que tant que la commande est en cours.
         */}
-        {role === 'buyer' && order.delivery_otp && (
+        {role === 'buyer' && deliveryOtp && isPendingDelivery && (
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={(e) => {
@@ -114,7 +119,7 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
               // tabulaires suffisent à aligner le code proprement.
               style={isOtpRevealed ? { fontFamily: typography.families.bold, letterSpacing: 1.5 } : undefined}
             >
-              {isOtpRevealed ? `Code : ${order.delivery_otp}` : 'Code : ••••'}
+              {isOtpRevealed ? `Code : ${deliveryOtp}` : 'Code : ••••'}
             </AppText>
             {isOtpRevealed ? (
               <EyeOff size={12} color={accent[600]} />

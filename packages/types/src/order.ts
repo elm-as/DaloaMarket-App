@@ -62,7 +62,15 @@ export interface CheckoutPayload {
   variant_label?: string | null;
   quantity: number;
   delivery_mode: 'delivery' | 'pickup';
-  payment_method: 'wave' | 'orange' | 'mtn' | 'moov' | 'cash_on_delivery';
+  payment_method:
+    | 'wave'
+    | 'orange'
+    | 'mtn'
+    | 'moov'
+    | 'cash_on_delivery'
+    | 'cod'
+    | 'cash_at_shop'
+    | 'cash';
   delivery_address: string;
   delivery_district: string;
   delivery_lat?: number | null;

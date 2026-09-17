@@ -144,7 +144,15 @@ export default function OrderTrackingScreen() {
               await ordersService.cancelOrder(order.id, "Annulation demandée par l'acheteur");
               Haptics.success();
               await refetch();
-              showAlert('Commande annulée', 'Votre commande a été annulée avec succès.');
+              const isOnlinePaid =
+                ['paid', 'confirmed'].includes(order.status) &&
+                !['cash_at_shop', 'cod'].includes(order.payment_method);
+              showAlert(
+                'Commande annulée',
+                isOnlinePaid
+                  ? 'Votre commande a été annulée. Votre remboursement Mobile Money est en cours de traitement.'
+                  : 'Votre commande a été annulée avec succès.'
+              );
             } catch (err: any) {
               showAlert('Erreur', err.message || "Impossible d'annuler cette commande.");
             } finally {
@@ -775,9 +783,8 @@ export default function OrderTrackingScreen() {
         {/* ── Code OTP vendeur : ramassage ── */}
         {isSeller &&
           pickupOtp &&
-          (assignment?.status === 'accepted' ||
-            order.status === 'awaiting_pickup' ||
-            order.status === 'paid_escrow') && (
+          (assignment?.pickup_confirmed_by_seller ||
+            ['awaiting_pickup', 'accepted', 'picked_up'].includes(assignment?.status ?? '')) && (
             <DeliveryCodeCard
               code={pickupOtp}
               type="pickup"
