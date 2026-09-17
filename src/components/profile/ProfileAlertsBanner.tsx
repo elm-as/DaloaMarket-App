@@ -7,6 +7,7 @@ interface ProfileAlertsBannerProps {
   hasListings: boolean;
   hasShopGps: boolean;
   hasPayoutAccount: boolean;
+  isSeller?: boolean;
   onDefineGps: () => void;
   onSetupPayout: () => void;
 }
@@ -15,11 +16,12 @@ export const ProfileAlertsBanner: React.FC<ProfileAlertsBannerProps> = ({
   hasListings,
   hasShopGps,
   hasPayoutAccount,
+  isSeller = false,
   onDefineGps,
   onSetupPayout,
 }) => {
-  // Ne pas afficher d'alerte si le compte n'a aucune annonce en vente
-  if (!hasListings) return null;
+  // Ne pas afficher d'alerte si l'utilisateur n'est pas vendeur et n'a aucune annonce
+  if (!hasListings && !isSeller) return null;
 
   return (
     <View style={styles.container}>

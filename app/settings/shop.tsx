@@ -21,9 +21,8 @@ import { uploadShopAsset } from '../../src/components/settings/uploadShopAsset';
 import { usePhase } from '../../src/context/PhaseContext';
 
 const THEME_COLORS = [
-  { value: '#FF7F00', label: 'Orange' }, { value: '#0066CC', label: 'Bleu' },
-  { value: '#10B981', label: 'Vert' }, { value: '#8B5CF6', label: 'Violet' },
-  { value: '#EF4444', label: 'Rouge' }, { value: '#1F2937', label: 'Anthracite' },
+  { value: '#FF7F00', label: 'Orange' }, { value: '#0066CC', label: 'Bleu' }, { value: '#10B981', label: 'Vert' },
+  { value: '#8B5CF6', label: 'Violet' }, { value: '#EF4444', label: 'Rouge' }, { value: '#1F2937', label: 'Anthracite' },
 ];
 
 export default function ShopSettingsScreen() {
@@ -129,11 +128,16 @@ export default function ShopSettingsScreen() {
 
   const handleSave = async () => {
     if (!user?.id) return;
+    if (!district?.trim()) {
+      setFeedback({ type: 'error', text: 'Veuillez sélectionner le quartier de votre boutique à Daloa.' });
+      return;
+    }
+    if (latitude == null || longitude == null) {
+      setFeedback({ type: 'error', text: 'Veuillez positionner votre boutique sur la carte (GPS).' });
+      return;
+    }
     if (slugCheck.isTaken) {
-      setFeedback({
-        type: 'error',
-        text: 'Cet identifiant URL est déjà utilisé par une autre boutique. Veuillez en choisir un autre.',
-      });
+      setFeedback({ type: 'error', text: 'Cet identifiant URL est déjà utilisé. Veuillez en choisir un autre.' });
       return;
     }
     try {
@@ -170,11 +174,7 @@ export default function ShopSettingsScreen() {
       setFeedback({ type: 'success', text: 'Paramètres enregistrés avec succès !' });
     } catch (err: any) {
       let text = err?.message || 'Erreur lors de l’enregistrement.';
-      if (
-        text.includes('users_shop_slug_key') ||
-        text.includes('unique constraint') ||
-        text.includes('duplicate key')
-      ) {
+      if (text.includes('users_shop_slug_key') || text.includes('unique constraint') || text.includes('duplicate key')) {
         text = 'Cet identifiant URL (slug) est déjà utilisé par une autre boutique. Veuillez en choisir un autre.';
       }
       setFeedback({ type: 'error', text });
