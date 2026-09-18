@@ -8,7 +8,7 @@ import { signInWithGoogle } from '../../src/lib/googleAuth';
 import { supabase } from '@daloa/api';
 import { colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon, typography } from '@daloa/ui';
 import { Mail, Lock, ArrowLeft, LogIn, Sparkles, UserPlus, ShieldCheck, Truck } from 'lucide-react-native';
-import { Haptics } from '@daloa/utils';
+import { Haptics, formatUserErrorMessage } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
 
 export default function LoginScreen() {
@@ -47,7 +47,7 @@ export default function LoginScreen() {
       if (router.canGoBack()) router.back();
       else router.replace('/(tabs)/profile' as any);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Identifiants incorrects. Veuillez réessayer.');
+      setErrorMsg(formatUserErrorMessage(err, 'Identifiants incorrects. Veuillez réessayer.'));
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +64,7 @@ export default function LoginScreen() {
         router.replace('/(tabs)/profile' as any);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Impossible de se connecter avec Google.');
+      setErrorMsg(formatUserErrorMessage(err, 'Impossible de se connecter avec Google.'));
     } finally {
       setIsGoogleLoading(false);
     }

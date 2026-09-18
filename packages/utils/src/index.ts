@@ -6,3 +6,4 @@ export * from './storage';
 export * from './censor';
 export * from './availability';
 export * from './media';
+export * from './errors';
