@@ -1,42 +1,101 @@
 import { supabase } from '../supabase';
 import { PayoutSettings } from '@daloa/types';
+import { normalizePayoutNetwork } from '@daloa/config';
+
+/**
+ * Convertit un identifiant canonique de base ('wave-ci', 'orange-money-ci'...)
+ * vers l'identifiant court utilisé par l'interface ('wave', 'orange'...).
+ */
+export const denormalizePayoutNetwork = (network?: string | null): string => {
+  if (!network) return 'wave';
+  const clean = network.replace(/-ci$/, '').toLowerCase();
+  if (['wave', 'orange', 'mtn', 'moov'].includes(clean)) return clean;
+  return 'wave';
+};
 
 export const payoutService = {
   /**
-   * Récupère la configuration Mobile Money de l'utilisateur
+   * Récupère la configuration Mobile Money de l'utilisateur.
+   * Cherche en priorité dans `delivery_persons` (pour un livreur),
+   * puis dans `users` (pour un vendeur ou acheteur).
    */
   async getPayoutSettings(userId: string): Promise<PayoutSettings | null> {
-    const { data, error } = await supabase
-      .from('payout_settings')
-      .select('*')
+    const { data: dpData } = await supabase
+      .from('delivery_persons')
+      .select('payout_network, payout_number, phone, name')
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (error || !data) return null;
+    if (dpData && (dpData.payout_number || dpData.payout_network)) {
+      return {
+        network: denormalizePayoutNetwork(dpData.payout_network) as any,
+        phone: dpData.payout_number || dpData.phone || '',
+        accountName: dpData.name || '',
+        isActive: true,
+      };
+    }
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('payout_network, payout_number, phone, full_name')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!userData || (!userData.payout_number && !userData.payout_network)) {
+      return null;
+    }
 
     return {
-      network: data.network as any,
-      phone: data.phone,
-      accountName: data.account_name,
-      isActive: data.is_active,
-      lockedUntil: data.locked_until,
+      network: denormalizePayoutNetwork(userData.payout_network) as any,
+      phone: userData.payout_number || userData.phone || '',
+      accountName: userData.full_name || '',
+      isActive: true,
     };
   },
 
   /**
-   * Sauvegarde la configuration Mobile Money
+   * Sauvegarde la configuration Mobile Money dans `delivery_persons` et `users`.
+   * Normalise le réseau vers le format SQL attendu ('wave-ci', 'orange-money-ci'...).
    */
   async savePayoutSettings(userId: string, settings: PayoutSettings): Promise<void> {
-    const { error } = await supabase.from('payout_settings').upsert({
-      user_id: userId,
-      network: settings.network,
-      phone: settings.phone,
-      account_name: settings.accountName || null,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    });
+    const cleanedPhone = (settings.phone || '').replace(/\D/g, '');
+    const canonicalNetwork = normalizePayoutNetwork(settings.network);
 
-    if (error) throw error;
+    const dpUpdates: Record<string, any> = {
+      payout_network: canonicalNetwork,
+      payout_number: cleanedPhone,
+      updated_at: new Date().toISOString(),
+    };
+    if (settings.accountName?.trim()) {
+      dpUpdates.name = settings.accountName.trim();
+    }
+
+    const { error: dpError } = await supabase
+      .from('delivery_persons')
+      .update(dpUpdates)
+      .eq('user_id', userId);
+
+    if (dpError) {
+      console.error('Erreur mise à jour delivery_persons payout:', dpError);
+      throw dpError;
+    }
+
+    const userUpdates: Record<string, any> = {
+      payout_network: canonicalNetwork,
+      payout_number: cleanedPhone,
+    };
+    if (settings.accountName?.trim()) {
+      userUpdates.full_name = settings.accountName.trim();
+    }
+
+    const { error: userError } = await supabase
+      .from('users')
+      .update(userUpdates)
+      .eq('id', userId);
+
+    if (userError) {
+      console.warn('Avertissement mise à jour users payout:', userError);
+    }
   },
 
   /**
