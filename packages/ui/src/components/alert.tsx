@@ -3,6 +3,7 @@ import { View, Modal, StyleSheet, Alert, Platform } from 'react-native';
 import { colors, radii, spacing } from '../tokens';
 import { AppText } from './AppText';
 import { AppPressable } from './AppPressable';
+import { sanitizeUserErrorMessage } from '@daloa/utils';
 
 /**
  * Remplaçant de `Alert.alert`, utilisable partout.
@@ -58,13 +59,15 @@ const BOUTON_OK: AlertButton[] = [{ text: 'OK', style: 'default' }];
  * Affiche un message bloquant. Signature identique à `Alert.alert`.
  */
 export function showAlert(title: string, message?: string, buttons?: AlertButton[]): void {
+  const displayMessage = message ? sanitizeUserErrorMessage(message) : message;
+
   if (Platform.OS !== 'web') {
     // `Alert.alert` n'accepte pas `undefined` comme tableau de boutons sur
     // toutes les versions : on ne le passe que s'il existe vraiment.
     if (buttons && buttons.length > 0) {
-      Alert.alert(title, message, buttons as any);
+      Alert.alert(title, displayMessage, buttons as any);
     } else {
-      Alert.alert(title, message);
+      Alert.alert(title, displayMessage);
     }
     return;
   }
@@ -72,7 +75,7 @@ export function showAlert(title: string, message?: string, buttons?: AlertButton
   emettre({
     id: prochainId++,
     title,
-    message,
+    message: displayMessage,
     buttons: buttons && buttons.length > 0 ? buttons : BOUTON_OK,
   });
 }

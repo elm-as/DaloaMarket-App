@@ -9,7 +9,7 @@ import { supabase, getPendingReferralCode, storeReferralCode } from '@daloa/api'
 import { colors, radii, spacing, AppText, AppPressable, Button, Input, KeyboardScreen, useAccent, GoogleIcon, typography } from '@daloa/ui';
 import { DALOA_DISTRICTS } from '@daloa/config';
 import { User, Mail, Phone, Lock, MapPin, ArrowLeft, ShieldCheck, Award } from 'lucide-react-native';
-import { Haptics } from '@daloa/utils';
+import { Haptics, formatUserErrorMessage } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
 
 export default function RegisterScreen() {
@@ -71,7 +71,7 @@ export default function RegisterScreen() {
       Haptics.success();
       safeBack(router, '/(tabs)/profile');
     } catch (err: any) {
-      setErrorMsg(err.message || "Erreur lors de l'inscription. Veuillez réessayer.");
+      setErrorMsg(formatUserErrorMessage(err, "Erreur lors de l'inscription. Veuillez réessayer."));
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +91,7 @@ export default function RegisterScreen() {
         safeBack(router, '/(tabs)/profile');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Impossible de s’inscrire avec Google.');
+      setErrorMsg(formatUserErrorMessage(err, 'Impossible de s’inscrire avec Google.'));
     } finally {
       setIsGoogleLoading(false);
     }
