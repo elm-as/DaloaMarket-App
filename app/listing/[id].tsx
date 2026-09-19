@@ -182,6 +182,7 @@ export default function ListingDetailScreen() {
   const cartItem = items.find((i) => i.id === cartItemId);
   const cartQty = cartItem?.quantity || 0;
   const isOwner = isAuthenticated && user?.id === seller?.id;
+  const unavailableReason = isOwner ? null : getUnavailabilityReason(listing);
 
   const conditionInfo = getCondition(listing.condition);
   const hasDiscount = listing.original_price != null && listing.original_price > activePrice;
@@ -328,6 +329,40 @@ export default function ListingDetailScreen() {
               </AppText>
             </View>
           </View>
+ 
+          {/* Signalement article vendu / indisponible */}
+          {unavailableReason ? (
+            <View style={styles.unavailableBanner}>
+              <View style={styles.unavailableBannerHeader}>
+                <View style={[styles.unavailablePill, { backgroundColor: colors.status.warningDark }]}>
+                  <AppText variant="overline" color={colors.text.inverse}>
+                    {unavailableReason === 'sold' ? 'Vendu' : 'Épuisé'}
+                  </AppText>
+                </View>
+                <AppText variant="bodyStrong" color={colors.text.body}>
+                  {unavailableReason === 'sold'
+                    ? 'Cet article a déjà été vendu'
+                    : 'Article temporairement épuisé'}
+                </AppText>
+              </View>
+              <AppText variant="caption" color={colors.text.muted}>
+                {unavailableReason === 'sold'
+                  ? "Cette annonce n'est plus disponible à l'achat sur le marché."
+                  : 'Le vendeur est momentanément en rupture de stock sur cet article.'}
+              </AppText>
+              <AppPressable
+                haptic="medium"
+                onPress={handleGoHome}
+                style={[styles.bannerBrowseBtn, { backgroundColor: accent.DEFAULT }]}
+                accessibilityRole="button"
+                accessibilityLabel="Voir les autres articles du marché"
+              >
+                <AppText variant="label" color={colors.text.inverse}>
+                  Voir les autres articles
+                </AppText>
+              </AppPressable>
+            </View>
+          ) : null}
 
           {/* Variantes — signal visuel si options dispo */}
           {hasVariants && (
@@ -502,7 +537,8 @@ export default function ListingDetailScreen() {
         isOwner={isOwner}
         onEditListing={() => router.push(`/listing/create?id=${listing.id}` as any)}
         onManageListing={() => setShowOwnerSheet(true)}
-        unavailableReason={isOwner ? null : getUnavailabilityReason(listing)}
+        unavailableReason={unavailableReason}
+        onBrowseOtherListings={handleGoHome}
       />
 
       {/* Feuille d'actions rapides propriétaire */}
@@ -695,5 +731,31 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: spacing[6],
+  },
+  unavailableBanner: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radii.xl,
+    padding: spacing[3],
+    gap: spacing[2],
+    marginVertical: spacing[2],
+  },
+  unavailableBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  unavailablePill: {
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  bannerBrowseBtn: {
+    height: 42,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing[1],
   },
 });

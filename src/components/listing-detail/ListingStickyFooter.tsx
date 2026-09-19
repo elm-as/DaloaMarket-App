@@ -18,6 +18,7 @@ interface ListingStickyFooterProps {
   onManageListing?: () => void;
   /** `null` = achetable ; sinon l'annonce est vendue ou épuisée. */
   unavailableReason?: 'sold' | 'out_of_stock' | null;
+  onBrowseOtherListings?: () => void;
 }
 
 export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
@@ -33,6 +34,7 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
   onEditListing,
   onManageListing,
   unavailableReason = null,
+  onBrowseOtherListings,
 }) => {
   const insets = useSafeAreaInsets();
   const accent = useAccent();
@@ -86,13 +88,27 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
   if (unavailableReason) {
     return (
       <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing[3]) }]}>
-        <View style={styles.unavailableBox}>
-          <Lock size={16} color={colors.text.muted} />
-          <AppText variant="bodyStrong" color={colors.text.muted}>
-            {unavailableReason === 'sold'
-              ? 'Article vendu : indisponible'
-              : 'Article épuisé pour le moment'}
-          </AppText>
+        <View style={styles.unavailableRow}>
+          <View style={styles.unavailableBadge}>
+            <Lock size={14} color={colors.text.muted} />
+            <AppText variant="caption" color={colors.text.muted}>
+              {unavailableReason === 'sold' ? 'Vendu' : 'Épuisé'}
+            </AppText>
+          </View>
+          {onBrowseOtherListings && (
+            <AppPressable
+              haptic="medium"
+              onPress={onBrowseOtherListings}
+              style={[styles.browseOtherBtn, { backgroundColor: accent.DEFAULT }]}
+              accessibilityRole="button"
+              accessibilityLabel="Voir les autres articles disponibles"
+            >
+              <ShoppingCart size={15} color={colors.text.inverse} strokeWidth={2.2} />
+              <AppText variant="label" color={colors.text.inverse}>
+                Voir les autres articles
+              </AppText>
+            </AppPressable>
+          )}
         </View>
       </View>
     );
@@ -210,15 +226,6 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
 };
 
 const styles = StyleSheet.create({
-  unavailableBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[2],
-    paddingVertical: spacing[4],
-    borderRadius: radii.xl,
-    backgroundColor: colors.bg.subtle,
-  },
   bar: {
     paddingHorizontal: spacing[3],
     paddingTop: spacing[2],
@@ -232,10 +239,25 @@ const styles = StyleSheet.create({
     elevation: 8,
     gap: spacing[2],
   },
-  row: {
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  unavailableRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], height: 48 },
+  unavailableBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[2],
+    gap: 6,
+    paddingHorizontal: spacing[3],
+    height: 48,
+    borderRadius: radii.xl,
+    backgroundColor: colors.bg.subtle,
+  },
+  browseOtherBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: radii.xl,
   },
   // ─── Stepper ───
   stepper: {
@@ -255,19 +277,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.bg.surface,
   },
-  qtyText: {
-    minWidth: 28,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-  inCartLabel: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  // ─── Ajouter au panier (plein écran si pas en cart) ───
+  qtyText: { minWidth: 28, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  inCartLabel: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  // ─── Ajouter au panier ───
   addBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -292,11 +304,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
   },
   // ─── Owner ───
-  ownerActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-  },
+  ownerActionsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   ownerManageBtn: {
     flex: 1,
     height: 48,
@@ -327,11 +335,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     overflow: 'hidden',
   },
-  variantFooterLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  variantFooterLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   variantFooterPill: {
     flexDirection: 'row',
     alignItems: 'center',
