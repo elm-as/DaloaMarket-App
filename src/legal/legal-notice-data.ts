@@ -11,9 +11,9 @@ export const LEGAL_NOTICE_DATA: LegalNoticeSection[] = [
     items: [
       { label: 'Plateforme', value: 'DaloaMarket (daloamarket.com)' },
       { label: 'Directeur de la publication', value: 'OULOBO Elmas Tresor (ElmasCore)' },
-      { label: 'Forme juridique', value: 'Entreprise individuelle — non immatriculée au RCCM à ce jour' },
+      { label: 'Forme juridique', value: 'Entreprise individuelle, non immatriculée au RCCM à ce jour' },
       { label: 'Pôle Communication & Opérations', value: 'Armand J. & Diomandé (DNPH)' },
-      { label: 'Adresse de l’éditeur', value: 'RueO21,68 — Yopougon, Abidjan, Côte d’Ivoire' },
+      { label: 'Adresse de l’éditeur', value: 'RueO21,68, Yopougon, Abidjan, Côte d’Ivoire' },
       { label: 'Zone d’activité', value: 'Daloa et sa région, Côte d’Ivoire' },
       { label: 'Contact officiel', value: 'contact@daloamarket.com' },
     ],
@@ -33,7 +33,7 @@ export const LEGAL_NOTICE_DATA: LegalNoticeSection[] = [
     title: 'Propriété Intellectuelle & Marques',
     items: [
       { label: 'Marque DaloaMarket', value: 'Tous droits réservés © 2026 ELMAS' },
-      { label: 'Code source & Design', value: 'Propriété exclusive de l’éditeur — Architecture ElmasCore' },
+      { label: 'Code source & Design', value: 'Propriété exclusive de l’éditeur, architecture ElmasCore' },
       { label: 'Reproduction', value: 'Toute reproduction totale ou partielle sans autorisation écrite est formellement interdite.' },
     ],
   },

@@ -148,7 +148,7 @@ export const CompleteProfileScreen: React.FC = () => {
           autoCorrect={false}
           helperText={
             refDepuisLien
-              ? 'Code reconnu — votre ambassadeur sera crédité.'
+              ? 'Code reconnu : votre ambassadeur sera crédité.'
               : 'À remplir uniquement si un ambassadeur vous a donné un code.'
           }
           leftIcon={<Award size={16} color={colors.text.subtle} />}

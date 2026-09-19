@@ -84,7 +84,7 @@ export const TERMS_ARTICLES: LegalArticle[] = [
       'DaloaMarket propose un paiement sécurisé tiers de confiance (escrow) : l’acheteur règle par Mobile Money (Wave, Orange, MTN, Moov). Les fonds sont bloqués jusqu’à la livraison effective.',
       'Pour être parfaitement clair : DaloaMarket n’est pas un établissement de paiement et ne détient pas de compte de cantonnement bancaire. Les sommes sont détenues par Money Fusion, prestataire agréé, jusqu’au déblocage. Le mot « séquestre » décrit ce blocage technique, et non un compte séparé ouvert par DaloaMarket.',
       'Frais de service acheteur : 2% du montant des articles. Ces frais couvrent la sécurisation du paiement, la garantie anti-fraude et le fonctionnement de l’infrastructure locale. Le détail est affiché ligne par ligne avant validation de la commande ; aucun frais n’est ajouté ensuite.',
-      'Commission vendeur : pendant la phase de lancement, aucune commission n’est prélevée sur les ventes — le vendeur reçoit l’intégralité du prix de son article. À l’issue de cette phase, la commission sera de 3,5% en compte standard et de 2,5% pour les membres Pass Vendeur Pro. Ce changement sera annoncé avant son entrée en vigueur.',
+      'Commission vendeur : pendant la phase de lancement, aucune commission n’est prélevée sur les ventes : le vendeur reçoit l’intégralité du prix de son article. À l’issue de cette phase, la commission sera de 3,5% en compte standard et de 2,5% pour les membres Pass Vendeur Pro. Ce changement sera annoncé avant son entrée en vigueur.',
       'La libération des fonds au vendeur est conditionnée à la saisie du code secret OTP remis par l’acheteur lors de la remise physique du colis.',
     ],
   },

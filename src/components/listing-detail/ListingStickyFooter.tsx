@@ -90,7 +90,7 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
           <Lock size={16} color={colors.text.muted} />
           <AppText variant="bodyStrong" color={colors.text.muted}>
             {unavailableReason === 'sold'
-              ? 'Article vendu — indisponible'
+              ? 'Article vendu : indisponible'
               : 'Article épuisé pour le moment'}
           </AppText>
         </View>

@@ -39,14 +39,14 @@ export const StepSummaryPreview: React.FC<StepSummaryPreviewProps> = ({
       icon: hasPhotos ? CheckCircle2 : AlertCircle,
       color: hasPhotos ? colors.status.successDark : colors.status.warning,
       bg: hasPhotos ? colors.status.successLight : colors.status.warningLight,
-      label: hasPhotos ? `${photos.length} photo${photos.length > 1 ? 's' : ''} ajoutée${photos.length > 1 ? 's' : ''}` : "Aucune photo — ajoutez-en à l'étape 1",
+      label: hasPhotos ? `${photos.length} photo${photos.length > 1 ? 's' : ''} ajoutée${photos.length > 1 ? 's' : ''}` : "Aucune photo : ajoutez-en à l'étape 1",
     },
     {
       ok: hasTitle,
       icon: hasTitle ? CheckCircle2 : AlertCircle,
       color: hasTitle ? colors.status.successDark : colors.status.warning,
       bg: hasTitle ? colors.status.successLight : colors.status.warningLight,
-      label: hasTitle ? `"${title.trim().slice(0, 40)}${title.trim().length > 40 ? '…' : ''}"` : "Titre manquant — requis à l'étape 1",
+      label: hasTitle ? `"${title.trim().slice(0, 40)}${title.trim().length > 40 ? '…' : ''}"` : "Titre manquant : requis à l'étape 1",
     },
     {
       ok: true,

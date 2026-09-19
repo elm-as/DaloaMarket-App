@@ -52,7 +52,7 @@ export function ShopProGateCard({ onUpgrade }: ShopProGateCardProps) {
       </View>
 
       <Button
-        title="Devenir Vendeur Pro — 2 500 FCFA/mois"
+        title="Devenir Vendeur Pro : 2 500 FCFA/mois"
         variant="primary"
         size="md"
         leftIcon={<Sparkles size={16} color={colors.text.inverse} />}

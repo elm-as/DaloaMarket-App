@@ -80,7 +80,7 @@ export const StepMediaTitle: React.FC<StepMediaTitleProps> = ({
           </View>
           <AppText variant="bodyStrong" color={accent[700]}>Ajouter des photos</AppText>
           <AppText variant="caption" color={accent[500]}>
-            JPG, PNG — max 5 photos
+            JPG, PNG : max 5 photos
           </AppText>
         </AppPressable>
       ) : (

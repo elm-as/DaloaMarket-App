@@ -47,7 +47,7 @@ function ProGate({ accent }: { accent: any }) {
         paiement à la livraison avec le Pass Vendeur Pro.
       </AppText>
       <Button
-        title="Passer au Pro — 2 500 FCFA/mois"
+        title="Passer au Pro : 2 500 FCFA/mois"
         variant="market"
         size="lg"
         onPress={() => router.push('/pro/become-pro' as any)}
