@@ -182,7 +182,7 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
               Votre article sera affiché à{' '}
               <AppText variant="bodyStrong" color={accent[700]}>{formatFCFA(numPrice)}</AppText>
               {hasDiscount && (
-                <AppText variant="caption" color={colors.status.successDark}> — -{discountPct}% de réduction</AppText>
+                <AppText variant="caption" color={colors.status.successDark}> (-{discountPct}% de réduction)</AppText>
               )}
             </AppText>
           </View>

@@ -594,7 +594,7 @@ export default function OrderTrackingScreen() {
               quelques instants. Vérifiez maintenant.
             </AppText>
             <Button
-              title="J'ai payé — Vérifier"
+              title="J'ai payé : Vérifier"
               variant="market"
               size="md"
               loading={isVerifying}
@@ -655,7 +655,7 @@ export default function OrderTrackingScreen() {
                 Cela évite qu’un livreur se déplace pour un article indisponible.
               </AppText>
               <Button
-                title="J’ai l’article — Confirmer"
+                title="J’ai l’article : Confirmer"
                 variant="market"
                 size="md"
                 loading={isSellerActing}
@@ -665,7 +665,7 @@ export default function OrderTrackingScreen() {
                 style={styles.verifyBtn}
               />
               <Button
-                title="Je n'ai plus le produit — annuler"
+                title="Je n'ai plus le produit : annuler"
                 variant="ghost"
                 size="sm"
                 disabled={isSellerActing}
@@ -715,7 +715,7 @@ export default function OrderTrackingScreen() {
                 />
               )}
               <Button
-                title="Je n'ai plus le produit — annuler"
+                title="Je n'ai plus le produit : annuler"
                 variant="ghost"
                 size="sm"
                 disabled={isSellerActing}

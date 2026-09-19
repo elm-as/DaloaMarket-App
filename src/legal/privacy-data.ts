@@ -35,7 +35,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
       'Transactions : historique des commandes, articles publiés, évaluations et avis clients',
       'Coordonnées de versement : si vous vendez ou livrez, le réseau Mobile Money et le numéro de téléphone sur lequel vos gains doivent être versés. Ce numéro nous est indispensable pour vous payer.',
       'Adresse IP : l’adresse utilisée lors de votre inscription et la dernière adresse de connexion, afin de détecter les comptes frauduleux et les abus. Une adresse à l’origine d’abus répétés peut être bloquée.',
-      'Empreinte d’identifiant : à la suppression d’un compte, nous gardons une empreinte cryptographique irréversible (SHA-256) de son adresse e-mail et de son identifiant de connexion — jamais l’adresse elle-même, et l’empreinte ne permet pas de la retrouver. Elle sert uniquement à reconnaître la réinscription d’une personne dont le compte avait été banni ou signalé.',
+      'Empreinte d’identifiant : à la suppression d’un compte, nous gardons une empreinte cryptographique irréversible (SHA-256) de son adresse e-mail et de son identifiant de connexion (jamais l’adresse elle-même, et l’empreinte ne permet pas de la retrouver). Elle sert uniquement à reconnaître la réinscription d’une personne dont le compte avait été banni ou signalé.',
       'Notifications : si vous les activez, un jeton propre à votre appareil, nécessaire pour vous envoyer les alertes de commande et de message. Vous pouvez les désactiver à tout moment dans les réglages de votre téléphone.',
       'Sécurité Mobile Money : DaloaMarket ne collecte ni ne stocke AUCUN code secret ni code PIN de compte Mobile Money. La saisie s’effectue exclusivement sur l’interface de notre prestataire Money Fusion.',
     ],
@@ -75,7 +75,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     paragraphs: [
       'Vos données sont hébergées sur une infrastructure Supabase hautement sécurisée avec chiffrement au repos (AES-256) et en transit (TLS 1.3).',
       'Les mots de passe sont hachés de manière irréversible et les identifiants d’accès sont protégés par des clés d’API restreintes avec Row Level Security (RLS).',
-      'Nos sous-traitants sont : Supabase (base de données, authentification, stockage des photos et e-mails transactionnels), Money Fusion (paiements et versements Mobile Money), Mapbox (cartes et calcul d’itinéraires), Expo — avec Apple et Google pour l’acheminement — (notifications push), Netlify et Render (hébergement du site et du service de paiement).',
+      'Nos sous-traitants sont : Supabase (base de données, authentification, stockage des photos et e-mails transactionnels), Money Fusion (paiements et versements Mobile Money), Mapbox (cartes et calcul d’itinéraires), Expo (avec Apple et Google pour l’acheminement) pour les notifications push, Netlify et Render (hébergement du site et du service de paiement).',
       'Certains de ces prestataires hébergent des données en dehors de la Côte d’Ivoire, notamment en Europe. Les transferts sont encadrés par les engagements contractuels de ces prestataires.',
       'Aucun traceur publicitaire, aucun pixel de suivi et aucun outil de profilage commercial n’est utilisé dans l’application. Aucune donnée de navigation n’est transmise à une régie publicitaire ou à un réseau social.',
     ],
@@ -111,7 +111,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     paragraphs: [
       'Pour toute question relative à vos données personnelles ou pour exercer vos droits, vous pouvez contacter notre référent DPO :',
       'Email dédié : privacy@daloamarket.com / support@daloamarket.com',
-      'Adresse postale : RueO21,68 — Yopougon, Abidjan, Côte d’Ivoire',
+      'Adresse postale : RueO21,68, Yopougon, Abidjan, Côte d’Ivoire',
     ],
   },
 ];

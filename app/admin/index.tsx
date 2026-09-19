@@ -116,7 +116,7 @@ export default function AdminScreen() {
               Phase active
             </AppText>
             <AppText variant="bodyStrong" color={isPhase0 ? colors.status.successDark : colors.status.warningDark}>
-              {isPhase0 ? 'Phase 0 — Lancement libre' : 'Phase 1 — Croissance Pro'}
+              {isPhase0 ? 'Phase 0 : Lancement libre' : 'Phase 1 : Croissance Pro'}
             </AppText>
             <AppText variant="caption" color={colors.text.muted}>
               {isPhase0

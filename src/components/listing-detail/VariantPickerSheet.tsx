@@ -310,8 +310,8 @@ export const VariantPickerSheet: React.FC<VariantPickerSheetProps> = ({
                 <ShoppingCart size={18} color={colors.text.inverse} strokeWidth={2.2} />
                 <AppText variant="label" color={colors.text.inverse} style={styles.ctaText}>
                   {hasInitialInCart
-                    ? `Enregistrer (${summary.totalQty}) — ${formatFCFA(summary.totalPrice)}`
-                    : `Ajouter ${summary.totalQty} article${summary.totalQty > 1 ? 's' : ''} — ${formatFCFA(summary.totalPrice)}`}
+                    ? `Enregistrer (${summary.totalQty}) : ${formatFCFA(summary.totalPrice)}`
+                    : `Ajouter ${summary.totalQty} article${summary.totalQty > 1 ? 's' : ''} : ${formatFCFA(summary.totalPrice)}`}
                 </AppText>
               </>
             ) : hasInitialInCart ? (
