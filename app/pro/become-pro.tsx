@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform, Linking as RNLinking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -60,8 +61,17 @@ export default function BecomeProScreen() {
         return;
       }
 
-      // Sur Mobile : ouvre le paiement Mobile Money dans un navigateur in-app (Chrome Custom Tab)
-      await WebBrowser.openBrowserAsync(result.paymentUrl);
+      // Sur Mobile : session de paiement avec retour automatique
+      const redirectUrl = Linking.createURL('payment/success');
+      try {
+        await WebBrowser.openAuthSessionAsync(result.paymentUrl, redirectUrl);
+      } catch {
+        try {
+          await WebBrowser.openBrowserAsync(result.paymentUrl);
+        } catch {
+          await RNLinking.openURL(result.paymentUrl);
+        }
+      }
 
       // Laisse un instant au webhook, puis resynchronise le profil.
       await new Promise((r) => setTimeout(r, 1500));

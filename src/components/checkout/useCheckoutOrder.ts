@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Platform, Linking } from 'react-native';
+import { Platform, Linking as RNLinking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { Haptics } from '@daloa/utils';
 import { ordersService, paymentService, analyticsService } from '@daloa/api';
@@ -13,11 +14,16 @@ async function openPaymentGateway(paymentUrl: string) {
     window.location.href = paymentUrl;
     return;
   }
+  const redirectUrl = Linking.createURL('payment/success');
   try {
-    await WebBrowser.openBrowserAsync(paymentUrl);
+    await WebBrowser.openAuthSessionAsync(paymentUrl, redirectUrl);
   } catch (err) {
-    console.warn('[Checkout] WebBrowser a échoué, repli sur Linking:', err);
-    await Linking.openURL(paymentUrl);
+    console.warn('[Checkout] openAuthSessionAsync a échoué, repli sur openBrowserAsync:', err);
+    try {
+      await WebBrowser.openBrowserAsync(paymentUrl);
+    } catch (e2) {
+      await RNLinking.openURL(paymentUrl);
+    }
   }
 }
 

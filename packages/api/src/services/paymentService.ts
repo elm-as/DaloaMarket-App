@@ -19,6 +19,7 @@ export interface InitiatePaymentInput {
   metadata?: Record<string, unknown>;
   orderInput?: Record<string, unknown>;
   orderInputs?: Record<string, unknown>[];
+  source?: string;
 }
 
 export interface InitiatePaymentResult {
@@ -45,13 +46,17 @@ export const paymentService = {
    */
   async initiatePayment(input: InitiatePaymentInput): Promise<InitiatePaymentResult> {
     const token = await getAccessToken();
+    const payload = {
+      ...input,
+      source: input.source || 'app',
+    };
     const response = await fetch(`${ENV_CONFIG.PAYMENT_API_URL}/create-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json().catch(() => ({} as any));
