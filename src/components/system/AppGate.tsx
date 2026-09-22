@@ -17,7 +17,7 @@ export const AppGate: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const { user, profile, isLoading, isProfileComplete, isAdmin } = useAuth();
 
   // 1. Maintenance (admins autorisés à naviguer)
-  if (settings?.maintenance.enabled && !isAdmin) {
+  if (settings?.maintenance?.enabled && !isAdmin) {
     return (
       <MaintenanceScreen
         message={settings.maintenance.message}

@@ -8,8 +8,11 @@ import { normalizePayoutNetwork } from '@daloa/config';
  */
 export const denormalizePayoutNetwork = (network?: string | null): string => {
   if (!network) return 'wave';
-  const clean = network.replace(/-ci$/, '').toLowerCase();
-  if (['wave', 'orange', 'mtn', 'moov'].includes(clean)) return clean;
+  const clean = network.replace(/-ci$/, '').toLowerCase().trim();
+  if (clean === 'orange' || clean === 'orange-money' || clean === 'orangemoney') return 'orange';
+  if (clean === 'mtn' || clean === 'mtn-momo' || clean === 'momo') return 'mtn';
+  if (clean === 'moov' || clean === 'moov-money' || clean === 'moovmoney') return 'moov';
+  if (clean === 'wave') return 'wave';
   return 'wave';
 };
 

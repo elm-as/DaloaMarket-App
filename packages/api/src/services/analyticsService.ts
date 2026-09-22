@@ -48,6 +48,24 @@ export const analyticsService = {
         }
       });
   },
+  /**
+   * Incrémente le compteur de vues d'une annonce (RPC Supabase increment_listing_views).
+   * Protège contre les vues en doublon par viewer/24h et n'échoue jamais de façon bloquante.
+   */
+  async incrementListingViews(listingId: string, viewerId?: string | null): Promise<void> {
+    try {
+      const vid = viewerId || `anon_${Math.random().toString(36).substring(2, 12)}`;
+      await supabase.rpc('increment_listing_views', {
+        p_listing_id: listingId,
+        p_viewer_id: vid,
+      });
+    } catch (e: unknown) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('[analytics] increment_listing_views échoué:', e);
+      }
+    }
+  },
 };
 
 declare const __DEV__: boolean | undefined;
+

@@ -81,9 +81,14 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => undefined);
+    }, 3000);
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync().catch(() => undefined);
+      clearTimeout(timer);
     }
+    return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) return null;
@@ -103,6 +108,7 @@ export default function RootLayout() {
               <StatusBar style="dark" backgroundColor={colors.bg.surface} />
               <AppGate>
               <Stack
+                initialRouteName="(tabs)"
                 screenOptions={{
                   headerShown: false,
                   contentStyle: { backgroundColor: colors.bg.surface },

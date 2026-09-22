@@ -12,14 +12,12 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Support monorepo pnpm : on s'en remet aux valeurs par défaut d'Expo.
-//
-// Depuis que les paquets partagés vivent à la racine et sont déclarés en
-// `workspace:*`, `getDefaultConfig` résout tout seul la bonne liste : le
-// node_modules de la racine, les deux apps, et les cinq paquets. L'ancien
-// `watchFolders = [monorepoRoot]` écrasait cette liste par le dépôt entier —
-// d'où la surveillance de 300 000 fichiers hors périmètre, et l'alerte
-// d'expo-doctor sur les entrées manquantes.
+// Support monorepo pnpm : inclure la racine du monorepo pour résoudre les packages partagés
+config.watchFolders = [monorepoRoot];
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(monorepoRoot, 'node_modules'),
+];
 
 // Exclusion des dépôts non-Expo du monorepo, et de l'app sœur : rien ne doit
 // se résoudre depuis ces arbres.
