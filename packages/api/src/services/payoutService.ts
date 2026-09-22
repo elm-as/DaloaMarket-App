@@ -104,12 +104,17 @@ export const payoutService = {
   /**
    * Récupère l'historique des reversements d'un utilisateur
    */
-  async getPayoutHistory(userId: string) {
-    const { data, error } = await supabase
+  async getPayoutHistory(userId: string, type?: string) {
+    let query = supabase
       .from('payouts')
       .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .eq('user_id', userId);
+
+    if (type) {
+      query = query.eq('type', type);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
     return (data || []).map((p: any) => ({

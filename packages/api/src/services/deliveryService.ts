@@ -344,50 +344,78 @@ export const deliveryService = {
 
     const { data: driver } = await supabase
       .from('delivery_persons')
-      .select('*')
+      .select('id, user_id, rating, is_available')
       .eq('id', driverId)
-      .single();
+      .maybeSingle();
 
-    // Récupérer toutes les courses livrées par ce coursier
-    const { data: allDeliveredRuns } = await supabase
-      .from('delivery_assignments')
-      .select('delivery_price, delivered_at')
-      .eq('delivery_person_id', driverId)
-      .eq('status', 'delivered');
+    const driverUserId = driver?.user_id || driverId;
 
-    // Récupérer les retraits déjà demandés ou validés
-    const { data: payouts } = await supabase
-      .from('payouts')
-      .select('amount, status')
-      .eq('user_id', driver?.user_id || driverId)
-      .in('status', ['pending', 'processing', 'completed', 'paid']);
+    const [deliveredRes, activeRes, payoutsRes] = await Promise.all([
+      // 1. Toutes les courses livrées par ce coursier
+      supabase
+        .from('delivery_assignments')
+        .select('delivery_price, delivered_at')
+        .eq('delivery_person_id', driverId)
+        .eq('status', 'delivered'),
+      // 2. Courses actuellement en cours d'acheminement
+      supabase
+        .from('delivery_assignments')
+        .select('delivery_price')
+        .eq('delivery_person_id', driverId)
+        .in('status', ['assigned', 'picked_up', 'in_transit']),
+      // 3. Versements liés aux livraisons uniquement
+      supabase
+        .from('payouts')
+        .select('amount, status')
+        .eq('user_id', driverUserId)
+        .eq('type', 'delivery'),
+    ]);
 
-    const totalWithdrawn = (payouts || []).reduce((acc, p) => acc + (p.amount || 0), 0);
+    const allDelivered = deliveredRes.data || [];
+    const activeRuns = activeRes.data || [];
+    const payouts = payoutsRes.data || [];
 
     let earningsToday = 0;
     let completedRunsToday = 0;
     let totalLifetimeEarnings = 0;
 
-    (allDeliveredRuns || []).forEach((r) => {
-      const deliveryPrice = Number(r.delivery_price) || 0;
-      const netGain = deliveryPrice - commissionOn(deliveryPrice);
-      totalLifetimeEarnings += netGain;
+    allDelivered.forEach((r) => {
+      const price = Number(r.delivery_price) || 0;
+      const net = price - commissionOn(price);
+      totalLifetimeEarnings += net;
 
       if (r.delivered_at && new Date(r.delivered_at) >= today) {
-        earningsToday += netGain;
+        earningsToday += net;
         completedRunsToday += 1;
       }
     });
 
-    const totalAvailableBalance = Math.max(0, totalLifetimeEarnings - totalWithdrawn);
+    const pendingEscrowAmount = activeRuns.reduce((sum, r) => {
+      const price = Number(r.delivery_price) || 0;
+      return sum + (price - commissionOn(price));
+    }, 0);
+
+    const pendingPayoutAmount = payouts
+      .filter((p) => p.status === 'pending' || p.status === 'processing')
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    const paidOutAmount = payouts
+      .filter((p) => p.status === 'paid' || p.status === 'completed')
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    const totalAvailableBalance = Math.max(0, totalLifetimeEarnings - paidOutAmount - pendingPayoutAmount);
 
     return {
       completedRunsToday,
       earningsToday,
-      pendingEscrowAmount: 0,
+      pendingEscrowAmount,
       totalAvailableBalance,
       rating: driver?.rating != null ? Number(driver.rating) : null,
       isOnline: Boolean(driver?.is_available),
+      totalLifetimeEarnings,
+      totalCompletedRuns: allDelivered.length,
+      pendingPayoutAmount,
+      paidOutAmount,
     };
   },
 

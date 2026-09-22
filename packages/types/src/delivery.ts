@@ -72,4 +72,8 @@ export interface DriverDailyStats {
   totalAvailableBalance: number;
   rating: number | null;
   isOnline: boolean;
+  totalLifetimeEarnings?: number;
+  totalCompletedRuns?: number;
+  pendingPayoutAmount?: number;
+  paidOutAmount?: number;
 }

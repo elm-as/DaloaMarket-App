@@ -204,10 +204,10 @@ export function usePayoutSettings(userId?: string | null) {
   });
 }
 
-export function usePayoutHistory(userId?: string | null) {
+export function usePayoutHistory(userId?: string | null, type?: string) {
   return useQuery({
-    queryKey: ['payout_history', userId],
-    queryFn: () => (userId ? payoutService.getPayoutHistory(userId) : []),
+    queryKey: ['payout_history', userId, type],
+    queryFn: () => (userId ? payoutService.getPayoutHistory(userId, type) : []),
     enabled: Boolean(userId),
   });
 }
