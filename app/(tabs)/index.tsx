@@ -29,7 +29,8 @@ import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { HomeHero } from '../../src/components/home/HomeHero';
 import { HomeDeliveryBanner } from '../../src/components/home/HomeDeliveryBanner';
-import { HomeRecommendations } from '../../src/components/home/HomeRecommendations';
+import { HomeTrendingSection } from '../../src/components/home/HomeTrendingSection';
+import { HomeForYouSection } from '../../src/components/home/HomeForYouSection';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
 import { getRecommendationsForUser, getTrendingRecommendations } from '../../src/lib/recommendationEngine';
@@ -198,13 +199,9 @@ export default function HomeScreen() {
       <HomeHero />
       <HomeDeliveryBanner />
 
-      {/* 1. Section Populaire à Daloa (Vélocité temporelle) */}
-      <HomeRecommendations
+      {/* 1. Section Populaire à Daloa (Vélocité temporelle / Billboard Top Chart) */}
+      <HomeTrendingSection
         recommendations={trendingRecommendations}
-        title="Populaire à Daloa"
-        subtitle="Les annonces les plus demandées du moment"
-        badgeText="🔥 Tendance"
-        icon={<Flame size={16} color={accent[600]} />}
         onPressItem={(item) => router.push(`/listing/${item.id}` as any)}
         onAddToCart={(item) => handleAddToCart(item.id)}
         onToggleFavorite={(id) => toggleFavorite(id)}
@@ -212,14 +209,10 @@ export default function HomeScreen() {
         getCartQty={getCartQty}
       />
 
-      {/* 2. Section Recommandations Pour vous (ML Personnalisé si profil actif) */}
+      {/* 2. Section Pour vous (Curation ML Personnalisée / Fiches Paysage) */}
       {personalizedRecommendations.length > 0 && (
-        <HomeRecommendations
+        <HomeForYouSection
           recommendations={personalizedRecommendations}
-          title="Pour vous"
-          subtitle="Sélectionné selon vos préférences & recherches"
-          badgeText="✨ Recommandé"
-          icon={<Sparkles size={16} color={accent[600]} />}
           onPressItem={(item) => router.push(`/listing/${item.id}` as any)}
           onAddToCart={(item) => handleAddToCart(item.id)}
           onToggleFavorite={(id) => toggleFavorite(id)}
