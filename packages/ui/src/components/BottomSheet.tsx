@@ -4,7 +4,6 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
   ScrollView,
   ViewStyle,
@@ -34,37 +33,44 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop}>
-          <TouchableWithoutFeedback>
-            <View style={[styles.sheet, contentStyle]}>
-              <View style={styles.handleContainer}>
-                <View style={styles.handle} />
-              </View>
+      <View style={styles.backdrop}>
+        {/* Fond sombre cliquable pour fermer sans intercepter les clics intérieurs */}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+          accessibilityLabel="Fermer la boîte modale"
+        />
 
-              {title && (
-                <View style={styles.header}>
-                  <Text style={styles.title}>{title}</Text>
-                  <TouchableOpacity
-                    onPress={onClose}
-                    activeOpacity={0.7}
-                    style={styles.closeBtn}
-                  >
-                    <X size={20} color={colors.grey[500]} />
-                  </TouchableOpacity>
-                </View>
-              )}
+        <View style={[styles.sheet, contentStyle]}>
+          <View style={styles.handleContainer}>
+            <View style={styles.handle} />
+          </View>
 
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
+          {title && (
+            <View style={styles.header}>
+              <Text style={styles.title}>{title}</Text>
+              <TouchableOpacity
+                onPress={onClose}
+                activeOpacity={0.7}
+                style={styles.closeBtn}
+                accessibilityLabel="Fermer"
               >
-                {children}
-              </ScrollView>
+                <X size={20} color={colors.grey[500]} />
+              </TouchableOpacity>
             </View>
-          </TouchableWithoutFeedback>
+          )}
+
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {children}
+          </ScrollView>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 };

@@ -1,5 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { View, TextInput, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import {
+  View,
+  TextInput,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { colors, radii, spacing, typography } from '../tokens';
 import { Haptics } from '@daloa/utils';
 
@@ -24,7 +30,19 @@ export const OtpInput: React.FC<OtpInputProps> = ({
   const digits = value.split('');
   const isSixDigits = length >= 6;
 
+  // Laisse le temps au BottomSheet (animation slide du Modal natif ~300ms)
+  // de terminer sa transition avant de requérir le focus du clavier.
+  useEffect(() => {
+    if (autoFocus) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocus]);
+
   const handleFocus = () => {
+    Haptics.lightImpact();
     inputRef.current?.focus();
   };
 
@@ -35,46 +53,53 @@ export const OtpInput: React.FC<OtpInputProps> = ({
   };
 
   return (
-    <Pressable
-      onPress={handleFocus}
-      style={styles.container}
-      accessible={true}
-      accessibilityLabel={`Champ de saisie code secret OTP à ${length} chiffres`}
-    >
-      <View style={styles.boxesContainer}>
-        {Array.from({ length }).map((_, index) => {
-          const digit = digits[index] || '';
-          const isCurrent = isFocused && index === digits.length;
-          const isFilled = digit.length > 0;
+    <View style={styles.container}>
+      <View style={styles.inputWrapper}>
+        {/*
+          Cases visuelles pass-through :
+          pointerEvents="none" garantit que les View n'interceptent aucun événement tactile.
+          Le clic traverse directement vers le TextInput natif placé au-dessus.
+        */}
+        <View style={styles.boxesContainer} pointerEvents="none">
+          {Array.from({ length }).map((_, index) => {
+            const digit = digits[index] || '';
+            const isCurrent = isFocused && index === digits.length;
+            const isFilled = digit.length > 0;
 
-          return (
-            <View
-              key={index}
-              style={[
-                styles.box,
-                isSixDigits && styles.boxSixDigits,
-                isFilled && styles.boxFilled,
-                isCurrent && styles.boxCurrent,
-                isError && styles.boxError,
-              ]}
-            >
-              <Text
+            return (
+              <View
+                key={index}
                 style={[
-                  styles.digitText,
-                  isSixDigits && styles.digitTextSixDigits,
+                  styles.box,
+                  isSixDigits && styles.boxSixDigits,
+                  isFilled && styles.boxFilled,
+                  isCurrent && styles.boxCurrent,
+                  isError && styles.boxError,
                 ]}
               >
-                {digit}
-              </Text>
-            </View>
-          );
-        })}
+                {digit ? (
+                  <Text
+                    style={[
+                      styles.digitText,
+                      isSixDigits && styles.digitTextSixDigits,
+                    ]}
+                  >
+                    {digit}
+                  </Text>
+                ) : isCurrent ? (
+                  <View style={styles.cursor} />
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
 
-        {/* 
-          Surcouche TextInput plein cadre :
-          Sur Android dans un BottomSheet, un champ 1x1 masqué empêche le focus natif.
-          Couvrir l'ensemble des cases avec StyleSheet.absoluteFillObject et opacity: 0.01
-          permet à l'OS Android de capter directement le tap et d'ouvrir le clavier numérique.
+        {/*
+          TextInput natif plein cadre :
+          1. elevation: 20 et zIndex: 20 garantissent qu'il est physiquement au premier plan sur Android.
+          2. opacity: 1 avec color: 'transparent' et backgroundColor: 'transparent' permet à Android
+             de reconnaître un vrai champ EditText actif et d'invoquer immédiatement le clavier virtuel.
+          3. Supporte les chiffres, le presse-papier et la détection automatique OTP SMS.
         */}
         <TextInput
           ref={inputRef}
@@ -85,11 +110,30 @@ export const OtpInput: React.FC<OtpInputProps> = ({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           caretHidden={true}
-          autoFocus={autoFocus}
+          autoComplete="one-time-code"
+          textContentType="oneTimeCode"
+          selectionColor="transparent"
           style={styles.overlayInput}
+          accessibilityLabel={`Saisie du code secret OTP à ${length} chiffres`}
+          accessibilityRole="text"
         />
       </View>
-    </Pressable>
+
+      {/* Raccourci tactile explicite pour garantir l'ouverture du clavier sur tous les appareils */}
+      <TouchableOpacity
+        onPress={handleFocus}
+        activeOpacity={0.7}
+        style={[styles.tapHelper, isFocused && styles.tapHelperActive]}
+        accessibilityRole="button"
+        accessibilityLabel="Ouvrir le clavier de saisie OTP"
+      >
+        <Text style={[styles.tapHelperText, isFocused && styles.tapHelperTextActive]}>
+          {isFocused
+            ? `Saisie en cours (${digits.length}/${length} chiffres)`
+            : '👆 Appuyez ici pour afficher le clavier'}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
@@ -99,18 +143,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
+  inputWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
   boxesContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
     gap: 8,
   },
   overlayInput: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.01,
     color: 'transparent',
     backgroundColor: 'transparent',
+    zIndex: 20,
+    elevation: 20,
   },
   box: {
     width: 52,
@@ -143,6 +193,12 @@ const styles = StyleSheet.create({
   boxError: {
     borderColor: colors.status.error,
   },
+  cursor: {
+    width: 2,
+    height: 24,
+    backgroundColor: colors.primary.DEFAULT,
+    borderRadius: 1,
+  },
   digitText: {
     color: '#111827',
     fontSize: typography.sizes['3xl'],
@@ -151,5 +207,27 @@ const styles = StyleSheet.create({
   },
   digitTextSixDigits: {
     fontSize: typography.sizes['2xl'],
+  },
+  tapHelper: {
+    marginTop: spacing[3],
+    paddingVertical: spacing[1],
+    paddingHorizontal: spacing[3],
+    backgroundColor: '#F3F4F6',
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  tapHelperActive: {
+    backgroundColor: '#FFF4E6',
+    borderColor: colors.primary.DEFAULT,
+  },
+  tapHelperText: {
+    fontSize: typography.sizes.xs,
+    fontFamily: typography.families.medium,
+    color: colors.grey[600],
+  },
+  tapHelperTextActive: {
+    color: colors.primary.DEFAULT,
+    fontFamily: typography.families.bold,
   },
 });
