@@ -20,11 +20,7 @@ import { CheckoutStepLocation } from '../../src/components/checkout/CheckoutStep
 import { CheckoutStepPayment } from '../../src/components/checkout/CheckoutStepPayment';
 import { PaymentMode, MobileMoneyOperator } from '../../src/components/checkout/PaymentMethodSelector';
 import { useCheckoutOrder } from '../../src/components/checkout/useCheckoutOrder';
-import {
-  resolveSellerLocation,
-  resolveBuyerLocation,
-  calculateDrivingDistanceKm,
-} from '../../src/components/checkout/checkout-location';
+import { resolveSellerLocation, resolveBuyerLocation, calculateDrivingDistanceKm } from '../../src/components/checkout/checkout-location';
 
 const FALLBACK_PHOTO = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
@@ -34,11 +30,7 @@ export default function CheckoutScreen() {
   const accent = useAccent();
   const insets = useSafeAreaInsets();
   const { listingId, variantId, qty, quantity: qtyParam, cart } = useLocalSearchParams<{
-    listingId?: string;
-    variantId?: string;
-    qty?: string;
-    quantity?: string;
-    cart?: string;
+    listingId?: string; variantId?: string; qty?: string; quantity?: string; cart?: string;
   }>();
   const quantity = Math.max(1, parseInt(qty || qtyParam || '1', 10));
   const isCartMode = cart === '1';
@@ -74,8 +66,13 @@ export default function CheckoutScreen() {
   );
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
 
-  // Coordonnées résolues du vendeur
-  const sellerCoords = useMemo(() => resolveSellerLocation(listing), [listing]);
+  // Coordonnées résolues du vendeur (en mode panier, prend le premier article du panier)
+  const sellerCoords = useMemo(() => {
+    if (isCartMode && cartItems.length > 0) {
+      return resolveSellerLocation(cartItems[0]?.listing);
+    }
+    return resolveSellerLocation(listing);
+  }, [isCartMode, cartItems, listing]);
 
   const [isLocatingGps, setIsLocatingGps] = useState(false);
 
@@ -113,7 +110,7 @@ export default function CheckoutScreen() {
   // Calcul dynamique de la distance via Mapbox dès que les positions vendeur ou acheteur changent
   useEffect(() => {
     let active = true;
-    const buyerPoint = resolveBuyerLocation(deliveryCoords);
+    const buyerPoint = resolveBuyerLocation(deliveryCoords, deliveryDistrict);
 
     calculateDrivingDistanceKm(sellerCoords, buyerPoint).then((calculatedDistance) => {
       if (active && calculatedDistance > 0) {
@@ -124,7 +121,7 @@ export default function CheckoutScreen() {
     return () => {
       active = false;
     };
-  }, [sellerCoords, deliveryCoords]);
+  }, [sellerCoords, deliveryCoords, deliveryDistrict]);
 
   const estimatedCartDelivery =
     deliveryMode === 'pickup' ? 0 : PRICING_CONFIG.delivery.baseFee * Math.max(1, cartSellerCount);
@@ -138,9 +135,9 @@ export default function CheckoutScreen() {
         sellerCommission: 0, sellerNetPayout: cartProductTotal, driverFee: 0, driverNetPayout: estimatedCartDelivery,
       }
     : calculateOrderBreakdown({
-        productPrice: activePrice, quantity, distanceKm,
+        productPrice: activePrice, quantity, distanceKm, deliveryMode,
         isProSeller: Boolean(listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()),
-        deliveryMode, deliveryFeeOverride: listing?.delivery_fee_override,
+        deliveryFeeOverride: listing?.delivery_fee_override,
       });
 
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({

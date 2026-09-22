@@ -1,4 +1,4 @@
-import { DALOA_CENTER } from '@daloa/config';
+import { DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
 import { isLocationInDaloa, getDrivingRoute, haversineDistance } from '@daloa/utils';
 
 export interface GeoPoint {
@@ -10,7 +10,8 @@ export interface GeoPoint {
  * Résout la position GPS réelle du vendeur sur la carte.
  * 1. Coordonnées directes de l'article (si géolocalisé)
  * 2. Coordonnées de la boutique du vendeur (shop_latitude / shop_longitude)
- * 3. Repli par défaut : Centre de Daloa
+ * 3. Repli intelligent sur le quartier déclaré du commerçant (ex: Tazibouo, Balouzon)
+ * 4. Repli par défaut : Centre de Daloa
  */
 export function resolveSellerLocation(listing: any): GeoPoint {
   if (!listing) {
@@ -37,19 +38,33 @@ export function resolveSellerLocation(listing: any): GeoPoint {
     return { latitude: Number(shopLat), longitude: Number(shopLng) };
   }
 
+  // Repli haute fidélité : barycentre du quartier déclaré
+  const district = listing.seller?.district || listing.district;
+  if (district && DALOA_DISTRICT_COORDINATES[district]) {
+    return DALOA_DISTRICT_COORDINATES[district];
+  }
+
   return { latitude: DALOA_CENTER.lat, longitude: DALOA_CENTER.lng };
 }
 
 /**
  * Résout la position GPS réelle choisie par l'acheteur sur la carte ou via GPS.
+ * Si le GPS est indisponible ou hors zone, repli sur le quartier sélectionné.
  */
-export function resolveBuyerLocation(deliveryCoords?: GeoPoint | null): GeoPoint {
+export function resolveBuyerLocation(
+  deliveryCoords?: GeoPoint | null,
+  district?: string | null
+): GeoPoint {
   if (
     deliveryCoords?.latitude != null &&
     deliveryCoords?.longitude != null &&
     isLocationInDaloa(deliveryCoords.latitude, deliveryCoords.longitude)
   ) {
     return { latitude: deliveryCoords.latitude, longitude: deliveryCoords.longitude };
+  }
+
+  if (district && DALOA_DISTRICT_COORDINATES[district]) {
+    return DALOA_DISTRICT_COORDINATES[district];
   }
 
   return { latitude: DALOA_CENTER.lat, longitude: DALOA_CENTER.lng };

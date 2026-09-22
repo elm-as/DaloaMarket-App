@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Haptics } from '@daloa/utils';
 import { ordersService, paymentService, analyticsService } from '@daloa/api';
 import { PaymentMode, MobileMoneyOperator } from './PaymentMethodSelector';
+import { resolveBuyerLocation } from './checkout-location';
 import { showAlert } from '@daloa/ui';
 
 async function openPaymentGateway(paymentUrl: string) {
@@ -73,6 +74,13 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           ? params.deliveryAddress.trim()
           : 'Retrait direct en boutique';
 
+      const resolvedDeliveryPoint = resolveBuyerLocation(
+        params.deliveryCoords,
+        params.deliveryDistrict
+      );
+      const deliveryLat = params.deliveryMode === 'delivery' ? resolvedDeliveryPoint.latitude : undefined;
+      const deliveryLng = params.deliveryMode === 'delivery' ? resolvedDeliveryPoint.longitude : undefined;
+
       // ══ 1. MODE PANIER (multi-articles / multi-vendeurs) ══
       if (params.isCartMode) {
         if (params.paymentMode === 'online') {
@@ -82,8 +90,8 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
             variant_id: ci.variant?.id || undefined,
             quantity: ci.quantity,
             delivery_address: fullAddress,
-            delivery_lat: params.deliveryCoords?.latitude ?? undefined,
-            delivery_lng: params.deliveryCoords?.longitude ?? undefined,
+            delivery_lat: deliveryLat,
+            delivery_lng: deliveryLng,
             delivery_mode: params.deliveryMode,
           }));
 
@@ -122,8 +130,8 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           deliveryMode: params.deliveryMode,
           paymentMethod: codMethod,
           fullAddress,
-          deliveryLat: params.deliveryCoords?.latitude,
-          deliveryLng: params.deliveryCoords?.longitude,
+          deliveryLat,
+          deliveryLng,
         });
         Haptics.success();
         const targetPath = firstOrderId ? `/order/${firstOrderId}` : '/(tabs)/orders';
@@ -148,8 +156,8 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
             variant_id: params.variantId || undefined,
             quantity: params.quantity,
             delivery_address: fullAddress,
-            delivery_lat: params.deliveryCoords?.latitude ?? undefined,
-            delivery_lng: params.deliveryCoords?.longitude ?? undefined,
+            delivery_lat: deliveryLat,
+            delivery_lng: deliveryLng,
             delivery_mode: params.deliveryMode,
           },
         });
@@ -193,8 +201,8 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         payment_method: effectivePaymentMethod as any,
         delivery_address: fullAddress,
         delivery_district: params.deliveryDistrict,
-        delivery_lat: params.deliveryCoords?.latitude,
-        delivery_lng: params.deliveryCoords?.longitude,
+        delivery_lat: deliveryLat,
+        delivery_lng: deliveryLng,
         buyer_phone: params.buyerPhone.trim(),
       });
 

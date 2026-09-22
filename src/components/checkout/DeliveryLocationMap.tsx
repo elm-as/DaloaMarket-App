@@ -38,7 +38,7 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     const sLat = sellerCoords?.latitude;
     const sLng = sellerCoords?.longitude;
     if (sLat != null && sLng != null) {
-      return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
+      return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/auto/640x360@2x?access_token=${activeToken}`;
     }
     return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
   }, [currentLat, currentLng, sellerCoords, zoom, activeToken, mapError]);

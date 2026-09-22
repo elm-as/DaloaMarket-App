@@ -94,6 +94,51 @@ export const DALOA_DISTRICTS = [
 
 export type DaloaDistrict = (typeof DALOA_DISTRICTS)[number] | string;
 
+/**
+ * Coordonnées GPS barycentriques des quartiers de Daloa.
+ * Utilisées comme repli haute fidélité lorsqu'une boutique ou un acheteur
+ * n'a pas activé son GPS ou a des coordonnées hors zone (ex: Abidjan).
+ */
+export const DALOA_DISTRICT_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
+  'Tazibouo': { latitude: 6.8795, longitude: -6.4488 },
+  'Balouzon': { latitude: 6.9044, longitude: -6.4234 },
+  'Lobia': { latitude: 6.8977, longitude: -6.4492 },
+  'Abattoir': { latitude: 6.8611, longitude: -6.4341 },
+  'Commerce': { latitude: 6.8900, longitude: -6.4449 },
+  'Centre-ville': { latitude: 6.8850, longitude: -6.4470 },
+  'Kennedy': { latitude: 6.8835, longitude: -6.4520 },
+  'Gbokora': { latitude: 6.9147, longitude: -6.4484 },
+  'Huberson': { latitude: 6.8811, longitude: -6.4658 },
+  'Suisse': { latitude: 6.8724, longitude: -6.4432 },
+  'Belle-ville': { latitude: 6.8750, longitude: -6.4579 },
+  'Millionnaire': { latitude: 6.8883, longitude: -6.4558 },
+  'Odjenecourani': { latitude: 6.8689, longitude: -6.4500 },
+  'Institut Pastoral': { latitude: 6.9027, longitude: -6.4406 },
+  'Palmeraie': { latitude: 6.8784, longitude: -6.4514 },
+  'Orly': { latitude: 6.8710, longitude: -6.4560 },
+  'Dioulabougou': { latitude: 6.8850, longitude: -6.4480 },
+  'Quartier Baoulé': { latitude: 6.8792, longitude: -6.4565 },
+  'Savonnerie': { latitude: 6.8730, longitude: -6.4510 },
+  'Évêché': { latitude: 6.8800, longitude: -6.4450 },
+  'Garage': { latitude: 6.8870, longitude: -6.4580 },
+  'Soleil': { latitude: 6.8920, longitude: -6.4380 },
+  'Texas': { latitude: 6.8760, longitude: -6.4460 },
+  'Labia': { latitude: 6.8910, longitude: -6.4510 },
+  'Fadiga': { latitude: 6.8820, longitude: -6.4490 },
+  'Marin': { latitude: 6.8840, longitude: -6.4550 },
+  'Cissoko': { latitude: 6.8780, longitude: -6.4440 },
+  'Gbeulville': { latitude: 6.8830, longitude: -6.4390 },
+  'Cafop': { latitude: 6.8690, longitude: -6.4620 },
+  'Koyakabougou': { latitude: 6.8950, longitude: -6.4520 },
+  'Liberia': { latitude: 6.8740, longitude: -6.4380 },
+  'Manioc': { latitude: 6.8670, longitude: -6.4460 },
+  'Mossibougou': { latitude: 6.8880, longitude: -6.4410 },
+  'Sapia': { latitude: 6.9080, longitude: -6.4350 },
+  'Wolof': { latitude: 6.8860, longitude: -6.4450 },
+  'Tagoura': { latitude: 6.9150, longitude: -6.4380 },
+  'Tapeguhe': { latitude: 6.8600, longitude: -6.4550 },
+};
+
 /** Catégories officielles DaloaMarket */
 export interface CategoryDefinition {
   id: string;

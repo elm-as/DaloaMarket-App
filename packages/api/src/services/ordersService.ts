@@ -1,7 +1,7 @@
 import { supabase } from '../supabase';
 import { OrderWithDetails, CheckoutPayload, OrderStatus } from '@daloa/types';
-import { calculateOrderBreakdown } from '@daloa/config';
-import { haversineDistance, generateSecureOtp } from '@daloa/utils';
+import { calculateOrderBreakdown, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
+import { haversineDistance, generateSecureOtp, isLocationInDaloa } from '@daloa/utils';
 import { systemSettingsService } from './systemSettingsService';
 
 /** Traduction des `reason` renvoyés par les RPC vendeur. */
@@ -36,15 +36,32 @@ export const ordersService = {
     const isPro = Boolean(seller?.pro_until && new Date(seller.pro_until) > new Date());
 
     // 2. Calcul de la distance
-    const sellerCoords = {
-      lat: seller?.shop_latitude ?? seller?.latitude ?? 6.8773,
-      lng: seller?.shop_longitude ?? seller?.longitude ?? -6.4502,
-    };
-    const buyerCoords = {
-      lat: payload.delivery_lat ?? 6.8773,
-      lng: payload.delivery_lng ?? -6.4502,
-    };
-    const distanceKm = haversineDistance(sellerCoords, buyerCoords);
+    const rawSellerLat = seller?.shop_latitude ?? seller?.latitude;
+    const rawSellerLng = seller?.shop_longitude ?? seller?.longitude;
+    let sellerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
+    if (rawSellerLat != null && rawSellerLng != null && isLocationInDaloa(Number(rawSellerLat), Number(rawSellerLng))) {
+      sellerCoords = { lat: Number(rawSellerLat), lng: Number(rawSellerLng) };
+    } else {
+      const sellerDistrict = seller?.district || listing.district;
+      const districtPoint = sellerDistrict ? (DALOA_DISTRICT_COORDINATES as any)[sellerDistrict] : null;
+      if (districtPoint) {
+        sellerCoords = { lat: districtPoint.latitude, lng: districtPoint.longitude };
+      }
+    }
+
+    const rawBuyerLat = payload.delivery_lat;
+    const rawBuyerLng = payload.delivery_lng;
+    let buyerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
+    if (rawBuyerLat != null && rawBuyerLng != null && isLocationInDaloa(Number(rawBuyerLat), Number(rawBuyerLng))) {
+      buyerCoords = { lat: Number(rawBuyerLat), lng: Number(rawBuyerLng) };
+    } else {
+      const buyerDistrict = payload.delivery_district;
+      const districtPoint = buyerDistrict ? (DALOA_DISTRICT_COORDINATES as any)[buyerDistrict] : null;
+      if (districtPoint) {
+        buyerCoords = { lat: districtPoint.latitude, lng: districtPoint.longitude };
+      }
+    }
+    const distanceKm = Math.min(15.0, Math.max(0.5, Number(haversineDistance(sellerCoords, buyerCoords).toFixed(1))));
 
     // Override de commission autoritaire depuis la config de phase (Phase 0 = 0%).
     // Lu ici pour garantir la cohérence web/mobile quel que soit l'appelant.
@@ -125,6 +142,29 @@ export const ordersService = {
       throw orderErr;
     }
 
+    // 4b. Décrémenter le stock et marquer comme vendu si stock = 0
+    try {
+      const prevStock = Number(listing.stock) || 1;
+      const orderQty = payload.quantity || 1;
+      const newStock = Math.max(0, prevStock - orderQty);
+      const updateData: any = {
+        stock: newStock,
+        status: newStock === 0 ? 'sold' : listing.status,
+      };
+      if (Array.isArray(listing.variants) && payload.variant_id) {
+        updateData.variants = listing.variants.map((v: any) => {
+          if (v.id === payload.variant_id) {
+            const vStock = Math.max(0, (Number(v.stock) || 0) - orderQty);
+            return { ...v, stock: vStock, active: vStock > 0 };
+          }
+          return v;
+        });
+      }
+      await supabase.from('listings').update(updateData).eq('id', payload.listing_id);
+    } catch (stockErr) {
+      console.warn('[ordersService] Erreur mise à jour stock:', stockErr);
+    }
+
     // 5. Si livraison demandée, créer le delivery_assignment avec ses deux codes.
     //    OTP sur 6 chiffres pour s'aligner sur le serveur (createOrderFromEscrow) :
     //    4 chiffres ne font que 10 000 combinaisons pour un code qui déclenche un
@@ -190,19 +230,29 @@ export const ordersService = {
       /* fail-safe */
     }
 
-    const buyerCoords = {
-      lat: opts.deliveryLat ?? 6.8773,
-      lng: opts.deliveryLng ?? -6.4502,
-    };
+    const rawBuyerLat = opts.deliveryLat;
+    const rawBuyerLng = opts.deliveryLng;
+    let buyerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
+    if (rawBuyerLat != null && rawBuyerLng != null && isLocationInDaloa(Number(rawBuyerLat), Number(rawBuyerLng))) {
+      buyerCoords = { lat: Number(rawBuyerLat), lng: Number(rawBuyerLng) };
+    }
     let firstOrderId: string | null = null;
 
     for (const [sellerId, group] of groups.entries()) {
       const seller = group.seller || {};
-      const sellerCoords = {
-        lat: seller.shop_latitude ?? seller.latitude ?? 6.8773,
-        lng: seller.shop_longitude ?? seller.longitude ?? -6.4502,
-      };
-      const distanceKm = haversineDistance(sellerCoords, buyerCoords);
+      const rawSellerLat = seller.shop_latitude ?? seller.latitude;
+      const rawSellerLng = seller.shop_longitude ?? seller.longitude;
+      let sellerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
+      if (rawSellerLat != null && rawSellerLng != null && isLocationInDaloa(Number(rawSellerLat), Number(rawSellerLng))) {
+        sellerCoords = { lat: Number(rawSellerLat), lng: Number(rawSellerLng) };
+      } else {
+        const sellerDistrict = seller.district || group.items[0]?.listing?.district;
+        const districtPoint = sellerDistrict ? (DALOA_DISTRICT_COORDINATES as any)[sellerDistrict] : null;
+        if (districtPoint) {
+          sellerCoords = { lat: districtPoint.latitude, lng: districtPoint.longitude };
+        }
+      }
+      const distanceKm = Math.min(15.0, Math.max(0.5, Number(haversineDistance(sellerCoords, buyerCoords).toFixed(1))));
       const productAmount = group.items.reduce(
         (s, ci) => s + (ci.variant?.price ?? ci.listing.price) * ci.quantity,
         0
@@ -263,6 +313,30 @@ export const ordersService = {
           product_amount: (ci.variant?.price ?? ci.listing.price) * ci.quantity,
         }))
       );
+
+      // Décrémenter le stock pour chaque article du panier
+      for (const ci of group.items) {
+        try {
+          const prevStock = Number(ci.listing.stock) || 1;
+          const newStock = Math.max(0, prevStock - ci.quantity);
+          const updateData: any = {
+            stock: newStock,
+            status: newStock === 0 ? 'sold' : ci.listing.status,
+          };
+          if (Array.isArray(ci.listing.variants) && ci.variant?.id) {
+            updateData.variants = ci.listing.variants.map((v: any) => {
+              if (v.id === ci.variant.id) {
+                const vStock = Math.max(0, (Number(v.stock) || 0) - ci.quantity);
+                return { ...v, stock: vStock, active: vStock > 0 };
+              }
+              return v;
+            });
+          }
+          await supabase.from('listings').update(updateData).eq('id', ci.listing.id);
+        } catch (stockErr) {
+          console.warn('[ordersService] Erreur mise à jour stock panier:', stockErr);
+        }
+      }
 
       // Une livraison par vendeur
       if (opts.deliveryMode === 'delivery') {
