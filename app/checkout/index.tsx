@@ -6,8 +6,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, KeyboardScreen } from '@daloa/ui';
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import * as Location from 'expo-location';
-import { calculateOrderBreakdown, PRICING_CONFIG } from '@daloa/config';
-import { Haptics } from '@daloa/utils';
+import { calculateOrderBreakdown, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
+import { Haptics, isLocationInDaloa } from '@daloa/utils';
 import { useListingDetail, analyticsService, useSystemSettings } from '@daloa/api';
 import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -81,25 +81,31 @@ export default function CheckoutScreen() {
       if (!isSilent) setIsLocatingGps(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        if (!isSilent) {
-          setErrorMsg('Veuillez autoriser l’accès GPS pour que le coursier puisse vous livrer.');
-        }
+        if (!isSilent) setErrorMsg('Veuillez autoriser l’accès GPS pour que le coursier puisse vous livrer.');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       if (loc?.coords) {
-        setDeliveryCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-        setErrorMsg(null);
-        Haptics.success();
+        const { latitude, longitude } = loc.coords;
+        if (isLocationInDaloa(latitude, longitude)) {
+          setDeliveryCoords({ latitude, longitude });
+          setErrorMsg(null);
+          Haptics.success();
+        } else {
+          const fallback = (deliveryDistrict && DALOA_DISTRICT_COORDINATES[deliveryDistrict]) || DALOA_CENTER;
+          const fbLat = (fallback as any).latitude ?? (fallback as any).lat;
+          const fbLng = (fallback as any).longitude ?? (fallback as any).lng;
+          setDeliveryCoords({ latitude: fbLat, longitude: fbLng });
+          if (!isSilent) setErrorMsg(`Position calée sur ${deliveryDistrict || 'Daloa'} (GPS hors zone).`);
+          Haptics.selection();
+        }
       }
     } catch {
-      if (!isSilent) {
-        setErrorMsg('Position GPS introuvable. Vérifiez que la localisation de votre appareil est activée.');
-      }
+      if (!isSilent) setErrorMsg('Position GPS introuvable. Vérifiez que la localisation de votre appareil est activée.');
     } finally {
       if (!isSilent) setIsLocatingGps(false);
     }
-  }, []);
+  }, [deliveryDistrict]);
 
   useEffect(() => {
     if (deliveryMode === 'delivery' && !deliveryCoords) {
@@ -123,8 +129,7 @@ export default function CheckoutScreen() {
     };
   }, [sellerCoords, deliveryCoords, deliveryDistrict]);
 
-  const estimatedCartDelivery =
-    deliveryMode === 'pickup' ? 0 : PRICING_CONFIG.delivery.baseFee * Math.max(1, cartSellerCount);
+  const estimatedCartDelivery = deliveryMode === 'pickup' ? 0 : PRICING_CONFIG.delivery.baseFee * Math.max(1, cartSellerCount);
   const cartBuyerServiceFee = Math.round(cartProductTotal * PRICING_CONFIG.marketplace.buyerServiceFeeRate);
 
   const breakdown = isCartMode
@@ -197,12 +202,13 @@ export default function CheckoutScreen() {
 
   const handleSelectDistrict = (d: string) => {
     setDeliveryDistrict(d);
+    if (d && DALOA_DISTRICT_COORDINATES[d]) {
+      setDeliveryCoords(DALOA_DISTRICT_COORDINATES[d]);
+    }
     setIsDistrictPickerOpen(false);
   };
 
-  const photoUrl = isCartMode
-    ? cartItems[0]?.listing?.photos?.[0] || FALLBACK_PHOTO
-    : listing?.photos?.[0] || FALLBACK_PHOTO;
+  const photoUrl = isCartMode ? cartItems[0]?.listing?.photos?.[0] || FALLBACK_PHOTO : listing?.photos?.[0] || FALLBACK_PHOTO;
 
   return (
     <KeyboardScreen>
@@ -338,7 +344,6 @@ const styles = StyleSheet.create({
   hero: { paddingHorizontal: spacing[4], paddingBottom: spacing[4], borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   heroNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
   heroBackBtn: { width: 36, height: 36, borderRadius: radii.lg, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  heroLockCircle: { width: 36, height: 36, borderRadius: radii.full, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  scrollContent: { padding: spacing[4] },
+  heroLockCircle: { width: 36, height: 36, borderRadius: radii.full, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }, scrollContent: { padding: spacing[4] },
   errorBanner: { backgroundColor: colors.status.errorLight, padding: spacing[3], borderRadius: radii.lg, marginBottom: spacing[3] },
 });

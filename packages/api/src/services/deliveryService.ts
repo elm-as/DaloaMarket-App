@@ -6,7 +6,8 @@ import {
   DeliveryPersonRow,
   Coordinates,
 } from '@daloa/types';
-import { haversineDistance } from '@daloa/utils';
+import { haversineDistance, isLocationInDaloa } from '@daloa/utils';
+import { DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
 import {
   deliveryVerificationService,
   VerifyPickupParams,
@@ -96,20 +97,47 @@ export const deliveryService = {
       const seller = order.seller || {};
       const buyer = order.buyer || {};
 
+      const dropoff = parseDropoffAddress(order.delivery_address);
+
+      const isSellerGpsValid =
+        seller.shop_latitude != null &&
+        seller.shop_longitude != null &&
+        isLocationInDaloa(seller.shop_latitude, seller.shop_longitude);
+
+      const sellerDistrictFallback =
+        (seller.district && (DALOA_DISTRICT_COORDINATES as any)[seller.district]) ||
+        (listing.district && (DALOA_DISTRICT_COORDINATES as any)[listing.district]);
+
       const pickupCoords: Coordinates = {
-        lat: seller.shop_latitude ?? 6.8773,
-        lng: seller.shop_longitude ?? -6.4502,
+        lat: isSellerGpsValid
+          ? seller.shop_latitude
+          : (sellerDistrictFallback?.latitude ?? DALOA_CENTER.lat),
+        lng: isSellerGpsValid
+          ? seller.shop_longitude
+          : (sellerDistrictFallback?.longitude ?? DALOA_CENTER.lng),
       };
+
+      const isOrderGpsValid =
+        order.delivery_lat != null &&
+        order.delivery_lng != null &&
+        isLocationInDaloa(order.delivery_lat, order.delivery_lng);
+
+      const buyerDistrictFallback =
+        dropoff.district && (DALOA_DISTRICT_COORDINATES as any)[dropoff.district];
+
       const dropoffCoords: Coordinates = {
-        lat: order.delivery_lat ?? 6.8773,
-        lng: order.delivery_lng ?? -6.4502,
+        lat: isOrderGpsValid
+          ? order.delivery_lat
+          : (buyerDistrictFallback?.latitude ?? DALOA_CENTER.lat),
+        lng: isOrderGpsValid
+          ? order.delivery_lng
+          : (buyerDistrictFallback?.longitude ?? DALOA_CENTER.lng),
       };
 
       const distanceKm = haversineDistance(pickupCoords, dropoffCoords);
       const deliveryPrice = Number(item.delivery_price) || 500;
       const driverFee = commissionOn(deliveryPrice);
       const driverNetGain = deliveryPrice - driverFee;
-      const dropoff = parseDropoffAddress(order.delivery_address);
 
       return {
         assignmentId: item.id,

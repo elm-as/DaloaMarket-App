@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
 import { MapPin, Navigation, LocateFixed, Plus, Minus } from 'lucide-react-native';
-import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics } from '@daloa/utils';
+import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics, isLocationInDaloa } from '@daloa/utils';
 
 interface DeliveryLocationMapProps {
   latitude: number | null;
@@ -24,8 +24,9 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
 }) => {
   const accent = useAccent();
   const [zoom, setZoom] = useState(14);
-  const currentLat = latitude ?? DALOA_CENTER.lat;
-  const currentLng = longitude ?? DALOA_CENTER.lng;
+  const isValidCoords = latitude != null && longitude != null && isLocationInDaloa(latitude, longitude);
+  const currentLat = isValidCoords ? latitude : DALOA_CENTER.lat;
+  const currentLng = isValidCoords ? longitude : DALOA_CENTER.lng;
   const [isLocating, setIsLocating] = useState(false);
 
   const activeToken = MAPBOX_PUBLIC_TOKEN;
@@ -35,9 +36,12 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     if (mapError || !activeToken) {
       return `https://staticmap.openstreetmap.de/staticmap.php?center=${currentLat.toFixed(5)},${currentLng.toFixed(5)}&zoom=${zoom}&size=640x360&maptype=mapnik`;
     }
-    const sLat = sellerCoords?.latitude;
-    const sLng = sellerCoords?.longitude;
-    if (sLat != null && sLng != null) {
+    const rawSLat = sellerCoords?.latitude;
+    const rawSLng = sellerCoords?.longitude;
+    const isSellerValid = rawSLat != null && rawSLng != null && isLocationInDaloa(rawSLat, rawSLng);
+    const sLat = isSellerValid ? rawSLat : DALOA_CENTER.lat;
+    const sLng = isSellerValid ? rawSLng : DALOA_CENTER.lng;
+    if (sellerCoords) {
       return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/auto/640x360@2x?access_token=${activeToken}`;
     }
     return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
@@ -54,8 +58,11 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
   // Calcul dynamique de l'itinéraire routier réel (Mapbox avec replis automatiques)
   useEffect(() => {
     let active = true;
-    const sLat = sellerCoords?.latitude ?? DALOA_CENTER.lat;
-    const sLng = sellerCoords?.longitude ?? DALOA_CENTER.lng;
+    const rawSLat = sellerCoords?.latitude;
+    const rawSLng = sellerCoords?.longitude;
+    const isSellerValid = rawSLat != null && rawSLng != null && isLocationInDaloa(rawSLat, rawSLng);
+    const sLat = isSellerValid ? rawSLat : DALOA_CENTER.lat;
+    const sLng = isSellerValid ? rawSLng : DALOA_CENTER.lng;
 
     getDrivingRoute(
       { latitude: sLat, longitude: sLng },
@@ -79,7 +86,12 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       Haptics.selection();
-      onChangeLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      const { latitude: rawLat, longitude: rawLng } = loc.coords;
+      if (isLocationInDaloa(rawLat, rawLng)) {
+        onChangeLocation({ latitude: rawLat, longitude: rawLng });
+      } else {
+        onChangeLocation({ latitude: DALOA_CENTER.lat, longitude: DALOA_CENTER.lng });
+      }
     } catch (err) {
       console.warn('Erreur localisation GPS:', err);
     } finally {

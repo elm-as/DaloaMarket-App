@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
 import { MapPin, Navigation, LocateFixed, AlertTriangle, Plus, Minus, ExternalLink } from 'lucide-react-native';
-import { Haptics } from '@daloa/utils';
+import { Haptics, isLocationInDaloa } from '@daloa/utils';
 
 interface ShopLocationMapProps {
   latitude: number | null;
@@ -23,9 +23,11 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
 }) => {
   const accent = useAccent();
   const [zoom, setZoom] = useState(14);
-  const currentLat = latitude ?? DALOA_CENTER.lat;
-  const currentLng = longitude ?? DALOA_CENTER.lng;
-  const hasCustomCoords = latitude != null && longitude != null;
+  const isValidCoords = latitude != null && longitude != null && isLocationInDaloa(latitude, longitude);
+  const isOutsideDaloa = latitude != null && longitude != null && !isLocationInDaloa(latitude, longitude);
+  const currentLat = isValidCoords ? latitude : DALOA_CENTER.lat;
+  const currentLng = isValidCoords ? longitude : DALOA_CENTER.lng;
+  const hasCustomCoords = isValidCoords;
 
   const handleOpenGoogleMaps = () => {
     Haptics.selection();
@@ -111,15 +113,15 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
         </View>
       </View>
 
-      {/* Avertissement si coordonnées hors Daloa */}
-      {Math.abs(currentLat - DALOA_CENTER.lat) > 0.8 && (
+      {/* Avertissement si coordonnées hors Daloa (ex: testeur à Abidjan) */}
+      {isOutsideDaloa && (
         <AppPressable
           onPress={() => onChangeLocation({ latitude: DALOA_CENTER.lat, longitude: DALOA_CENTER.lng })}
           style={styles.warningBanner}
         >
           <AlertTriangle size={13} color={colors.status.warningDark} />
           <AppText variant="caption" color={colors.status.warningDark} style={styles.flex1}>
-            Position hors de Daloa. Touchez ici pour recentrer automatiquement sur Daloa.
+            Position hors de Daloa détectée (Mode test). Emplacement calé sur Daloa.
           </AppText>
         </AppPressable>
       )}
@@ -183,9 +185,9 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
         <View style={styles.coordsBadge}>
           <MapPin size={11} color={colors.text.inverse} />
           <AppText variant="caption" color={colors.text.inverse} style={styles.coordsText}>
-            {hasCustomCoords
+            {isValidCoords
               ? `${latitude?.toFixed(4)}, ${longitude?.toFixed(4)}`
-              : 'Daloa Centre (par défaut)'}
+              : 'Daloa (calé sur le quartier)'}
           </AppText>
         </View>
       </View>
