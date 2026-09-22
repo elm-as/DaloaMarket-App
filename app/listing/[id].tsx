@@ -7,6 +7,7 @@ import { findSimilar } from '../../src/lib/recommendationEngine';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { useAuth } from '../../src/context/AuthContext';
+import { userBehaviorService } from '../../src/services/userBehaviorService';
 import { ListingVariant } from '@daloa/types';
 import { colors, radii, spacing, Skeleton, ListingCard, AppText, AppPressable, useAccent, useResponsive, typography, showAlert } from '@daloa/ui';
 import { Tag, MapPin, Truck, Check, Home, ChevronLeft } from 'lucide-react-native';
@@ -65,15 +66,23 @@ export default function ListingDetailScreen() {
     return findSimilar(listing as any, similarCandidates as any, { limit: 6 });
   }, [listing, similarCandidates]);
 
-  // Log comportemental (fire-and-forget) — graine pour le ML futur
+  // Log comportemental On-Device ML & Analytics Supabase
   useEffect(() => {
     if (!listing?.id) return;
-    analyticsService.logEvent({
-      eventName: 'listing_view',
-      userId: user?.id ?? null,
-      listingId: listing.id,
-      props: { category: listing.category, price: listing.price, district: listing.district },
-    });
+
+    userBehaviorService.trackInteraction(
+      {
+        type: 'view',
+        listingId: listing.id,
+        category: listing.category,
+        price: listing.price,
+        title: listing.title,
+        district: listing.district,
+      },
+      user?.id
+    );
+
+    void analyticsService.incrementListingViews(listing.id, user?.id);
   }, [listing?.id, user?.id]);
 
   const variants = listing?.variants || [];
@@ -212,6 +221,24 @@ export default function ListingDetailScreen() {
     );
   };
 
+  const handleToggleFavorite = () => {
+    if (!id || !listing) return;
+    toggleFavorite(id);
+    if (!isFavorite) {
+      userBehaviorService.trackInteraction(
+        {
+          type: 'favorite',
+          listingId: listing.id,
+          category: listing.category,
+          price: listing.price,
+          title: listing.title,
+          district: listing.district,
+        },
+        user?.id
+      );
+    }
+  };
+
   const handleAddToCart = () => {
     if (hasVariants) {
       setShowVariantPicker(true);
@@ -219,12 +246,34 @@ export default function ListingDetailScreen() {
     }
     Haptics.lightImpact();
     addToCart(listing, null, 1);
+    userBehaviorService.trackInteraction(
+      {
+        type: 'add_to_cart',
+        listingId: listing.id,
+        category: listing.category,
+        price: listing.price,
+        title: listing.title,
+        district: listing.district,
+      },
+      user?.id
+    );
   };
 
   const handleVariantsQuantitiesConfirm = (selections: { variant: ListingVariant; quantity: number }[]) => {
     setShowVariantPicker(false);
     Haptics.success();
     setListingVariants(listing, selections);
+    userBehaviorService.trackInteraction(
+      {
+        type: 'add_to_cart',
+        listingId: listing.id,
+        category: listing.category,
+        price: listing.price,
+        title: listing.title,
+        district: listing.district,
+      },
+      user?.id
+    );
   };
 
   const handleVariantConfirm = (variant: ListingVariant) => {
@@ -232,6 +281,17 @@ export default function ListingDetailScreen() {
     setShowVariantPicker(false);
     Haptics.success();
     addToCart(listing, variant, 1);
+    userBehaviorService.trackInteraction(
+      {
+        type: 'add_to_cart',
+        listingId: listing.id,
+        category: listing.category,
+        price: listing.price,
+        title: listing.title,
+        district: listing.district,
+      },
+      user?.id
+    );
   };
 
   const handleBuyNow = () => {
@@ -273,7 +333,7 @@ export default function ListingDetailScreen() {
           onBack={handleBack}
           onGoHome={handleGoHome}
           onShare={handleShare}
-          onToggleFavorite={() => id && toggleFavorite(id)}
+          onToggleFavorite={handleToggleFavorite}
           onReport={handleReport}
         />
 

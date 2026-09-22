@@ -10,6 +10,8 @@ interface ProfileQuickActionsProps {
   onOpenDeliverers: () => void;
   onOpenShop: () => void;
   onShareShopWhatsApp: () => void;
+  /** Achats en cours + ventes à traiter (0 = pas de pastille). */
+  activeOrdersCount?: number;
 }
 
 export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
@@ -19,6 +21,7 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
   onOpenDeliverers,
   onOpenShop,
   onShareShopWhatsApp,
+  activeOrdersCount = 0,
 }) => {
   const accent = useAccent();
 
@@ -61,17 +64,30 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
         <AppPressable
           onPress={onOpenOrders}
           style={styles.gridCard}
-          accessibilityLabel="Mes commandes"
+          accessibilityLabel={
+            activeOrdersCount > 0
+              ? `Mes commandes, ${activeOrdersCount} en cours`
+              : 'Mes commandes'
+          }
         >
           <View style={[styles.cardIconBox, { backgroundColor: accent[50] }]}>
             <Package size={18} color={accent[600]} />
+            {activeOrdersCount > 0 && (
+              <View style={styles.cardBadge}>
+                <AppText variant="caption" color={colors.text.inverse} style={styles.cardBadgeText}>
+                  {activeOrdersCount > 9 ? '9+' : activeOrdersCount}
+                </AppText>
+              </View>
+            )}
           </View>
           <View style={styles.cardTexts}>
             <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
               Commandes
             </AppText>
             <AppText variant="caption" color={colors.text.subtle} style={styles.cardSubtitle}>
-              Suivi & ventes
+              {activeOrdersCount > 0
+                ? `${activeOrdersCount} en cours`
+                : 'Suivi & ventes'}
             </AppText>
           </View>
         </AppPressable>
@@ -178,6 +194,24 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cardBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 3,
+    borderRadius: radii.full,
+    backgroundColor: colors.status.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.bg.surface,
+  },
+  cardBadgeText: {
+    fontSize: 9.5,
+    fontFamily: typography.families.black,
   },
   cardTexts: {
     flex: 1,

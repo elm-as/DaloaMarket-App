@@ -1,13 +1,17 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { Sparkles, MapPin, Heart, Plus, Zap, TrendingUp, Star, Tag, Check } from 'lucide-react-native';
+import { Sparkles, MapPin, Heart, Plus, Zap, TrendingUp, Star, Tag, Check, Flame } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { formatFCFA, getListingPriceRange } from '@daloa/utils';
 import { ScoredRecommendation } from '../../lib/recommendationEngine';
 
 interface HomeRecommendationsProps {
   recommendations: ScoredRecommendation<any>[];
+  title?: string;
+  subtitle?: string;
+  badgeText?: string;
+  icon?: React.ReactNode;
   onPressItem: (item: any) => void;
   onAddToCart: (item: any) => void;
   onToggleFavorite: (itemId: string) => void;
@@ -26,6 +30,10 @@ function renderReasonIcon(reason: string) {
 
 export const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
   recommendations,
+  title,
+  subtitle,
+  badgeText,
+  icon,
   onPressItem,
   onAddToCart,
   onToggleFavorite,
@@ -38,6 +46,13 @@ export const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
   if (displayItems.length === 0) return null;
 
   const isPersonalized = displayItems.some((r) => r.isPersonalized);
+  const displayTitle = title || 'Pour vous';
+  const displayBadge = badgeText || (isPersonalized ? 'Personnalisé' : 'Tendance');
+  const displaySubtitle =
+    subtitle ||
+    (isPersonalized
+      ? 'Sélectionné selon vos préférences & favoris'
+      : 'Les pépites du moment à Daloa');
 
   return (
     <View style={styles.container}>
@@ -45,23 +60,21 @@ export const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
       <View style={styles.headerRow}>
         <View style={styles.titleWrap}>
           <View style={[styles.iconWrap, { backgroundColor: accent[50] }]}>
-            <Sparkles size={16} color={accent[600]} />
+            {icon || <Sparkles size={16} color={accent[600]} />}
           </View>
           <View>
             <View style={styles.titleRow}>
               <AppText variant="subtitle" style={styles.sectionTitle}>
-                Pour vous
+                {displayTitle}
               </AppText>
               <View style={[styles.badgePill, { backgroundColor: isPersonalized ? accent[50] : colors.bg.subtle }]}>
                 <AppText variant="caption" color={isPersonalized ? accent[700] : colors.text.muted} style={styles.badgeText}>
-                  {isPersonalized ? 'Personnalisé' : 'Tendance'}
+                  {displayBadge}
                 </AppText>
               </View>
             </View>
             <AppText variant="caption" color={colors.text.subtle}>
-              {isPersonalized
-                ? 'Sélectionné selon vos préférences & favoris'
-                : 'Les pépites du moment à Daloa'}
+              {displaySubtitle}
             </AppText>
           </View>
         </View>

@@ -321,6 +321,37 @@ export const ordersService = {
   },
 
   /**
+   * Décompte des commandes « en cours » d'un utilisateur, pour les pastilles.
+   *
+   * Est active : une commande payée ou en transit, ainsi qu'une commande
+   * espèces (COD) encore `pending` — elle attend une action du vendeur. Une
+   * commande `pending` payée en ligne est un panier abandonné au paiement :
+   * elle resterait affichée indéfiniment, donc elle est exclue.
+   *
+   * Une seule requête sert les deux rôles : les volumes par utilisateur sont
+   * faibles et le filtrage se fait en mémoire, ce qui évite un `or()` imbriqué
+   * côté PostgREST.
+   */
+  async countActiveOrders(userId: string): Promise<{ buying: number; selling: number; total: number }> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, status, payment_method, buyer_id, seller_id')
+      .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+      .in('status', ['pending', 'paid', 'in_transit']);
+
+    if (error) throw error;
+
+    const isActive = (o: any) =>
+      o.status === 'paid' || o.status === 'in_transit' || (o.status === 'pending' && o.payment_method === 'cod');
+
+    const active = (data || []).filter(isActive);
+    const buying = active.filter((o: any) => o.buyer_id === userId).length;
+    const selling = active.filter((o: any) => o.seller_id === userId).length;
+
+    return { buying, selling, total: buying + selling };
+  },
+
+  /**
    * Récupère le détail complet d'une commande
    */
   async getOrderById(orderId: string): Promise<OrderWithDetails> {

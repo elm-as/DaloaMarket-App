@@ -3,11 +3,11 @@ import { View, ScrollView, StyleSheet, Linking, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography, Button } from '@daloa/ui';
 import {
-  Mail, MessageSquare, Sparkles, ArrowLeft, BookOpen,
+  Mail, MessageSquare, Sparkles, ArrowLeft, BookOpen, MessageCircle,
 } from 'lucide-react-native';
-import { ENV_CONFIG } from '@daloa/config';
+import { ENV_CONFIG, getSupportWhatsAppUrl, getSupportWhatsAppDisplay } from '@daloa/config';
 import { Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '@daloa/api';
@@ -39,6 +39,11 @@ export default function HelpScreen() {
     fetchUserFeedbacks();
   }, [fetchUserFeedbacks]);
 
+  const handleWhatsApp = () => {
+    Haptics.lightImpact();
+    Linking.openURL(getSupportWhatsAppUrl('Bonjour Support DaloaMarket'));
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
@@ -60,6 +65,28 @@ export default function HelpScreen() {
             Une question ou un avis ? Notre équipe est à votre écoute.
           </AppText>
         </LinearGradient>
+
+        {/* Assistance directe WhatsApp */}
+        <View style={styles.whatsappCard}>
+          <View style={styles.whatsappHeader}>
+            <View style={styles.whatsappIconBox}>
+              <MessageCircle size={20} color="#15803D" />
+            </View>
+            <View style={styles.whatsappHeaderText}>
+              <AppText variant="bodyStrong">Assistance Directe WhatsApp</AppText>
+              <AppText variant="caption" color={colors.text.muted}>
+                Une question ou une urgence ? Échangez directement avec notre équipe.
+              </AppText>
+            </View>
+          </View>
+          <Button
+            title={`Contacter sur WhatsApp (${getSupportWhatsAppDisplay()})`}
+            variant="whatsapp"
+            size="md"
+            leftIcon={<MessageCircle size={18} color={colors.text.inverse} />}
+            onPress={handleWhatsApp}
+          />
+        </View>
 
         {/* 4 accès rapides */}
         <View style={styles.grid}>
@@ -156,4 +183,29 @@ const styles = StyleSheet.create({
   tutoCard: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
   tutoIconBox: { backgroundColor: '#FEF3C7' },
   footerNote: { fontSize: 11, marginTop: spacing[2] },
+  whatsappCard: {
+    backgroundColor: colors.bg.surface,
+    borderRadius: radii['2xl'],
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    gap: spacing[3],
+  },
+  whatsappHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  whatsappIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.xl,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  whatsappHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
 });

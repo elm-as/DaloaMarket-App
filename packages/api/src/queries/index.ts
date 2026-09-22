@@ -95,6 +95,21 @@ export function useUserOrders(userId?: string | null, role: 'buyer' | 'seller' =
   });
 }
 
+/**
+ * Décompte des commandes actives (achats + ventes) pour les pastilles de
+ * DaloaMarket. Rythme volontairement plus lent que `useUserOrders` : une
+ * pastille n'a pas besoin de la fraîcheur d'un écran de suivi.
+ */
+export function useActiveOrdersCount(userId?: string | null) {
+  return useQuery({
+    queryKey: ['active_orders_count', userId],
+    queryFn: () =>
+      userId ? ordersService.countActiveOrders(userId) : { buying: 0, selling: 0, total: 0 },
+    enabled: Boolean(userId),
+    refetchInterval: 30000,
+  });
+}
+
 export function useOrderDetail(orderId?: string | null) {
   return useQuery({
     queryKey: ['order', orderId],
@@ -114,6 +129,20 @@ export function useAvailableRuns(driverCoords?: Coordinates | null, isOnline = t
     queryFn: () => deliveryService.getAvailableRuns(driverCoords),
     enabled: isOnline,
     refetchInterval: 6000, // sondage rapide des courses disponibles
+  });
+}
+
+/**
+ * Décompte + aperçu des courses à prendre, pour la pastille d'onglet et la
+ * cloche de DaloaDelivery. Clé distincte de `available_runs` (qui dépend de la
+ * position du livreur) et sondage plus lent : c'est un indicateur, pas la file.
+ */
+export function useAvailableRunsBrief(enabled = true) {
+  return useQuery({
+    queryKey: ['available_runs_brief'],
+    queryFn: () => deliveryService.getAvailableRunsBrief(),
+    enabled,
+    refetchInterval: 15000,
   });
 }
 

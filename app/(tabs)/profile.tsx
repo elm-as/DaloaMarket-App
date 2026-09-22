@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Share, Linking, RefreshControl, ActivityI
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
-import { supabase, authService } from '@daloa/api';
+import { supabase, authService, useActiveOrdersCount } from '@daloa/api';
 import { colors, useAccent, ConfirmDialog, showAlert } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { ProfileGuestView } from '../../src/components/profile/ProfileGuestView';
@@ -18,6 +18,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const accent = useAccent();
   const { user, profile, logout, isAuthenticated, isLoading, refreshProfile } = useAuth();
+  const { data: activeOrders } = useActiveOrdersCount(user?.id);
 
   const [stats, setStats] = useState({
     activeCount: 0,
@@ -231,6 +232,7 @@ export default function ProfileScreen() {
           onOpenDeliverers={() => router.push('/affiliations' as any)}
           onOpenShop={() => router.push('/settings/shop' as any)}
           onShareShopWhatsApp={handleShareShopWhatsApp}
+          activeOrdersCount={activeOrders?.total ?? 0}
         />
 
         {/* 6. Menus secondaires compacts et Déconnexion */}

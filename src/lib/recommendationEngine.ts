@@ -1,8 +1,10 @@
 /**
  * Moteur de recommandations DaloaMarket (Mobile)
  * Profile construit depuis les favoris Supabase — persistant, cross-device.
- * Algorithmes identiques au web mais sans localStorage.
+ * Algorithmes identiques au web mais avec ML On-Device.
  */
+
+import { computeTrendingScore } from '@daloa/api';
 
 // ─── Stop words français ─────────────────────────────────────────────────────
 
@@ -256,9 +258,40 @@ export interface ScoredRecommendation<T = ListingLike> {
 }
 
 /**
+ * Retourne les annonces les plus tendances à Daloa (score de vélocité avec décroissance temporelle Gravity Decay).
+ */
+export function getTrendingRecommendations<T extends ListingLike>(
+  listings: T[],
+  options: { limit?: number; excludeIds?: string[] } = {}
+): ScoredRecommendation<T>[] {
+  const { limit = 8, excludeIds = [] } = options;
+  const excludeSet = new Set(excludeIds);
+  const candidates = listings.filter((l) => !excludeSet.has(l.id) && (l.stock === undefined || l.stock > 0));
+  const safeLimit = Math.min(8, Math.max(1, limit));
+
+  const scored = candidates.map((item) => {
+    const rawVelocity = computeTrendingScore(item as any);
+    const isBoosted = item.boosted_until && new Date(item.boosted_until) > new Date();
+    const normalizedScore = Math.min(99, Math.max(30, Math.round(rawVelocity * 15)));
+    const matchReason = isBoosted ? 'En vedette' : 'Populaire à Daloa';
+
+    return {
+      item,
+      score: normalizedScore,
+      similarityPercent: normalizedScore,
+      matchReason,
+      isPersonalized: false,
+    };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return diversifyRecommendations(scored, safeLimit);
+}
+
+/**
  * Retourne les meilleures recommandations pour l'utilisateur.
- * Si l'utilisateur n'a pas encore de favoris (Cold Start),
- * le moteur met en avant les annonces populaires, boostées et fraîches à Daloa.
+ * Si l'utilisateur n'a pas encore de profil (Cold Start),
+ * le moteur met en avant les annonces populaires à Daloa.
  */
 export function getRecommendationsForUser<T extends ListingLike>(
   listings: T[],
@@ -270,46 +303,10 @@ export function getRecommendationsForUser<T extends ListingLike>(
   const candidates = listings.filter((l) => !excludeSet.has(l.id) && (l.stock === undefined || l.stock > 0));
 
   const hasPersonalization = favorites && favorites.length > 0;
-
   const safeLimit = Math.min(8, Math.max(1, options.limit ?? 8));
 
   if (!hasPersonalization) {
-    // Mode Découverte (Cold-Start) : popularité locale réelle + fraîcheur + boost.
-    // Normalisation log des vues pour éviter qu'un article très vu écrase tout.
-    const maxLogViews = Math.max(
-      1,
-      ...candidates.map((c) => Math.log1p(c.view_count || 0))
-    );
-
-    const scored = candidates.map((item) => {
-      let score = 45;
-      const isBoosted = item.boosted_until && new Date(item.boosted_until) > new Date();
-      if (isBoosted) score += 20;
-      if (item.photos && item.photos.length > 0) score += 8;
-
-      // Popularité (0-20 pts) via view_count normalisé
-      const popularity = Math.log1p(item.view_count || 0) / maxLogViews;
-      score += Math.round(popularity * 20);
-
-      // Fraîcheur (0-12 pts)
-      if (item.created_at) {
-        const ageDays = (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24);
-        if (ageDays < 3) score += 12;
-        else if (ageDays < 7) score += 8;
-        else if (ageDays < 21) score += 4;
-      }
-
-      const matchReason = isBoosted
-        ? 'En vedette'
-        : popularity > 0.6
-        ? 'Populaire à Daloa'
-        : 'À découvrir';
-
-      return { item, score, similarityPercent: score, matchReason, isPersonalized: false };
-    });
-
-    scored.sort((a, b) => b.score - a.score);
-    return diversifyRecommendations(scored, safeLimit);
+    return getTrendingRecommendations(candidates, { limit: safeLimit });
   }
 
   const profile = buildUserProfile(favorites);

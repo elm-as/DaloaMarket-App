@@ -5,9 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import {
-  ShieldCheck, MapPin, Users, Rocket, ArrowLeft, Truck, Lock, ShoppingBag, Zap, MessageCircle, Mail
+  ShieldCheck, MapPin, Users, Rocket, ArrowLeft, Truck, Lock, ShoppingBag, Zap, Mail
 } from 'lucide-react-native';
-import { ENV_CONFIG, getSupportWhatsAppUrl, getSupportWhatsAppDisplay } from '@daloa/config';
+import { ENV_CONFIG } from '@daloa/config';
 import { Haptics } from '@daloa/utils';
 
 const METRICS = [
@@ -43,11 +43,6 @@ export default function AboutScreen() {
   const accent = useAccent();
   const insets = useSafeAreaInsets();
 
-  // Le support ne prend pas d'appels : WhatsApp uniquement.
-  const handleWhatsApp = () => {
-    Haptics.lightImpact();
-    Linking.openURL(getSupportWhatsAppUrl('Bonjour Support DaloaMarket'));
-  };
 
   const handleMail = (email: string) => {
     Haptics.lightImpact();
@@ -144,12 +139,6 @@ export default function AboutScreen() {
               <AppText variant="caption" color={colors.text.subtle}>Siège opérationnel</AppText>
               <AppText variant="bodyStrong">Daloa / Abidjan, Côte d'Ivoire</AppText>
             </View>
-            <AppPressable onPress={handleWhatsApp} style={styles.actionContactRow}>
-              <MessageCircle size={15} color={accent[600]} />
-              <AppText variant="caption" color={accent[600]} style={styles.bold}>
-                WhatsApp {getSupportWhatsAppDisplay()}
-              </AppText>
-            </AppPressable>
             <AppPressable onPress={() => handleMail(ENV_CONFIG.SUPPORT_EMAIL)} style={styles.actionContactRow}>
               <Mail size={15} color={accent[600]} />
               <AppText variant="caption" color={accent[600]} style={styles.bold}>{ENV_CONFIG.SUPPORT_EMAIL}</AppText>

@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, StyleSheet, RefreshControl, Image, ActivityIndicator, ScrollView } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, ShoppingCart, Package, Sparkles, Heart } from 'lucide-react-native';
+import { Search, ShoppingCart, Package, Sparkles, Heart, Flame } from 'lucide-react-native';
 import {
   colors,
   radii,
@@ -15,9 +15,15 @@ import {
   Skeleton,
   useResponsive,
   CurrencyText,
+  useAccent,
 } from '@daloa/ui';
 import { Image as ExpoImage } from 'expo-image';
-import { useInfiniteListings, useFavoriteListings } from '@daloa/api';
+import {
+  useInfiniteListings,
+  useFavoriteListings,
+  useActiveOrdersCount,
+  interleaveSellerListings,
+} from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
@@ -26,7 +32,8 @@ import { HomeDeliveryBanner } from '../../src/components/home/HomeDeliveryBanner
 import { HomeRecommendations } from '../../src/components/home/HomeRecommendations';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
-import { getRecommendationsForUser } from '../../src/lib/recommendationEngine';
+import { getRecommendationsForUser, getTrendingRecommendations } from '../../src/lib/recommendationEngine';
+import { userBehaviorService } from '../../src/services/userBehaviorService';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -34,10 +41,15 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { itemCount, addToCart, updateQuantity, setListingVariants, items } = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
+  /* Achats en cours + ventes à traiter : l'icône « Mes commandes » n'indiquait
+     rien, une vente pouvait arriver sans aucun signal dans l'application. */
+  const { data: activeOrders } = useActiveOrdersCount(user?.id);
+  const activeOrdersCount = activeOrders?.total ?? 0;
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeVariantListing, setActiveVariantListing] = useState<any | null>(null);
   const [managingListing, setManagingListing] = useState<any | null>(null);
   const { gridColumns } = useResponsive();
+  const accent = useAccent();
 
   const activeListingInitialQuantities = useMemo(() => {
     if (!activeVariantListing) return undefined;
@@ -68,14 +80,37 @@ export default function HomeScreen() {
 
   const { data: favoriteListings } = useFavoriteListings(user?.id);
 
+  // Hydratation du profil ML local avec les favoris Supabase
+  useEffect(() => {
+    if (favoriteListings && favoriteListings.length > 0) {
+      userBehaviorService.hydrateFavorites(favoriteListings as any);
+    }
+  }, [favoriteListings]);
+
   const listingsList = data?.pages.flatMap((p) => p.data) || [];
 
-  // Section "Pour vous" — Recommandations intelligentes (Personnalisées ou Découverte Cold-Start)
-  const recommendations = useMemo(() => {
+  // 1. Populaire à Daloa (Vélocité temporelle avec décroissance gravité)
+  const trendingRecommendations = useMemo(() => {
     if (!listingsList.length || selectedCategory) return [];
+    return getTrendingRecommendations(listingsList, { limit: 8 });
+  }, [listingsList, selectedCategory]);
+
+  // 2. Pour vous (ML On-Device & préférences utilisateur)
+  const personalizedRecommendations = useMemo(() => {
+    if (!listingsList.length || selectedCategory) return [];
+    const onDevice = userBehaviorService.getPersonalizedListings(listingsList, { limit: 8 });
+    if (onDevice.length > 0) return onDevice;
     const favs = favoriteListings || [];
-    return getRecommendationsForUser(listingsList, favs as any, { limit: 8 });
+    if (favs.length > 0) {
+      return getRecommendationsForUser(listingsList, favs as any, { limit: 8 });
+    }
+    return [];
   }, [listingsList, favoriteListings, selectedCategory]);
+
+  // 3. Curation Anti-Monopole vendeurs sur le fil principal
+  const curatedListings = useMemo(() => {
+    return interleaveSellerListings(listingsList, 2);
+  }, [listingsList]);
 
   const getCartQty = useCallback(
     (listingId: string) => {
@@ -163,15 +198,35 @@ export default function HomeScreen() {
       <HomeHero />
       <HomeDeliveryBanner />
 
-      {/* Section Recommandations Pour vous (Cold-Start & Personnalisé) */}
+      {/* 1. Section Populaire à Daloa (Vélocité temporelle) */}
       <HomeRecommendations
-        recommendations={recommendations}
+        recommendations={trendingRecommendations}
+        title="Populaire à Daloa"
+        subtitle="Les annonces les plus demandées du moment"
+        badgeText="🔥 Tendance"
+        icon={<Flame size={16} color={accent[600]} />}
         onPressItem={(item) => router.push(`/listing/${item.id}` as any)}
         onAddToCart={(item) => handleAddToCart(item.id)}
         onToggleFavorite={(id) => toggleFavorite(id)}
         isFavorited={(id) => isFavorited(id)}
         getCartQty={getCartQty}
       />
+
+      {/* 2. Section Recommandations Pour vous (ML Personnalisé si profil actif) */}
+      {personalizedRecommendations.length > 0 && (
+        <HomeRecommendations
+          recommendations={personalizedRecommendations}
+          title="Pour vous"
+          subtitle="Sélectionné selon vos préférences & recherches"
+          badgeText="✨ Recommandé"
+          icon={<Sparkles size={16} color={accent[600]} />}
+          onPressItem={(item) => router.push(`/listing/${item.id}` as any)}
+          onAddToCart={(item) => handleAddToCart(item.id)}
+          onToggleFavorite={(id) => toggleFavorite(id)}
+          isFavorited={(id) => isFavorited(id)}
+          getCartQty={getCartQty}
+        />
+      )}
 
       <View style={styles.sectionHeader}>
         <AppText variant="title">Catégories</AppText>
@@ -227,8 +282,24 @@ export default function HomeScreen() {
           <AppPressable rippleBorderless onPress={() => router.push('/favorites' as any)} style={styles.iconBtn} accessibilityLabel="Mes favoris">
             <Heart size={20} color={colors.grey[600]} />
           </AppPressable>
-          <AppPressable rippleBorderless onPress={() => router.push('/(tabs)/orders' as any)} style={styles.iconBtn} accessibilityLabel="Mes commandes">
+          <AppPressable
+            rippleBorderless
+            onPress={() => router.push('/(tabs)/orders' as any)}
+            style={styles.iconBtn}
+            accessibilityLabel={
+              activeOrdersCount > 0
+                ? `Mes commandes, ${activeOrdersCount} en cours`
+                : 'Mes commandes'
+            }
+          >
             <Package size={20} color={colors.grey[600]} />
+            {activeOrdersCount > 0 && (
+              <View style={styles.ordersBadge}>
+                <AppText variant="caption" color={colors.text.inverse} style={styles.cartBadgeText}>
+                  {activeOrdersCount > 9 ? '9+' : activeOrdersCount}
+                </AppText>
+              </View>
+            )}
           </AppPressable>
           <AppPressable
             rippleBorderless
@@ -273,7 +344,7 @@ export default function HomeScreen() {
         </ScrollView>
       ) : (
         <FlashList
-          data={listingsList}
+          data={curatedListings}
           numColumns={gridColumns}
           keyExtractor={(item: any) => item.id}
           ListHeaderComponent={ListHeader}
@@ -412,6 +483,20 @@ const styles = StyleSheet.create({
   },
   cartBadgeText: {
     fontSize: 9.5,
+  },
+  /* Rouge (et non orange comme le panier) : le panier est une intention, une
+     commande en cours demande une action. */
+  ordersBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: colors.status.error,
+    minWidth: 16,
+    height: 16,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
   },
   listContent: {
     paddingHorizontal: spacing[2],

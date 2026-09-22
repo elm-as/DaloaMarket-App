@@ -24,6 +24,20 @@ import { deliveryStorageService } from './deliveryStorageService';
  */
 export const PLATFORM_COMMISSION_RATE = 0.1;
 
+/** Aperçu d'une course à prendre, pour les pastilles et la cloche de l'en-tête. */
+export interface AvailableRunBriefItem {
+  assignmentId: string;
+  pickupLocation: string;
+  dropoffLocation: string;
+  deliveryPrice: number;
+  createdAt: string;
+}
+
+export interface AvailableRunsBrief {
+  count: number;
+  runs: AvailableRunBriefItem[];
+}
+
 const commissionOn = (deliveryPrice: number): number =>
   Math.round(deliveryPrice * PLATFORM_COMMISSION_RATE);
 
@@ -120,6 +134,39 @@ export const deliveryService = {
         createdAt: item.created_at,
       };
     });
+  },
+
+  /**
+   * Version légère de `getAvailableRuns` pour les pastilles et la cloche : le
+   * décompte exact des courses à prendre + les quelques plus récentes.
+   *
+   * Volontairement sans jointure ni calcul de distance — c'est ce qui permet de
+   * l'appeler depuis la barre du haut sans dupliquer la requête complète de
+   * l'écran « Courses disponibles ».
+   */
+  async getAvailableRunsBrief(limit = 5): Promise<AvailableRunsBrief> {
+    const { data, count, error } = await supabase
+      .from('delivery_assignments')
+      .select('id, pickup_location, dropoff_location, delivery_price, created_at', {
+        count: 'exact',
+      })
+      .eq('status', 'awaiting_pickup')
+      .is('delivery_person_id', null)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    return {
+      count: count ?? (data || []).length,
+      runs: (data || []).map((item: any) => ({
+        assignmentId: item.id,
+        pickupLocation: item.pickup_location || 'Boutique',
+        dropoffLocation: item.dropoff_location || 'Adresse client',
+        deliveryPrice: Number(item.delivery_price) || 0,
+        createdAt: item.created_at,
+      })),
+    };
   },
 
   /**
