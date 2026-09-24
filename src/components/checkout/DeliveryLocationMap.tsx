@@ -1,18 +1,17 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
+import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
-import { MapPin, Navigation, LocateFixed, Plus, Minus } from 'lucide-react-native';
-import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics, isLocationInDaloa } from '@daloa/utils';
+import { MapPin, Navigation, LocateFixed } from 'lucide-react-native';
+import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
 
 interface DeliveryLocationMapProps {
   latitude: number | null;
   longitude: number | null;
   sellerCoords?: { latitude: number; longitude: number } | null;
   onChangeLocation: (coords: { latitude: number; longitude: number }) => void;
-  onDistanceChange?: (distanceKm: number) => void;
 }
 
 export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
@@ -20,32 +19,15 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
   longitude,
   sellerCoords,
   onChangeLocation,
-  onDistanceChange,
 }) => {
   const accent = useAccent();
-  const [zoom, setZoom] = useState(14);
+  const [isLocating, setIsLocating] = useState(false);
+
+  /* Position affichée : celle reçue si elle est exploitable, sinon le centre de
+     Daloa — la carte doit toujours pouvoir se dessiner quelque part. */
   const isValidCoords = latitude != null && longitude != null && isLocationInDaloa(latitude, longitude);
   const currentLat = isValidCoords ? latitude : DALOA_CENTER.lat;
   const currentLng = isValidCoords ? longitude : DALOA_CENTER.lng;
-  const [isLocating, setIsLocating] = useState(false);
-
-  const activeToken = MAPBOX_PUBLIC_TOKEN;
-  const [mapError, setMapError] = useState(false);
-
-  const staticMapUrl = useMemo(() => {
-    if (mapError || !activeToken) {
-      return `https://staticmap.openstreetmap.de/staticmap.php?center=${currentLat.toFixed(5)},${currentLng.toFixed(5)}&zoom=${zoom}&size=640x360&maptype=mapnik`;
-    }
-    const rawSLat = sellerCoords?.latitude;
-    const rawSLng = sellerCoords?.longitude;
-    const isSellerValid = rawSLat != null && rawSLng != null && isLocationInDaloa(rawSLat, rawSLng);
-    const sLat = isSellerValid ? rawSLat : DALOA_CENTER.lat;
-    const sLng = isSellerValid ? rawSLng : DALOA_CENTER.lng;
-    if (sellerCoords) {
-      return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-shop+3B82F6(${sLng.toFixed(5)},${sLat.toFixed(5)}),pin-l-home+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/auto/640x360@2x?access_token=${activeToken}`;
-    }
-    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
-  }, [currentLat, currentLng, sellerCoords, zoom, activeToken, mapError]);
 
   const [routeInfo, setRouteInfo] = useState<DrivingRouteResult>({
     distanceKm: 2.5,
@@ -69,22 +51,29 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
       { latitude: currentLat, longitude: currentLng }
     ).then((res) => {
       if (active) {
+        // Affichage seul : la distance qui fait foi est celle de l'écran de
+        // checkout. Deux calculs concurrents donnaient un prix qui changeait
+        // tout seul selon celui qui répondait en dernier.
         setRouteInfo(res);
-        onDistanceChange?.(res.distanceKm);
       }
     });
 
     return () => {
       active = false;
     };
-  }, [currentLat, currentLng, sellerCoords?.latitude, sellerCoords?.longitude, onDistanceChange]);
+  }, [currentLat, currentLng, sellerCoords?.latitude, sellerCoords?.longitude]);
 
   const handleLocateMe = async () => {
     try {
       setIsLocating(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const loc = await withTimeout(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        GPS_TIMEOUT_MS,
+        () => Location.getLastKnownPositionAsync()
+      );
+      if (!loc?.coords) return;
       Haptics.selection();
       const { latitude: rawLat, longitude: rawLng } = loc.coords;
       if (isLocationInDaloa(rawLat, rawLng)) {
@@ -108,7 +97,7 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     const sellerSnippet = hasSeller ? `var sM=L.circleMarker([${sLat},${sLng}],{radius:8,fillColor:'#10B981',color:'#fff',weight:2,fillOpacity:0.9}).addTo(map);sM.bindPopup('<b>Boutique Vendeur</b>');` : '';
     const routeSnippet = leafletCoords.length > 0 ? `var poly=L.polyline(${JSON.stringify(leafletCoords)},{color:'${accent.DEFAULT}',weight:4,opacity:0.85}).addTo(map);map.fitBounds(poly.getBounds(),{padding:[30,30]});` : '';
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup('<b>Lieu de livraison</b>').openPopup();${sellerSnippet}${routeSnippet}function notify(nLat,nLng){if(window.parent){window.parent.postMessage(JSON.stringify({type:'DELIVERY_COORDS',latitude:nLat,longitude:nLng}),'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notify(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notify(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup('<b>Lieu de livraison</b>').openPopup();${sellerSnippet}${routeSnippet}function notify(nLat,nLng){var m=JSON.stringify({type:'DELIVERY_COORDS',latitude:nLat,longitude:nLng});if(window.ReactNativeWebView&&window.ReactNativeWebView.postMessage){window.ReactNativeWebView.postMessage(m);}else if(window.parent){window.parent.postMessage(m,'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notify(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notify(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
   }, [currentLat, currentLng, sellerCoords, routeInfo.coordinates, accent.DEFAULT]);
 
   useEffect(() => {
@@ -177,35 +166,30 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
             title="Carte de livraison à Daloa"
           />
         ) : (
-          <View style={styles.nativeMapContainer}>
-            <Image
-              source={{ uri: staticMapUrl }}
-              style={styles.staticMapImage}
-              contentFit="cover"
-              transition={150}
-              cachePolicy="memory-disk"
-              onError={() => setMapError(true)}
-            />
-            <View style={styles.zoomButtons}>
-              <AppPressable
-                haptic="light"
-                onPress={() => setZoom((z) => Math.min(18, z + 1))}
-                style={styles.zoomBtn}
-                accessibilityLabel="Zoom avant"
-              >
-                <Plus size={14} color={colors.text.DEFAULT} strokeWidth={2.5} />
-              </AppPressable>
-              <View style={styles.zoomDivider} />
-              <AppPressable
-                haptic="light"
-                onPress={() => setZoom((z) => Math.max(11, z - 1))}
-                style={styles.zoomBtn}
-                accessibilityLabel="Zoom arrière"
-              >
-                <Minus size={14} color={colors.text.DEFAULT} strokeWidth={2.5} />
-              </AppPressable>
-            </View>
-          </View>
+          /* Le natif n'affichait qu'une image statique : impossible d'y
+             « toucher ou glisser le repère » comme le promettait le libellé, et
+             les boutons +/- n'avaient aucun effet dès qu'un vendeur était
+             épinglé (l'URL statique utilisait un cadrage automatique). La carte
+             Leaflet existait déjà, elle n'était rendue que sur le web. */
+          <WebView
+            originWhitelist={['*']}
+            source={{ html: mapHtml }}
+            style={styles.webview}
+            scrollEnabled={false}
+            javaScriptEnabled
+            domStorageEnabled
+            setSupportMultipleWindows={false}
+            onMessage={(event) => {
+              try {
+                const payload = JSON.parse(event.nativeEvent.data);
+                if (payload?.type === 'DELIVERY_COORDS' && payload.latitude && payload.longitude) {
+                  onChangeLocation({ latitude: payload.latitude, longitude: payload.longitude });
+                }
+              } catch {
+                // message non JSON : ignoré
+              }
+            }}
+          />
         )}
       </View>
 
@@ -270,44 +254,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.bg.subtle,
   },
+  webview: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   iframe: {
     width: '100%',
     height: '100%',
     border: 'none',
   } as any,
-  nativeMapContainer: {
-    ...StyleSheet.absoluteFillObject,
-    position: 'relative',
-  },
-  staticMapImage: {
-    width: '100%',
-    height: '100%',
-  },
-  zoomButtons: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: radii.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    overflow: 'hidden',
-  },
-  zoomBtn: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  zoomDivider: {
-    height: 1,
-    backgroundColor: colors.border.subtle,
-  },
   nativeFallback: {
     flex: 1,
     alignItems: 'center',

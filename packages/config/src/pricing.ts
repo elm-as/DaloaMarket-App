@@ -1,5 +1,27 @@
 import { OrderFeeBreakdown } from '@daloa/types';
 
+/**
+ * Bornes du devis de livraison — la « règle de tarification unique ».
+ *
+ * Ces valeurs étaient jusqu'ici recopiées en dur dans `ordersService`,
+ * `payments.js` et le checkout web, chacun avec ses propres nombres. Elles sont
+ * la référence : toute autre implémentation (web, serveur Railway, SQL) doit
+ * produire le même résultat, ce que vérifie le test de parité.
+ */
+export const DELIVERY_DISTANCE_RULE = {
+  /** Plancher facturable : une course reste une course même à 100 m. */
+  minKm: 0.5,
+  /** Plafond intra-urbain de Daloa. */
+  maxKm: 15,
+  /** Majoration appliquée à la distance à vol d'oiseau quand aucun itinéraire
+   *  routier n'est disponible (réseau coupé, quota Mapbox). */
+  roadFactor: 1.3,
+  /** Borne haute de vraisemblance d'une distance routière transmise par un
+   *  client, exprimée en multiple du vol d'oiseau. Au-delà, la valeur est
+   *  refusée et remplacée par `haversine × roadFactor`. */
+  maxRoadRatio: 1.8,
+};
+
 /** Grille tarifaire officielle DaloaMarket & DaloaDelivery */
 export const PRICING_CONFIG = {
   // Frais de livraison kilométriques
@@ -47,6 +69,39 @@ export const PRICING_CONFIG = {
     disableListingPublishFees: true,
   },
 };
+
+/** Applique les bornes du devis à une distance brute (en km, 1 décimale). */
+export function clampBillableDistanceKm(distanceKm: number): number {
+  const { minKm, maxKm } = DELIVERY_DISTANCE_RULE;
+  if (!Number.isFinite(distanceKm)) return minKm;
+  return Math.min(maxKm, Math.max(minKm, Math.round(distanceKm * 10) / 10));
+}
+
+/**
+ * Retient une distance routière seulement si elle est plausible au regard de la
+ * distance à vol d'oiseau, sinon retombe sur l'estimation `× roadFactor`.
+ *
+ * C'est la règle qu'applique aussi la RPC `create_cod_order` : une fonction SQL
+ * ne peut pas appeler Mapbox, elle reçoit donc la distance routière du client et
+ * la borne ici plutôt que de lui faire confiance.
+ */
+export function reconcileRoadDistanceKm(
+  roadKm: number | null | undefined,
+  straightKm: number
+): number {
+  const { roadFactor, maxRoadRatio } = DELIVERY_DISTANCE_RULE;
+  const estimated = clampBillableDistanceKm(straightKm * roadFactor);
+
+  if (roadKm == null || !Number.isFinite(roadKm) || roadKm <= 0) return estimated;
+
+  const bounded = clampBillableDistanceKm(roadKm);
+  // Une route est toujours au moins aussi longue que le vol d'oiseau, et jamais
+  // démesurément plus longue à l'échelle de Daloa.
+  if (bounded + 0.05 < clampBillableDistanceKm(straightKm)) return estimated;
+  if (straightKm > 0 && bounded > straightKm * maxRoadRatio) return estimated;
+
+  return bounded;
+}
 
 /** Calcule le tarif de livraison en FCFA en fonction de la distance en kilomètres */
 export function calculateDeliveryFee(distanceKm: number, customFeeOverride?: number | null): number {

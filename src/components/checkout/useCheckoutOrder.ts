@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { Haptics } from '@daloa/utils';
 import { ordersService, paymentService, analyticsService } from '@daloa/api';
 import { PaymentMode, MobileMoneyOperator } from './PaymentMethodSelector';
-import { resolveBuyerLocation } from './checkout-location';
+import { resolveBuyerPoint } from '@daloa/utils';
 import { showAlert } from '@daloa/ui';
 
 async function openPaymentGateway(paymentUrl: string) {
@@ -37,6 +37,10 @@ interface UseCheckoutOrderParams {
   listing?: any;
   activePrice: number;
   breakdown: { totalAmount: number };
+  /** Distance routière mesurée à l'écran, transmise telle quelle à la base qui
+   *  la valide avant de facturer (elle ne la recalcule pas : une fonction SQL
+   *  ne peut pas appeler Mapbox). */
+  distanceKm: number;
   isCartMode: boolean;
   cartItems: any[];
   clearCart: () => void;
@@ -80,7 +84,7 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           ? params.deliveryAddress.trim()
           : 'Retrait direct en boutique';
 
-      const resolvedDeliveryPoint = resolveBuyerLocation(
+      const resolvedDeliveryPoint = resolveBuyerPoint(
         params.deliveryCoords,
         params.deliveryDistrict
       );
@@ -132,12 +136,24 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         // Le web ecrit et lit `cash_at_shop`. Ecrire `cash` rendait la commande
         // orpheline cote vendeur web : aucune branche ne matchait, donc aucun bouton.
         const codMethod = params.paymentMode === 'cod' ? 'cod' : 'cash_at_shop';
+        // La distance mesurée l'a été depuis le vendeur du premier article :
+        // on ne l'attribue qu'à lui. La base estimera elle-même pour les autres
+        // vendeurs plutôt que de leur appliquer une mesure qui n'est pas la leur.
+        const measuredSellerId =
+          params.cartItems[0]?.listing?.user_id || params.cartItems[0]?.listing?.seller?.id;
+        const roadKmBySeller =
+          measuredSellerId && params.distanceKm > 0
+            ? { [measuredSellerId]: params.distanceKm }
+            : {};
+
         const firstOrderId = await ordersService.createCartOrders(params.user.id, params.cartItems, {
           deliveryMode: params.deliveryMode,
           paymentMethod: codMethod,
           fullAddress,
           deliveryLat,
           deliveryLng,
+          deliveryDistrict: params.deliveryDistrict,
+          roadKmBySeller,
         });
         Haptics.success();
         const targetPath = firstOrderId ? `/order/${firstOrderId}` : '/(tabs)/orders';
@@ -210,7 +226,7 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         delivery_lat: deliveryLat,
         delivery_lng: deliveryLng,
         buyer_phone: params.buyerPhone.trim(),
-      });
+      }, params.distanceKm);
 
       analyticsService.logEvent({
         eventName: 'purchase',

@@ -7,7 +7,7 @@ import { colors, radii, spacing, AppText, AppPressable, useAccent, KeyboardScree
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { calculateOrderBreakdown, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
-import { Haptics, isLocationInDaloa } from '@daloa/utils';
+import { Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
 import { useListingDetail, analyticsService, useSystemSettings } from '@daloa/api';
 import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -20,7 +20,7 @@ import { CheckoutStepLocation } from '../../src/components/checkout/CheckoutStep
 import { CheckoutStepPayment } from '../../src/components/checkout/CheckoutStepPayment';
 import { PaymentMode, MobileMoneyOperator } from '../../src/components/checkout/PaymentMethodSelector';
 import { useCheckoutOrder } from '../../src/components/checkout/useCheckoutOrder';
-import { resolveSellerLocation, resolveBuyerLocation, calculateDrivingDistanceKm } from '../../src/components/checkout/checkout-location';
+import { resolveSellerPoint, resolveBuyerPoint, resolveBillableDistanceKm } from '@daloa/utils';
 
 const FALLBACK_PHOTO = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
@@ -69,9 +69,9 @@ export default function CheckoutScreen() {
   // Coordonnées résolues du vendeur (en mode panier, prend le premier article du panier)
   const sellerCoords = useMemo(() => {
     if (isCartMode && cartItems.length > 0) {
-      return resolveSellerLocation(cartItems[0]?.listing);
+      return resolveSellerPoint(cartItems[0]?.listing);
     }
-    return resolveSellerLocation(listing);
+    return resolveSellerPoint(listing);
   }, [isCartMode, cartItems, listing]);
 
   const [isLocatingGps, setIsLocatingGps] = useState(false);
@@ -84,7 +84,17 @@ export default function CheckoutScreen() {
         if (!isSilent) setErrorMsg('Veuillez autoriser l’accès GPS pour que le coursier puisse vous livrer.');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      // Sans garde-temps, `getCurrentPositionAsync` ne rend jamais la main
+      // quand l'appareil n'obtient pas de fix : le bouton restait figé sur
+      // « Localisation… » indéfiniment.
+      const loc = await withTimeout(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        GPS_TIMEOUT_MS,
+        () => Location.getLastKnownPositionAsync()
+      );
+      if (!loc?.coords && !isSilent) {
+        setErrorMsg('Position GPS introuvable. Vérifiez que la localisation de votre appareil est activée.');
+      }
       if (loc?.coords) {
         const { latitude, longitude } = loc.coords;
         if (isLocationInDaloa(latitude, longitude)) {
@@ -116,9 +126,9 @@ export default function CheckoutScreen() {
   // Calcul dynamique de la distance via Mapbox dès que les positions vendeur ou acheteur changent
   useEffect(() => {
     let active = true;
-    const buyerPoint = resolveBuyerLocation(deliveryCoords, deliveryDistrict);
+    const buyerPoint = resolveBuyerPoint(deliveryCoords, deliveryDistrict);
 
-    calculateDrivingDistanceKm(sellerCoords, buyerPoint).then((calculatedDistance) => {
+    resolveBillableDistanceKm(sellerCoords, buyerPoint).then((calculatedDistance) => {
       if (active && calculatedDistance > 0) {
         setDistanceKm(calculatedDistance);
       }
@@ -147,6 +157,7 @@ export default function CheckoutScreen() {
 
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({
     user, profile, listingId, variantId, variant, quantity, listing, activePrice, breakdown,
+    distanceKm,
     isCartMode, cartItems, clearCart, deliveryMode, deliveryDistrict, deliveryCoords,
     deliveryAddress, buyerPhone, paymentMode, operator, onlineDisabled,
     paymentConfigNotice: paymentConfig?.notice,
@@ -273,7 +284,6 @@ export default function CheckoutScreen() {
               deliveryCoords={deliveryCoords}
               onDeliveryCoordsChange={setDeliveryCoords}
               sellerCoords={sellerCoords}
-              onDistanceChange={setDistanceKm}
               deliveryAddress={deliveryAddress}
               onDeliveryAddressChange={setDeliveryAddress}
               buyerPhone={buyerPhone}
