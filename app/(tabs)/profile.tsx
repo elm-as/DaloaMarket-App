@@ -8,7 +8,6 @@ import { colors, useAccent, ConfirmDialog, showAlert } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { ProfileGuestView } from '../../src/components/profile/ProfileGuestView';
 import { ProfileHero } from '../../src/components/profile/ProfileHero';
-import { ProfileStatsStrip } from '../../src/components/profile/ProfileStatsStrip';
 import { ProfileAlertsBanner } from '../../src/components/profile/ProfileAlertsBanner';
 import { ProfileProBanner } from '../../src/components/profile/ProfileProBanner';
 import { ProfileQuickActions } from '../../src/components/profile/ProfileQuickActions';
@@ -196,16 +195,21 @@ export default function ProfileScreen() {
           onOpenSettings={() => router.push('/settings' as any)}
           onEditAvatar={handlePickAvatar}
           isUploadingAvatar={isUploadingAvatar}
+          stats={[
+            { label: 'En vente', value: stats.activeCount, onPress: () => router.push('/seller/my-listings' as any) },
+            { label: 'Vendues', value: stats.soldCount, onPress: () => router.push('/seller/my-listings' as any) },
+            { label: 'Avis', value: stats.reviewCount },
+          ]}
         />
 
-        {/* 2. Strip 3 métriques chiffrées en police tabulaire */}
-        <ProfileStatsStrip
-          activeCount={stats.activeCount}
-          soldCount={stats.soldCount}
-          reviewCount={stats.reviewCount}
-          rating={profile?.rating}
-          onPressActive={() => router.push('/seller/my-listings' as any)}
-          onPressSold={() => router.push('/seller/my-listings' as any)}
+        {/* 2. Raccourcis : une carte qui déborde sur le bandeau, tout visible */}
+        <ProfileQuickActions
+          onOpenMyListings={() => router.push('/seller/my-listings' as any)}
+          onOpenOrders={() => router.push('/(tabs)/orders' as any)}
+          onOpenDeliverers={() => router.push('/affiliations' as any)}
+          onOpenShop={() => router.push('/settings/shop' as any)}
+          onShareShopWhatsApp={handleShareShopWhatsApp}
+          activeOrdersCount={activeOrders?.total ?? 0}
         />
 
         {/* 3. Alertes proactives (GPS ou Payout manquant) */}
@@ -216,17 +220,6 @@ export default function ProfileScreen() {
           isSeller={isPro || Boolean(profile?.shop_name) || Boolean((profile as any)?.payout_network)}
           onDefineGps={() => router.push('/settings/shop' as any)}
           onSetupPayout={() => router.push('/settings/payout' as any)}
-        />
-
-        {/* 5. Grille des actions rapides marchandes */}
-        <ProfileQuickActions
-          onPublishListing={() => router.push('/listing/create' as any)}
-          onOpenMyListings={() => router.push('/seller/my-listings' as any)}
-          onOpenOrders={() => router.push('/(tabs)/orders' as any)}
-          onOpenDeliverers={() => router.push('/affiliations' as any)}
-          onOpenShop={() => router.push('/settings/shop' as any)}
-          onShareShopWhatsApp={handleShareShopWhatsApp}
-          activeOrdersCount={activeOrders?.total ?? 0}
         />
 
         {/* 6. Menus secondaires compacts et Déconnexion */}

@@ -211,6 +211,7 @@ export default function HomeScreen() {
   const ListHeader = (
     <View>
       <HomeHero />
+      <HomeDeliveryBanner />
 
       {/* Recommandations : personnalisé d'abord, tendance en complément */}
       <HomeForYouSection
@@ -240,6 +241,11 @@ export default function HomeScreen() {
           <Sparkles size={16} color={colors.primary.DEFAULT} />
           <AppText variant="title">
             {selectedCategory ? 'Annonces filtrées' : 'Dernières annonces'}
+          </AppText>
+        </View>
+        <View style={styles.countBadge}>
+          <AppText variant="caption" color={colors.text.muted}>
+            {listingsList.length}
           </AppText>
         </View>
       </View>
@@ -370,10 +376,7 @@ export default function HomeScreen() {
                   </AppText>
                 </AppPressable>
               </View>
-            ) : (
-              // Lien DaloaDelivery en fin de fil : utile, mais pas avant les articles.
-              listingsList.length > 0 ? <HomeDeliveryBanner /> : null
-            )
+            ) : null
           }
           renderItem={renderItem}
         />

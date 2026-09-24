@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Linking, StyleSheet, TextInput, View } from 'react-native';
-import { AlertTriangle, CheckCircle2, MessageCircle, PhoneCall, Star, Store, Truck, XCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AlertTriangle, CheckCircle2, MessageCircle, PhoneCall, Scale, Star, Store, Truck, XCircle } from 'lucide-react-native';
 import { supabase } from '@daloa/api';
 import { AppPressable, AppText, Button, colors, radii, spacing, useAccent, showAlert } from '@daloa/ui';
 import { formatDate, formatFCFA, Haptics, isPickupMode } from '@daloa/utils';
@@ -21,6 +22,26 @@ interface OrderStatusHeroProps {
 
 const SUPPORT_WHATSAPP = 'https://wa.me/2250704163361';
 
+/** Une couleur par situation, comme sur le site : orange, vert, rouge, bleu-vert, ardoise. */
+const GRADIENTS = {
+  progress: ['#FB923C', '#FF7F00', '#D97706'],
+  success: ['#10B981', '#0D9488'],
+  dispute: ['#F43F5E', '#DC2626'],
+  resolved: ['#14B8A6', '#0891B2'],
+  cancelled: ['#64748B', '#334155'],
+} as const;
+
+const WHITE = '#FFFFFF';
+const WHITE_SOFT = 'rgba(255,255,255,0.85)';
+
+function Card({ tone, children }: { tone: keyof typeof GRADIENTS; children: React.ReactNode }) {
+  return (
+    <LinearGradient colors={GRADIENTS[tone] as unknown as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
+      {children}
+    </LinearGradient>
+  );
+}
+
 /** Texte d'une commande annulée ou en litige ; même logique que le web (`orderClosedCopy.ts`). */
 function getClosedCopy(order: any, isSeller: boolean) {
   const assignment = order.delivery_assignment;
@@ -31,6 +52,28 @@ function getClosedCopy(order: any, isSeller: boolean) {
   const isCod = order.payment_method === 'cod';
   const isCashAtShop = order.payment_method === 'cash_at_shop';
   const unavailable = order.cancel_reason === 'unavailable' || order.cancel_reason === 'seller_unavailable';
+
+  // Litige arbitré par l'équipe (resolve_delivery_dispute) : annulation `admin_refund_*`.
+  if (order.status === 'cancelled' && String(order.cancel_reason || '').startsWith('admin_refund')) {
+    const partial = order.cancel_reason === 'admin_refund_partial';
+    return isSeller
+      ? {
+          kind: 'resolved' as const,
+          title: 'Litige réglé',
+          message: partial
+            ? 'L’acheteur était absent : le livreur a été dédommagé et le colis vous est rapporté.'
+            : 'L’équipe DaloaMarket a tranché en faveur de l’acheteur.',
+          money: 'Aucun versement pour cette commande',
+        }
+      : {
+          kind: 'resolved' as const,
+          title: 'Litige réglé',
+          message: partial
+            ? 'L’article vous est remboursé ; la course du livreur reste due.'
+            : 'L’équipe DaloaMarket a tranché en votre faveur.',
+          money: `Remboursement de ${formatFCFA(partial ? order.product_amount : order.total_amount)} en cours vers votre Mobile Money`,
+        };
+  }
 
   if (isDisputed) {
     return {
@@ -80,66 +123,58 @@ export function OrderStatusHero({ order, steps, isSeller, userId, driverPhone }:
   const closed = getClosedCopy(order, isSeller);
 
   if (closed) {
-    const isDispute = closed.kind === 'dispute';
+    const Icon = closed.kind === 'dispute' ? AlertTriangle : closed.kind === 'resolved' ? Scale : XCircle;
     return (
-      <View
-        style={[
-          styles.card,
-          isDispute
-            ? { backgroundColor: colors.status.warningLight, borderColor: colors.status.warningBorder }
-            : { backgroundColor: colors.bg.surface, borderColor: colors.border.DEFAULT },
-        ]}
-      >
+      <Card tone={closed.kind}>
         <View style={styles.row}>
-          <View style={[styles.bubble, { backgroundColor: isDispute ? colors.status.warning : colors.bg.subtle }]}>
-            {isDispute ? (
-              <AlertTriangle size={24} color={colors.text.inverse} />
-            ) : (
-              <XCircle size={24} color={colors.grey[500]} />
-            )}
+          <View style={styles.bubble}>
+            <Icon size={24} color={WHITE} />
           </View>
           <View style={styles.flex}>
-            <AppText variant="title">{closed.title}</AppText>
-            <AppText variant="caption" color={colors.text.muted}>{closed.message}</AppText>
+            <AppText variant="title" color={WHITE}>{closed.title}</AppText>
+            <AppText variant="caption" color={WHITE_SOFT}>{closed.message}</AppText>
           </View>
         </View>
         <View style={styles.moneyBox}>
-          <AppText variant="bodyStrong">{closed.money}</AppText>
+          <AppText variant="bodyStrong" color={WHITE}>{closed.money}</AppText>
         </View>
-        <AppPressable onPress={() => Linking.openURL(SUPPORT_WHATSAPP)} style={styles.helpBtn}>
+        <AppPressable onPress={() => Linking.openURL(SUPPORT_WHATSAPP)} style={styles.whiteBtn}>
           <MessageCircle size={15} color={colors.whatsappDark} />
-          <AppText variant="label" color={colors.whatsappDark}>Aide WhatsApp</AppText>
+          <AppText variant="label" color={colors.text.DEFAULT}>Aide WhatsApp</AppText>
         </AppPressable>
-      </View>
+      </Card>
     );
   }
 
   if (isDelivered) {
     const a = order.delivery_assignment;
     const when = a?.delivered_at || a?.buyer_confirmed_at;
-    const title = isSeller ? 'Vente conclue' : isPickup ? 'Article retiré' : 'Commande livrée';
+    // Livraison validée par l'équipe à l'issue d'un litige.
+    const title = a?.resolved_at
+      ? 'Litige réglé · livraison validée'
+      : isSeller ? 'Vente conclue' : isPickup ? 'Article retiré' : 'Commande livrée';
     return (
-      <View style={[styles.card, { backgroundColor: colors.status.successLight, borderColor: colors.status.successBorder }]}>
+      <Card tone="success">
         <View style={styles.row}>
           <PopIn>
-            <View style={[styles.bubble, { backgroundColor: colors.status.success }]}>
-              <CheckCircle2 size={24} color={colors.text.inverse} />
+            <View style={styles.bubble}>
+              <CheckCircle2 size={24} color={WHITE} />
             </View>
           </PopIn>
           <View style={styles.flex}>
-            <AppText variant="title">{title}</AppText>
-            <AppText variant="caption" color={colors.text.muted}>
+            <AppText variant="title" color={WHITE}>{title}</AppText>
+            <AppText variant="caption" color={WHITE_SOFT}>
               {when ? `Le ${formatDate(when, true)}` : 'Remise confirmée'} · {formatFCFA(order.total_amount)}
             </AppText>
           </View>
         </View>
-        <Segments done={1} total={1} color={colors.status.success} />
+        <Segments done={1} total={1} />
         {!isSeller && userId && order.listing_id && order.seller_id && (
-          <View style={[styles.ratingBox, { borderTopColor: colors.status.successBorder }]}>
+          <View style={styles.ratingBox}>
             <InlineSellerRating userId={userId} sellerId={order.seller_id} listingId={order.listing_id} />
           </View>
         )}
-      </View>
+      </Card>
     );
   }
 
@@ -149,34 +184,34 @@ export function OrderStatusHero({ order, steps, isSeller, userId, driverPhone }:
   const showCall = !isSeller && !isPickup && !!driverPhone && order.status === 'in_transit';
 
   return (
-    <View style={[styles.card, { backgroundColor: accent[50], borderColor: accent[200] }]}>
+    <Card tone="progress">
       <View style={styles.row}>
-        <View style={[styles.bubble, { backgroundColor: accent.DEFAULT }]}>
-          <Icon size={24} color={colors.text.inverse} />
+        <View style={styles.bubble}>
+          <Icon size={24} color={WHITE} />
         </View>
         <View style={styles.flex}>
-          <AppText variant="caption" color={accent[700]}>
+          <AppText variant="caption" color={WHITE_SOFT}>
             Étape {Math.min(done + 1, steps.length)} sur {steps.length}
           </AppText>
-          <AppText variant="title">{current.label}</AppText>
-          <AppText variant="caption" color={colors.text.muted}>{current.sub}</AppText>
+          <AppText variant="title" color={WHITE}>{current.label}</AppText>
+          <AppText variant="caption" color={WHITE_SOFT}>{current.sub}</AppText>
         </View>
       </View>
-      <Segments done={done} total={steps.length} color={accent.DEFAULT} />
+      <Segments done={done} total={steps.length} />
       {showCall && (
         <AppPressable
           onPress={() => {
             Haptics.lightImpact();
             Linking.openURL(`tel:${driverPhone}`);
           }}
-          style={styles.callBtn}
+          style={styles.whiteBtn}
           accessibilityLabel="Appeler le livreur"
         >
-          <PhoneCall size={15} color={colors.grey[700]} />
-          <AppText variant="label">Appeler le livreur</AppText>
+          <PhoneCall size={15} color={colors.primary.DEFAULT} />
+          <AppText variant="label" color={colors.text.DEFAULT}>Appeler le livreur</AppText>
         </AppPressable>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -189,11 +224,11 @@ function PopIn({ children }: { children: React.ReactNode }) {
   return <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>;
 }
 
-function Segments({ done, total, color }: { done: number; total: number; color: string }) {
+function Segments({ done, total }: { done: number; total: number }) {
   return (
     <View style={styles.segments}>
       {Array.from({ length: total }).map((_, i) => (
-        <View key={i} style={[styles.segment, { backgroundColor: i < done ? color : colors.grey[200] }]} />
+        <View key={i} style={[styles.segment, { backgroundColor: i < done ? WHITE : 'rgba(255,255,255,0.3)' }]} />
       ))}
     </View>
   );
@@ -297,10 +332,10 @@ function InlineSellerRating({ userId, sellerId, listingId }: { userId: string; s
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 1,
-    borderRadius: radii.xl,
+    borderRadius: radii['2xl'],
     padding: spacing[4],
     marginBottom: spacing[3],
+    overflow: 'hidden',
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
   flex: { flex: 1, gap: 2 },
@@ -310,6 +345,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   segments: { flexDirection: 'row', gap: 4, marginTop: spacing[4] },
   segment: { flex: 1, height: 6, borderRadius: 3 },
@@ -318,7 +354,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
     borderRadius: radii.md,
-    backgroundColor: colors.bg.surface,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  whiteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: spacing[3],
+    paddingHorizontal: spacing[3],
+    height: 38,
+    borderRadius: radii.md,
+    backgroundColor: WHITE,
   },
   helpBtn: {
     flexDirection: 'row',
@@ -340,7 +387,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.bg.surface,
   },
-  ratingBox: { marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: 1 },
+  ratingBox: { marginTop: spacing[4], padding: spacing[3], borderRadius: radii.lg, backgroundColor: WHITE },
   ratingInner: { gap: spacing[2] },
   stars: { flexDirection: 'row', gap: 4 },
   starBtn: { padding: 2 },

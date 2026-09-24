@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { PlusCircle, Package, Truck, Store, Share2, Tag } from 'lucide-react-native';
-import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { Package, Truck, Store, Share2, Tag } from 'lucide-react-native';
+import { colors, spacing, radii, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 interface ProfileQuickActionsProps {
-  onPublishListing: () => void;
+  onPublishListing?: () => void;
   onOpenMyListings: () => void;
   onOpenOrders: () => void;
   onOpenDeliverers: () => void;
@@ -14,8 +14,12 @@ interface ProfileQuickActionsProps {
   activeOrdersCount?: number;
 }
 
+/**
+ * Raccourcis du profil : une seule carte qui déborde sur le bandeau, en
+ * colonnes égales — tout est visible sans défiler. « Publier » n'y figure pas :
+ * c'est l'onglet central « Vendre ».
+ */
 export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
-  onPublishListing,
   onOpenMyListings,
   onOpenOrders,
   onOpenDeliverers,
@@ -24,206 +28,84 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
   activeOrdersCount = 0,
 }) => {
   const accent = useAccent();
+  const items = [
+    { label: 'Annonces', icon: Tag, onPress: onOpenMyListings, badge: 0 },
+    { label: 'Commandes', icon: Package, onPress: onOpenOrders, badge: activeOrdersCount },
+    { label: 'Livreurs', icon: Truck, onPress: onOpenDeliverers, badge: 0 },
+    { label: 'Boutique', icon: Store, onPress: onOpenShop, badge: 0 },
+    { label: 'Partager', icon: Share2, onPress: onShareShopWhatsApp, badge: 0 },
+  ];
 
   return (
-    <View style={styles.container}>
-      {/* « Publier » est l'onglet central « Vendre » : pas de second bouton ici. */}
-      {/* Grille des raccourcis marchands */}
-      <View style={styles.grid}>
-        {/* 1. Mes Annonces */}
-        <AppPressable
-          onPress={onOpenMyListings}
-          style={styles.gridCard}
-          accessibilityLabel="Gérer mes annonces"
-        >
-          <View style={[styles.cardIconBox, { backgroundColor: '#FEF3C7' }]}>
-            <Tag size={18} color="#D97706" />
-          </View>
-          <View style={styles.cardTexts}>
-            <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
-              Mes Annonces
-            </AppText>
-            <AppText variant="caption" color={colors.text.subtle} style={styles.cardSubtitle}>
-              Gérer & vendre
-            </AppText>
-          </View>
-        </AppPressable>
-
-        {/* 2. Mes commandes */}
-        <AppPressable
-          onPress={onOpenOrders}
-          style={styles.gridCard}
-          accessibilityLabel={
-            activeOrdersCount > 0
-              ? `Mes commandes, ${activeOrdersCount} en cours`
-              : 'Mes commandes'
-          }
-        >
-          <View style={[styles.cardIconBox, { backgroundColor: accent[50] }]}>
-            <Package size={18} color={accent[600]} />
-            {activeOrdersCount > 0 && (
-              <View style={styles.cardBadge}>
-                <AppText variant="caption" color={colors.text.inverse} style={styles.cardBadgeText}>
-                  {activeOrdersCount > 9 ? '9+' : activeOrdersCount}
+    <View style={styles.card}>
+      {items.map(({ label, icon: Icon, onPress, badge }) => (
+        <AppPressable key={label} onPress={onPress} style={styles.item} accessibilityLabel={label}>
+          <View style={[styles.iconBox, { backgroundColor: accent[50] }]}>
+            <Icon size={20} color={accent.DEFAULT} />
+            {badge > 0 && (
+              <View style={[styles.badge, { backgroundColor: accent.DEFAULT }]}>
+                <AppText variant="caption" color={colors.text.inverse} style={styles.badgeText}>
+                  {badge > 9 ? '9+' : badge}
                 </AppText>
               </View>
             )}
           </View>
-          <View style={styles.cardTexts}>
-            <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
-              Commandes
-            </AppText>
-            <AppText variant="caption" color={colors.text.subtle} style={styles.cardSubtitle}>
-              {activeOrdersCount > 0
-                ? `${activeOrdersCount} en cours`
-                : 'Suivi & ventes'}
-            </AppText>
-          </View>
+          <AppText variant="caption" color={colors.text.body} numberOfLines={1} style={styles.label}>
+            {label}
+          </AppText>
         </AppPressable>
-
-        {/* 2. Mes livreurs */}
-        <AppPressable
-          onPress={onOpenDeliverers}
-          style={styles.gridCard}
-          accessibilityLabel="Mes livreurs affiliés"
-        >
-          <View style={[styles.cardIconBox, { backgroundColor: '#EFF6FF' }]}>
-            <Truck size={18} color="#2563EB" />
-          </View>
-          <View style={styles.cardTexts}>
-            <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
-              Mes Livreurs
-            </AppText>
-            <AppText variant="caption" color={colors.text.subtle} style={styles.cardSubtitle}>
-              Coursiers affiliés
-            </AppText>
-          </View>
-        </AppPressable>
-
-        {/* 3. Ma boutique */}
-        <AppPressable
-          onPress={onOpenShop}
-          style={styles.gridCard}
-          accessibilityLabel="Paramètres de ma boutique"
-        >
-          <View style={[styles.cardIconBox, { backgroundColor: '#F0FDF4' }]}>
-            <Store size={18} color="#16A34A" />
-          </View>
-          <View style={styles.cardTexts}>
-            <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
-              Ma Boutique
-            </AppText>
-            <AppText variant="caption" color={colors.text.subtle} style={styles.cardSubtitle}>
-              Vitrine & logo
-            </AppText>
-          </View>
-        </AppPressable>
-      </View>
-
-      {/* 5. Partager sur WhatsApp (Centré pleine largeur) */}
-      <AppPressable
-        onPress={onShareShopWhatsApp}
-        style={styles.shareCard}
-        accessibilityLabel="Partager ma boutique sur WhatsApp"
-      >
-        <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8' }]}>
-          <Share2 size={16} color="#DB2777" />
-        </View>
-        <AppText variant="bodyStrong" color={colors.text.body} style={styles.cardTitle}>
-          Partager boutique (WhatsApp)
-        </AppText>
-      </AppPressable>
+      ))}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing[4],
-    marginBottom: spacing[4],
-  },
-  publishBtn: {
+  card: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[2],
-    paddingVertical: spacing[3],
-    borderRadius: radii.xl,
+    marginHorizontal: spacing[4],
+    marginTop: -spacing[10],
     marginBottom: spacing[3],
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  publishText: {
-    fontFamily: typography.families.extrabold,
-    fontSize: 14,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing[2],
-  },
-  gridCard: {
-    flex: 1,
-    minWidth: '47%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: spacing[2],
+    borderRadius: radii['2xl'],
     backgroundColor: colors.bg.surface,
-    padding: spacing[3],
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    gap: spacing[2],
+    shadowColor: '#7C2D12',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  cardIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
+  item: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing[2],
+    borderRadius: radii.lg,
+  },
+  iconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardBadge: {
+  badge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    minWidth: 17,
-    height: 17,
-    paddingHorizontal: 3,
-    borderRadius: radii.full,
-    backgroundColor: colors.status.error,
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: colors.bg.surface,
   },
-  cardBadgeText: {
-    fontSize: 9.5,
-    fontFamily: typography.families.black,
-  },
-  cardTexts: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cardTitle: {
-    fontFamily: typography.families.extrabold,
-    fontSize: 13,
-  },
-  cardSubtitle: {
+  badgeText: {
     fontSize: 10,
-    color: colors.text.subtle,
+    lineHeight: 12,
   },
-  shareCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg.surface,
-    padding: spacing[3],
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    gap: spacing[2],
-    marginTop: spacing[2],
+  label: {
+    fontSize: 11,
   },
 });

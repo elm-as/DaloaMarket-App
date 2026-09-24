@@ -27,6 +27,8 @@ import {
   MapPin,
   ShieldCheck,
   Store,
+  Route,
+  ChevronDown,
 } from 'lucide-react-native';
 import { formatDate, formatFCFA, Haptics, isPickupMode } from '@daloa/utils';
 import { OrderStatusHero } from '../../src/components/orders/OrderStatusHero';
@@ -656,10 +658,28 @@ export default function OrderTrackingScreen() {
 
         {/* ── Timeline : masquée si annulée/litige, repliée une fois livrée ── */}
         {isDelivered && !isClosed && (
-          <AppPressable onPress={() => setShowJourney((v) => !v)} style={styles.journeyToggle}>
-            <AppText variant="label" color={colors.text.body}>
-              {showJourney ? 'Masquer le parcours' : 'Voir le parcours de la commande'}
-            </AppText>
+          <AppPressable
+            onPress={() => setShowJourney((v) => !v)}
+            style={styles.journeyToggle}
+            accessibilityLabel={showJourney ? 'Masquer le parcours' : 'Voir le parcours de la commande'}
+          >
+            <View style={[styles.journeyIcon, { backgroundColor: accent[50] }]}>
+              <Route size={18} color={accent.DEFAULT} />
+            </View>
+            <View style={styles.journeyText}>
+              <AppText variant="bodyStrong">Parcours de la commande</AppText>
+              <AppText variant="caption" color={colors.text.muted}>
+                {steps.length} étapes
+                {order.delivery_assignment?.delivered_at
+                  ? ` · terminé le ${formatDate(order.delivery_assignment.delivered_at)}`
+                  : ''}
+              </AppText>
+            </View>
+            <ChevronDown
+              size={18}
+              color={colors.grey[400]}
+              style={{ transform: [{ rotate: showJourney ? '180deg' : '0deg' }] }}
+            />
           </AppPressable>
         )}
         {!isClosed && (!isDelivered || showJourney) && (
@@ -902,13 +922,27 @@ export default function OrderTrackingScreen() {
 
 const styles = StyleSheet.create({
   journeyToggle: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing[3],
+    paddingHorizontal: spacing[4],
     paddingVertical: spacing[3],
     marginBottom: spacing[3],
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.bg.surface,
+  },
+  journeyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  journeyText: {
+    flex: 1,
+    gap: 2,
   },
   container: {
     flex: 1,
