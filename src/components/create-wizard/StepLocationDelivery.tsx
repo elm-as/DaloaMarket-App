@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  Switch,
   Modal,
   Animated,
   Pressable,
@@ -11,9 +10,10 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { DALOA_DISTRICTS } from '@daloa/config';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { MapPin, Truck, Plus, Minus, ChevronDown, Search, Check, X } from 'lucide-react-native';
+import { MapPin, Truck, Plus, Minus, ChevronDown, ChevronRight, Search, Check, X } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
 
 interface StepLocationDeliveryProps {
@@ -21,8 +21,6 @@ interface StepLocationDeliveryProps {
   setSelectedDistrict: (d: string) => void;
   stock: number;
   setStock: React.Dispatch<React.SetStateAction<number>>;
-  acceptsDelivery: boolean;
-  setAcceptsDelivery: (a: boolean) => void;
 }
 
 export const StepLocationDelivery: React.FC<StepLocationDeliveryProps> = ({
@@ -30,10 +28,9 @@ export const StepLocationDelivery: React.FC<StepLocationDeliveryProps> = ({
   setSelectedDistrict,
   stock,
   setStock,
-  acceptsDelivery,
-  setAcceptsDelivery,
 }) => {
   const accent = useAccent();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -138,31 +135,29 @@ export const StepLocationDelivery: React.FC<StepLocationDeliveryProps> = ({
         </View>
       </View>
 
-      {/* ── Livraison ── */}
-      <View style={[styles.deliveryCard, { backgroundColor: accent[50], borderColor: accent[100] }]}>
+      {/* ── Livraison ──
+          L'interrupteur « Livraison acceptée » n'était enregistré nulle part :
+          la livraison se règle pour toute la boutique (seller_delivery_settings). */}
+      <AppPressable
+        haptic="selection"
+        onPress={() => router.push('/settings/shop' as any)}
+        style={[styles.deliveryCard, { backgroundColor: accent[50], borderColor: accent[100] }]}
+      >
         <View style={styles.deliveryLeft}>
           <View style={styles.deliveryIcon}>
             <Truck size={18} color={accent[600]} />
           </View>
           <View style={styles.flex1}>
             <AppText variant="label" color={colors.text.body}>
-              Livraison DaloaDelivery acceptée
+              Livraison et paiement à la livraison
             </AppText>
             <AppText variant="caption" color={colors.text.muted}>
-              Permet aux acheteurs de se faire livrer par coursier avec paiement séquestre.
+              Réglés pour toute votre boutique, dans les paramètres de la boutique.
             </AppText>
           </View>
         </View>
-        <Switch
-          value={acceptsDelivery}
-          onValueChange={(val) => {
-            Haptics.lightImpact();
-            setAcceptsDelivery(val);
-          }}
-          trackColor={{ false: colors.border.DEFAULT, true: accent.DEFAULT }}
-          thumbColor={colors.bg.surface}
-        />
-      </View>
+        <ChevronRight size={18} color={accent[600]} />
+      </AppPressable>
 
       {/* ── Bottom Sheet Picker ── */}
       <Modal

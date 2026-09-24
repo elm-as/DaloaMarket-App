@@ -181,3 +181,33 @@ export async function getDrivingRoute(
     isRoadNetwork: false,
   };
 }
+
+/**
+ * Lit `delivery_persons.current_location`, colonne **text** contenant du JSON
+ * (`{"lat":…,"lng":…}`, parfois `latitude`/`longitude`, ou l'ancien « lat,lng »).
+ * Jumeau de `parseGeoPoint` du site DaloaDelivery (DeliveryMap.tsx).
+ */
+export function parseGeoPoint(value: unknown): { lat: number; lng: number } | null {
+  if (!value) return null;
+
+  let raw: any = value;
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      const parts = raw.split(',');
+      if (parts.length !== 2) return null;
+      raw = { lat: parts[0], lng: parts[1] };
+    }
+  }
+
+  const lat = Number(raw?.lat ?? raw?.latitude);
+  const lng = Number(raw?.lng ?? raw?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+/** Format d'écriture unique de `current_location` : `{"lat":…,"lng":…}`. */
+export function serializeGeoPoint(point: { lat: number; lng: number }): string {
+  return JSON.stringify({ lat: point.lat, lng: point.lng });
+}

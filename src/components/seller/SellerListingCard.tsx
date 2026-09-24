@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { Edit3, RotateCcw, CheckCircle2, Trash2, Eye } from 'lucide-react-native';
+import { Edit3, RotateCcw, CheckCircle2, Trash2, Eye, Zap } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { formatFCFA } from '@daloa/utils';
 
@@ -11,6 +11,8 @@ interface SellerListingCardProps {
   onEdit: () => void;
   onToggleStatus: () => void;
   onDelete: () => void;
+  /** Absent pour une annonce vendue : on ne booste que ce qui est en vente. */
+  onBoost?: () => void;
 }
 
 /**
@@ -23,9 +25,11 @@ export const SellerListingCard: React.FC<SellerListingCardProps> = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onBoost,
 }) => {
   const accent = useAccent();
   const isSold = item.status === 'sold';
+  const isBoosted = !!item.boosted_until && new Date(item.boosted_until) > new Date();
   const photo = item.photos?.[0];
 
   return (
@@ -46,7 +50,7 @@ export const SellerListingCard: React.FC<SellerListingCardProps> = ({
             </AppText>
             <View style={[styles.badge, { backgroundColor: isSold ? colors.status.warningLight : colors.status.successLight }]}>
               <AppText variant="overline" color={isSold ? colors.status.warningDark : colors.status.successDark}>
-                {isSold ? 'Vendu' : 'En vente'}
+                {isSold ? 'Vendu' : isBoosted ? 'Boostée' : 'En vente'}
               </AppText>
             </View>
           </View>
@@ -89,6 +93,16 @@ export const SellerListingCard: React.FC<SellerListingCardProps> = ({
             <CheckCircle2 size={14} color={colors.status.warningDark} />
             <AppText variant="caption" color={colors.status.warningDark}>Marquer vendu</AppText>
           </AppPressable>
+        )}
+
+        {onBoost && !isSold && (
+          <>
+            <View style={styles.btnDivider} />
+            <AppPressable haptic="selection" onPress={onBoost} style={styles.actionBtn}>
+              <Zap size={14} color={accent.DEFAULT} />
+              <AppText variant="caption" color={accent.DEFAULT}>Booster</AppText>
+            </AppPressable>
+          </>
         )}
 
         <View style={styles.btnDivider} />

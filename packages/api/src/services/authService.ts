@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import { decodeBase64ToArrayBuffer } from '../lib/base64';
-import { UserProfile, RegisterInput, LoginInput, DeliveryPersonRow } from '@daloa/types';
+import { UserProfile, UserUpdate, RegisterInput, LoginInput, DeliveryPersonRow } from '@daloa/types';
 import { User } from '@supabase/supabase-js';
 
 /**
@@ -141,7 +141,9 @@ export const authService = {
           full_name: input.fullName,
           phone: input.phone,
           district: input.district || 'Centre-ville',
-          role: input.role || 'buyer',
+          // Seul `livreur` est retenu par handle_new_user (liste blanche) ;
+          // 'buyer' n'existe pas en base et faisait échouer l'inscription.
+          ...(input.role === 'delivery' ? { role: 'livreur' } : {}),
         },
       },
     });
@@ -158,7 +160,8 @@ export const authService = {
       full_name: input.fullName,
       phone: input.phone,
       district: input.district || 'Centre-ville',
-      role: input.role || 'buyer',
+      // Pas de `role` : la base refuse qu'un utilisateur modifie le sien, et
+      // l'upsert entier échouait (téléphone et quartier non enregistrés).
     };
 
     if (input.role === 'seller' && input.shopName) {
@@ -208,7 +211,7 @@ export const authService = {
   /**
    * Mise à jour du profil
    */
-  async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
+  async updateProfile(userId: string, updates: UserUpdate): Promise<UserProfile> {
     const { data, error } = await supabase
       .from('users')
       .update(updates)

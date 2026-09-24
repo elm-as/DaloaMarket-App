@@ -1,31 +1,12 @@
 import { useState } from 'react';
-import { Platform, Linking as RNLinking } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Haptics } from '@daloa/utils';
 import { ordersService, paymentService, analyticsService } from '@daloa/api';
 import { PaymentMode, MobileMoneyOperator } from './PaymentMethodSelector';
 import { resolveBuyerPoint } from '@daloa/utils';
 import { showAlert } from '@daloa/ui';
-
-async function openPaymentGateway(paymentUrl: string) {
-  if (Platform.OS === 'web') {
-    window.location.href = paymentUrl;
-    return;
-  }
-  const redirectUrl = Linking.createURL('payment/success');
-  try {
-    await WebBrowser.openAuthSessionAsync(paymentUrl, redirectUrl);
-  } catch (err) {
-    console.warn('[Checkout] openAuthSessionAsync a échoué, repli sur openBrowserAsync:', err);
-    try {
-      await WebBrowser.openBrowserAsync(paymentUrl);
-    } catch (e2) {
-      await RNLinking.openURL(paymentUrl);
-    }
-  }
-}
+import { openPaymentGateway } from '../../lib/openPaymentGateway';
 
 interface UseCheckoutOrderParams {
   user: any;

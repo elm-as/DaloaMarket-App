@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Search, Tag } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent, ConfirmDialog, EmptyState, Skeleton, typography } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, ConfirmDialog, EmptyState, Skeleton, typography, showAlert } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { supabase, listingsService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { safeBack } from '../../src/utils/navigation';
 import { SellerListingCard } from '../../src/components/seller/SellerListingCard';
 import { RestockSheet } from '../../src/components/seller/RestockSheet';
+import { BoostSheet } from '../../src/components/seller/BoostSheet';
 
 export default function MyListingsScreen() {
   const router = useRouter();
@@ -23,7 +24,8 @@ export default function MyListingsScreen() {
 
   // Modales de confirmation
   const [targetListing, setTargetListing] = useState<any | null>(null);
-  const [confirmAction, setConfirmAction] = useState<'sell' | 'reactivate' | 'delete' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'sell' | 'reactivate' | 'delete' | 'boost' | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const fetchMyListings = useCallback(async () => {
@@ -39,6 +41,14 @@ export default function MyListingsScreen() {
       if (!error && data) {
         setListings(data);
       }
+
+      // Solde de crédits pour le boost (non exposé par le profil de session).
+      const { data: me } = await supabase
+        .from('users')
+        .select('listing_credits')
+        .eq('id', user.id)
+        .maybeSingle();
+      setCredits(me?.listing_credits ?? 0);
     } catch (err) {
       console.warn('Erreur chargement de mes annonces:', err);
     } finally {
@@ -124,14 +134,35 @@ export default function MyListingsScreen() {
     }
   };
 
+  const handleBoost = async (days: 1 | 2 | 7) => {
+    if (!targetListing) return;
+    try {
+      setIsActionLoading(true);
+      const { newBalance } = await listingsService.boostWithCredits(targetListing.id, days);
+      Haptics.success();
+      setCredits(newBalance);
+      setConfirmAction(null);
+      setTargetListing(null);
+      await fetchMyListings();
+    } catch (err: any) {
+      showAlert('Boost impossible', err.message || 'Réessayez dans un instant.');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <SellerListingCard
       item={item}
       onPress={() => router.push(`/listing/${item.id}` as any)}
-      onEdit={() => router.push(`/listing/${item.id}` as any)}
+      onEdit={() => router.push(`/listing/create?id=${item.id}` as any)}
       onToggleStatus={() => {
         setTargetListing(item);
         setConfirmAction(item.status === 'sold' ? 'reactivate' : 'sell');
+      }}
+      onBoost={() => {
+        setTargetListing(item);
+        setConfirmAction('boost');
       }}
       onDelete={() => {
         setTargetListing(item);
@@ -244,6 +275,23 @@ export default function MyListingsScreen() {
         cancelText="Annuler"
         isLoading={isActionLoading}
         onConfirm={handleExecuteAction}
+        onCancel={() => {
+          setConfirmAction(null);
+          setTargetListing(null);
+        }}
+      />
+
+      <BoostSheet
+        visible={confirmAction === 'boost'}
+        listingTitle={targetListing?.title}
+        credits={credits}
+        isLoading={isActionLoading}
+        onConfirm={handleBoost}
+        onBuyCredits={() => {
+          setConfirmAction(null);
+          setTargetListing(null);
+          router.push('/pro/packs' as any);
+        }}
         onCancel={() => {
           setConfirmAction(null);
           setTargetListing(null);

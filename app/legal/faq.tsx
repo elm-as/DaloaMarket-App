@@ -75,7 +75,7 @@ const FAQ_ITEMS: FaqItemData[] = [
   {
     category: 'seller',
     q: 'Quels sont les boosts de visibilité disponibles ?',
-    a: `Le Boost à ${VISIBILITY.boost} place votre annonce en tête de liste avec un badge « Sponsorisé » pendant ${VISIBILITY.boostDays} jours. Le Bump à ${VISIBILITY.bump} la fait simplement remonter en tête, sans badge ni durée. Les deux sont indépendants du Pass Vendeur Pro.`,
+    a: `Le Boost place votre annonce en tête de liste avec un badge « Sponsorisé ». Il se paie en crédits : ${VISIBILITY.boostOptions}. Les crédits s'achètent en packs (${VISIBILITY.creditPacks}), indépendamment du Pass Vendeur Pro.`,
   },
   {
     category: 'seller',

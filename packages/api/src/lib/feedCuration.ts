@@ -11,11 +11,11 @@ export interface FeedListingCandidate {
   user_id?: string;
   listing_user_id?: string;
   seller?: { id?: string; full_name?: string } | null;
-  view_count?: number;
+  view_count?: number | null;
   created_at?: string;
-  sort_at?: string;
+  sort_at?: string | null;
   boosted_until?: string | null;
-  stock?: number;
+  stock?: number | null;
 }
 
 /**
@@ -58,7 +58,7 @@ export function getTrendingListings<T extends FeedListingCandidate>(
   listings: T[],
   limit = 8
 ): T[] {
-  const available = listings.filter((l) => l.stock === undefined || l.stock > 0);
+  const available = listings.filter((l) => l.stock == null || l.stock > 0);
 
   const scored = available.map((item) => ({
     item,

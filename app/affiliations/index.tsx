@@ -77,7 +77,7 @@ export default function AffiliationsScreen() {
 
   const list = affiliations || [];
   const pending = list.filter((a) => a.status === 'pending');
-  const active = list.filter((a) => a.status === 'active' || a.status === 'accepted');
+  const active = list.filter((a) => a.status === 'active');
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);

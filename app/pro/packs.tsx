@@ -1,35 +1,63 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { PRICING_CONFIG } from '@daloa/config';
+import { PRICING_CONFIG, BOOST_CREDIT_OPTIONS } from '@daloa/config';
+import { paymentService } from '@daloa/api';
 import { colors, radii, spacing, Card, Button, Badge, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
-import { Layers, Zap, ArrowUpCircle, ArrowLeft } from 'lucide-react-native';
+import { Layers, Zap, ArrowLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
+import { useAuth } from '../../src/context/AuthContext';
+import { openPaymentGateway } from '../../src/lib/openPaymentGateway';
 
 export default function PacksScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
+  const { user, profile, refreshProfile } = useAuth();
   const [selectedPack, setSelectedPack] = useState<string>('silver');
 
-  const handleBuyPack = (packName: string, price: number) => {
-    Haptics.success();
-    showAlert(
-      'Paiement Mobile Money',
-      `Confirmez l'achat du ${packName} pour ${formatFCFA(price)} via Wave / Orange / MTN.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          onPress: () => {
-            showAlert('Succès !', "Vos crédits d'annonces ont été ajoutés.");
-            router.back();
-          },
-        },
-      ]
-    );
+  const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
+
+  /**
+   * Achat réel d'un pack via MoneyFusion. L'écran affichait auparavant
+   * « Vos crédits ont été ajoutés » sans aucun paiement ni crédit.
+   * Les crédits sont ajoutés par le serveur à la confirmation du paiement.
+   */
+  const handleBuyPack = async (pack: (typeof PRICING_CONFIG.packs)[number]) => {
+    if (!user?.id) {
+      router.push('/auth/login' as any);
+      return;
+    }
+    Haptics.selection();
+    setBuyingPackId(pack.id);
+    try {
+      const result = await paymentService.initiatePayment({
+        type: `credits_pack_${pack.credits}` as 'credits_pack_5' | 'credits_pack_12' | 'credits_pack_30',
+        amount: pack.price,
+        userId: user.id,
+        customerName: profile?.full_name || 'Vendeur DaloaMarket',
+        customerPhone: profile?.phone || '',
+      });
+      if (!result.paymentUrl) {
+        throw new Error('Lien de paiement indisponible. Réessayez.');
+      }
+
+      await openPaymentGateway(result.paymentUrl);
+      if (Platform.OS === 'web') return;
+
+      await new Promise((r) => setTimeout(r, 1500));
+      await refreshProfile();
+      showAlert(
+        'Paiement lancé',
+        `Dès la confirmation Mobile Money, vos ${pack.credits} crédits sont ajoutés automatiquement.`
+      );
+    } catch (err: any) {
+      showAlert('Paiement impossible', err.message || 'Une erreur est survenue. Réessayez.');
+    } finally {
+      setBuyingPackId(null);
+    }
   };
 
   return (
@@ -65,7 +93,7 @@ export default function PacksScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Packs crédits */}
-        <AppText variant="subtitle">Packs de crédits annonces</AppText>
+        <AppText variant="subtitle">Packs de crédits de boost</AppText>
         <View style={styles.packsGrid}>
           {PRICING_CONFIG.packs.map((pack) => {
             const isSelected = selectedPack === pack.id;
@@ -89,7 +117,7 @@ export default function PacksScreen() {
                   {pack.name}
                 </AppText>
                 <AppText variant="caption" color={colors.text.subtle}>
-                  {pack.credits} annonces
+                  {pack.credits} crédits de boost
                 </AppText>
                 <AppText variant="bodyStrong" color={accent[600]}>
                   {formatFCFA(pack.price)}
@@ -99,7 +127,9 @@ export default function PacksScreen() {
                   title="Acheter"
                   variant={isSelected ? 'market' : 'outline'}
                   size="sm"
-                  onPress={() => handleBuyPack(pack.name, pack.price)}
+                  loading={buyingPackId === pack.id}
+                  disabled={buyingPackId !== null}
+                  onPress={() => handleBuyPack(pack)}
                   style={styles.packBtn}
                 />
               </Card>
@@ -107,54 +137,27 @@ export default function PacksScreen() {
           })}
         </View>
 
-        {/* Boost */}
-        <AppText variant="subtitle">Options de boost immédiat</AppText>
+        {/* Boost : payé en crédits, comme sur le web (buy_boost_with_credits).
+            Les offres « Boost 500 F » et « Bump 200 F » n'avaient aucun
+            paiement derrière : le serveur ne connaît pas ces types d'achat. */}
+        <AppText variant="subtitle">Booster une annonce</AppText>
         <View style={styles.boostCard}>
           <View style={styles.boostRow}>
             <View style={[styles.boostIconBox, { backgroundColor: accent[50] }]}>
               <Zap size={22} color={accent.DEFAULT} />
             </View>
             <View style={styles.flex1}>
-              <AppText variant="bodyStrong">Boost en vedette (7 jours)</AppText>
+              <AppText variant="bodyStrong">Mise en avant avec vos crédits</AppText>
               <AppText variant="caption" color={colors.text.muted} style={styles.boostSub}>
-                Bandeau doré, badge TOP et affichage prioritaire sur la page d'accueil de Daloa.
-              </AppText>
-              <AppText variant="bodyStrong" color={accent[600]}>
-                {formatFCFA(PRICING_CONFIG.boosts.boost7Days)}
+                {BOOST_CREDIT_OPTIONS.map((o) => `${o.label} : ${o.credits} crédit${o.credits > 1 ? 's' : ''}`).join(' · ')}
               </AppText>
             </View>
           </View>
           <Button
-            title="Booster une annonce (500 F)"
+            title="Choisir une annonce à booster"
             variant="outline"
             size="sm"
-            onPress={() => handleBuyPack('Boost 7 Jours', 500)}
-            fullWidth
-            style={styles.boostBtn}
-          />
-        </View>
-
-        {/* Bump */}
-        <View style={styles.boostCard}>
-          <View style={styles.boostRow}>
-            <View style={[styles.boostIconBox, { backgroundColor: colors.secondary[50] }]}>
-              <ArrowUpCircle size={22} color={colors.secondary.DEFAULT} />
-            </View>
-            <View style={styles.flex1}>
-              <AppText variant="bodyStrong">Remontée immédiate (Bump)</AppText>
-              <AppText variant="caption" color={colors.text.muted} style={styles.boostSub}>
-                Replace votre annonce tout en haut du flux des nouveautés comme si elle venait d'être publiée.
-              </AppText>
-              <AppText variant="bodyStrong" color={colors.secondary.DEFAULT}>
-                {formatFCFA(PRICING_CONFIG.boosts.bumpToListTop)}
-              </AppText>
-            </View>
-          </View>
-          <Button
-            title="Remonter en tête (200 F)"
-            variant="outline"
-            size="sm"
-            onPress={() => handleBuyPack('Bump Immédiat', 200)}
+            onPress={() => router.push('/seller/my-listings' as any)}
             fullWidth
             style={styles.boostBtn}
           />

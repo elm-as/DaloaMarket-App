@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { useChatMessages, chatService, notificationsService } from '@daloa/api';
+import { useChatMessages, chatService } from '@daloa/api';
 import {
   colors,
   radii,
@@ -90,21 +90,8 @@ export default function ChatRoomScreen() {
         listingId: listingId || undefined,
       });
       refetch();
-
-      const senderName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Un utilisateur';
-      notificationsService
-        .sendPushNotification({
-          userIds: [partnerId],
-          title: `💬 Nouveau message de ${senderName}`,
-          body: textToSend.length > 80 ? `${textToSend.slice(0, 77)}...` : textToSend,
-          data: {
-            chatPartnerId: user.id,
-            listingId: listingId || undefined,
-            url: `/messages/${listingId || 'inbox'}/${user.id}`,
-          },
-          appType: 'market',
-        })
-        .catch((e) => console.warn('[Push Chat Notification Warning]:', e));
+      // La notification du destinataire est émise par la base
+      // (trigger push_webhook_messages), à partir du message enregistré.
     } catch (err) {
       console.warn('Erreur envoi message:', err);
       setInputText(textToSend);

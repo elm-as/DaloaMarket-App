@@ -8,7 +8,7 @@
  * « 0 % de commission acheteur » alors que 2 % sont bien facturés.
  */
 
-import { PRICING_CONFIG } from '@daloa/config';
+import { PRICING_CONFIG, BOOST_CREDIT_OPTIONS } from '@daloa/config';
 
 /** Formate un taux (0.02) en pourcentage lisible ("2 %"), virgule décimale française. */
 export const pct = (rate: number): string => {
@@ -20,7 +20,7 @@ export const pct = (rate: number): string => {
 export const fcfa = (amount: number): string =>
   `${amount.toLocaleString('fr-FR').replace(/ | | /g, ' ')} FCFA`;
 
-const { marketplace, delivery, proSubscription, boosts } = PRICING_CONFIG;
+const { marketplace, delivery, proSubscription, packs } = PRICING_CONFIG;
 
 export const FEES = {
   /** Frais de service acheteur, réellement facturés au checkout. */
@@ -44,10 +44,18 @@ export const PRO_PASS = {
   yearly: fcfa(proSubscription.annualPrice),
 } as const;
 
+/**
+ * Visibilité : boost payé en crédits (RPC buy_boost_with_credits), crédits
+ * achetés en packs. L'ancien « Boost 500 FCFA » et le « Bump 200 FCFA »
+ * n'étaient achetables nulle part : le serveur de paiement refuse ces types.
+ */
+const joinFr = (items: string[]): string =>
+  items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} ou ${items[items.length - 1]}`;
 export const VISIBILITY = {
-  boost: fcfa(boosts.boost7Days),
-  boostDays: 7,
-  bump: fcfa(boosts.bumpToListTop),
+  /** « 1 crédit (24 heures), 2 crédits (2 jours) ou 5 crédits (7 jours) » */
+  boostOptions: joinFr(BOOST_CREDIT_OPTIONS.map((o) => `${o.credits} crédit${o.credits > 1 ? 's' : ''} (${o.label})`)),
+  /** « 5 crédits pour 500 FCFA, 12 crédits pour 1 000 FCFA ou 30 crédits pour 2 000 FCFA » */
+  creditPacks: joinFr(packs.map((p) => `${p.credits} crédits pour ${fcfa(p.price)}`)),
 } as const;
 
 /**

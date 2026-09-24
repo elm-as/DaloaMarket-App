@@ -73,7 +73,13 @@
           "locationAlwaysAndWhenInUsePermission": "DaloaMarket utilise votre position pour localiser votre boutique à Daloa."
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#FF9800"
+        }
+      ],
       "expo-font",
       "expo-web-browser"
     ],

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { listingsService } from '@daloa/api';
+import { listingsService, supabase } from '@daloa/api';
 import { colors, spacing, Button, KeyboardScreen, ConfirmDialog, showAlert } from '@daloa/ui';
 import { ArrowRight, Check, CreditCard, MapPin } from 'lucide-react-native';
 import { Haptics } from '@daloa/utils';
@@ -19,12 +19,21 @@ import { StepSummaryPreview } from '../../src/components/create-wizard/StepSumma
 
 const STEP_TITLES = ['Photos & Titre', 'Catégorie & Prix', 'Quartier & Livraison', 'Aperçu & Publication'];
 
-const FALLBACK_PHOTO =
-  'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=320';
-
+/**
+ * Création et modification d'annonce.
+ *
+ * Le bouton « Modifier l'annonce » (fiche, menu propriétaire, Mes annonces)
+ * ouvrait déjà `/listing/create?id=…`, mais l'écran ignorait l'`id` : il
+ * affichait un formulaire vide et, une fois validé, créait une DEUXIÈME
+ * annonce. Avec `id`, l'annonce est chargée (propriétaire uniquement),
+ * pré-remplie, puis mise à jour — comme `ListingCreatePage` côté web.
+ */
 export default function ListingCreateScreen() {
   const router = useRouter();
   const { user, profile, isAuthenticated } = useAuth();
+  const { id: editId } = useLocalSearchParams<{ id?: string }>();
+  const isEditing = Boolean(editId);
+  const [isLoadingListing, setIsLoadingListing] = useState(isEditing);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,10 +48,57 @@ export default function ListingCreateScreen() {
   const [originalPrice, setOriginalPrice] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState(profile?.district || 'Centre-ville');
   const [stock, setStock] = useState(1);
-  const [acceptsDelivery, setAcceptsDelivery] = useState(true);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdListingId, setCreatedListingId] = useState<string | null>(null);
   const [errorDialog, setErrorDialog] = useState<string | null>(null);
+
+  // Édition : chargement et pré-remplissage de l'annonce existante.
+  useEffect(() => {
+    if (!editId || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('id', editId)
+        .maybeSingle();
+      if (cancelled) return;
+
+      if (error || !data || data.user_id !== user.id || data.status === 'deleted') {
+        setIsLoadingListing(false);
+        showAlert('Annonce introuvable', 'Cette annonce n’existe plus ou ne vous appartient pas.');
+        safeBack(router, '/seller/my-listings');
+        return;
+      }
+
+      setTitle(data.title || '');
+      setDescription(data.description || '');
+      setSelectedCategory(data.category || 'fashion');
+      setSelectedCondition(data.condition || 'like_new');
+      setPrice(data.price != null ? String(data.price) : '');
+      setOriginalPrice(data.original_price != null ? String(data.original_price) : '');
+      setSelectedDistrict(data.district || profile?.district || 'Centre-ville');
+      setStock(Math.max(1, data.stock || 1));
+      setPhotos(
+        (data.photos || [])
+          .filter((u: unknown): u is string => typeof u === 'string' && u.startsWith('http'))
+          .map((uri: string) => ({ uri }))
+      );
+      const existing = Array.isArray(data.variants) ? (data.variants as any[]) : [];
+      setVariants(
+        existing.map((v) => ({
+          id: v.id ? String(v.id) : undefined,
+          title: String(v.label || ''),
+          price: v.price == null || v.price === '' ? null : Number(v.price),
+          stock: Math.max(0, Number(v.stock) || 0),
+        }))
+      );
+      setIsLoadingListing(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editId, user?.id]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -104,6 +160,12 @@ export default function ListingCreateScreen() {
 
   const handleNext = () => {
     Haptics.selection();
+    // Au moins une vraie photo, comme sur le web : l'app publiait sinon une
+    // photo de banque d'images à la place de l'article.
+    if (currentStep === 1 && photos.length === 0) {
+      showAlert('Photo requise', 'Ajoutez au moins une photo de votre article.');
+      return;
+    }
     if (currentStep === 1 && (!title.trim() || title.trim().length < 3)) {
       showAlert('Titre requis', 'Veuillez saisir un titre d’au moins 3 caractères.');
       return;
@@ -139,6 +201,10 @@ export default function ListingCreateScreen() {
       showAlert('Prix invalide', invalidPricing);
       return;
     }
+    if (photos.length === 0) {
+      showAlert('Photo requise', 'Ajoutez au moins une photo de votre article.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -159,9 +225,7 @@ export default function ListingCreateScreen() {
         uploadedPhotos.push(url);
       }
 
-      const finalPhotos = uploadedPhotos.length > 0 ? uploadedPhotos : [FALLBACK_PHOTO];
-
-      const created = await listingsService.createListing(user.id, {
+      const input = {
         title: title.trim(),
         description: description.trim(),
         price: parseFloat(price),
@@ -170,21 +234,27 @@ export default function ListingCreateScreen() {
         condition: selectedCondition as any,
         district: selectedDistrict,
         stock,
-        accepts_delivery: acceptsDelivery,
-        photos: finalPhotos,
+        photos: uploadedPhotos,
         variants: variants.map((v) => ({
+          id: v.id,
           label: v.title,
           price: v.price || null,
           stock: v.stock || 1,
           active: true,
         })),
-      });
+      };
+
+      const saved = editId
+        ? await listingsService.updateListing(editId, input)
+        : await listingsService.createListing(user.id, input);
 
       Haptics.success();
-      setCreatedListingId(created.id);
+      setCreatedListingId(saved.id);
       setShowSuccessDialog(true);
     } catch (err: any) {
-      let msg = err?.message || 'Échec de la publication de votre annonce.';
+      let msg =
+        err?.message ||
+        (isEditing ? 'Échec de l’enregistrement des modifications.' : 'Échec de la publication de votre annonce.');
       if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
         msg = 'Une annonce similaire existe déjà avec ces caractéristiques.';
       } else if (msg.includes('Failed to fetch') || msg.includes('Network') || msg.includes('timeout')) {
@@ -204,6 +274,14 @@ export default function ListingCreateScreen() {
       router.replace('/(tabs)' as any);
     }
   };
+
+  if (isLoadingListing) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
+      </View>
+    );
+  }
 
   return (
     <KeyboardScreen>
@@ -250,8 +328,6 @@ export default function ListingCreateScreen() {
               setSelectedDistrict={setSelectedDistrict}
               stock={stock}
               setStock={setStock}
-              acceptsDelivery={acceptsDelivery}
-              setAcceptsDelivery={setAcceptsDelivery}
             />
           )}
           {currentStep === 4 && (
@@ -262,7 +338,6 @@ export default function ListingCreateScreen() {
               originalPrice={originalPrice}
               district={selectedDistrict}
               stock={stock}
-              acceptsDelivery={acceptsDelivery}
             />
           )}
         </ScrollView>
@@ -279,7 +354,7 @@ export default function ListingCreateScreen() {
             />
           ) : (
             <Button
-              title="Publier à Daloa"
+              title={isEditing ? 'Enregistrer les modifications' : 'Publier à Daloa'}
               variant="success"
               onPress={handlePublish}
               loading={isSubmitting}
@@ -293,8 +368,12 @@ export default function ListingCreateScreen() {
         <ConfirmDialog
           visible={showSuccessDialog}
           type="info"
-          title="Annonce en ligne !"
-          message="Votre article est maintenant visible par tous les acheteurs à Daloa."
+          title={isEditing ? 'Annonce modifiée !' : 'Annonce en ligne !'}
+          message={
+            isEditing
+              ? 'Vos modifications sont visibles immédiatement.'
+              : 'Votre article est maintenant visible par tous les acheteurs à Daloa.'
+          }
           confirmText="Voir l'annonce"
           cancelText="Fermer"
           onConfirm={handleGoToCreatedListing}
@@ -308,7 +387,7 @@ export default function ListingCreateScreen() {
         <ConfirmDialog
           visible={Boolean(errorDialog)}
           type="danger"
-          title="Erreur de publication"
+          title={isEditing ? 'Erreur d’enregistrement' : 'Erreur de publication'}
           message={errorDialog || ''}
           confirmText="Compris"
           onConfirm={() => setErrorDialog(null)}
@@ -340,5 +419,9 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

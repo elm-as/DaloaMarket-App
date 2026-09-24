@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useOrderDetail, ordersService, paymentService } from '@daloa/api';
+import { useOrderDetail, ordersService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { colors, radii, spacing, Button, Avatar, RatingStars, DeliveryCodeCard, BottomSheet, AppText, AppPressable, useAccent, typography, showAlert } from '@daloa/ui';
 import {
@@ -30,6 +30,7 @@ import {
   Store,
 } from 'lucide-react-native';
 import { formatDate, formatFCFA, Haptics, isPickupMode } from '@daloa/utils';
+import { OrderStatusHero } from '../../src/components/orders/OrderStatusHero';
 
 /* ─── helpers ─────────────────────────────────────────────────────── */
 
@@ -124,9 +125,9 @@ export default function OrderTrackingScreen() {
   const [isDisputeOpen, setIsDisputeOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [isSellerActing, setIsSellerActing] = useState(false);
   const [enteredPickupOtp, setEnteredPickupOtp] = useState('');
+  const [showJourney, setShowJourney] = useState(false);
 
   const handleCancelOrder = () => {
     if (!order) return;
@@ -146,7 +147,7 @@ export default function OrderTrackingScreen() {
               await refetch();
               const isOnlinePaid =
                 ['paid', 'confirmed'].includes(order.status) &&
-                !['cash_at_shop', 'cod'].includes(order.payment_method);
+                !['cash_at_shop', 'cod'].includes(order.payment_method ?? '');
               showAlert(
                 'Commande annulée',
                 isOnlinePaid
@@ -169,40 +170,6 @@ export default function OrderTrackingScreen() {
     const channel = ordersService.subscribeToOrderUpdates(id, () => refetch());
     return () => { channel.unsubscribe(); };
   }, [id, refetch]);
-
-  // Vérifie activement le paiement auprès de l'API (le simple refetch DB ne suffit
-  // pas : le statut ne change que si le paiement est confirmé côté serveur).
-  const verifyPayment = useCallback(async () => {
-    if (!id) return null;
-    try {
-      const res = await paymentService.checkPaymentStatus(id);
-      await refetch();
-      return res;
-    } catch {
-      return null;
-    }
-  }, [id, refetch]);
-
-  useEffect(() => {
-    if (!order || order.status !== 'pending_payment') return;
-    const timer = setInterval(() => { verifyPayment(); }, 5000);
-    return () => clearInterval(timer);
-  }, [order?.status, verifyPayment]);
-
-  const handleManualVerify = async () => {
-    setIsVerifying(true);
-    Haptics.lightImpact();
-    const res = await verifyPayment();
-    setIsVerifying(false);
-    if (res?.isPaid) {
-      Haptics.success();
-    } else {
-      showAlert(
-        'Paiement en attente',
-        "Nous n'avons pas encore reçu la confirmation. Si vous venez de payer, patientez quelques instants puis réessayez."
-      );
-    }
-  };
 
   const handleReportDispute = async () => {
     if (!disputeReason.trim()) return;
@@ -430,6 +397,7 @@ export default function OrderTrackingScreen() {
   const isCod = order.payment_method === 'cod';
   const isCashAtShop = order.payment_method === 'cash_at_shop';
   const isDelivered = order.status === 'delivered' || order.status === 'completed';
+  const isClosed = order.status === 'cancelled' || order.status === 'disputed' || assignment?.status === 'disputed';
   // Aucun séquestre en COD ni en paiement boutique : afficher « séquestré » y était trompeur.
   const amountLabel =
     isCod || isCashAtShop ? 'Montant à régler' : 'Montant total séquestré';
@@ -580,31 +548,14 @@ export default function OrderTrackingScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* ── Vérification de paiement (acheteur, commande non réglée) ── */}
-        {!isSeller && order.status === 'pending_payment' && (
-          <View style={styles.paymentPendingCard}>
-            <View style={styles.paymentPendingHeader}>
-              <CreditCard size={18} color={colors.status.warningDark} />
-              <AppText variant="bodyStrong" color={colors.status.warningDark}>
-                En attente de paiement
-              </AppText>
-            </View>
-            <AppText variant="caption" color={colors.text.muted}>
-              Si vous venez de payer via Mobile Money, la confirmation peut prendre
-              quelques instants. Vérifiez maintenant.
-            </AppText>
-            <Button
-              title="J'ai payé : Vérifier"
-              variant="market"
-              size="md"
-              loading={isVerifying}
-              onPress={handleManualVerify}
-              leftIcon={<CreditCard size={16} color={colors.text.inverse} />}
-              fullWidth
-              style={styles.verifyBtn}
-            />
-          </View>
-        )}
+        {/* ── État de la commande ── */}
+        <OrderStatusHero
+          order={order}
+          steps={steps}
+          isSeller={isSeller}
+          userId={user?.id}
+          driverPhone={driver?.phone}
+        />
 
         {/* ── Articles de la commande (multi-articles) ── */}
         {Array.isArray((order as any).order_items) && (order as any).order_items.length > 1 && (
@@ -760,6 +711,10 @@ export default function OrderTrackingScreen() {
                 fullWidth
                 style={styles.verifyBtn}
               />
+              {/* Sans code, le serveur refuse de libérer un séquestre au
+                  profit du vendeur : l'option ne vaut que pour le paiement en
+                  boutique, où aucun argent ne transite par DaloaMarket. */}
+              {order.payment_method !== 'online' && (
               <AppPressable
                 onPress={() =>
                   showAlert(
@@ -777,6 +732,7 @@ export default function OrderTrackingScreen() {
                   L’acheteur n’a pas son code
                 </AppText>
               </AppPressable>
+              )}
             </View>
           )}
 
@@ -810,7 +766,15 @@ export default function OrderTrackingScreen() {
             />
           )}
 
-        {/* ── Timeline ── */}
+        {/* ── Timeline : masquée si annulée/litige, repliée une fois livrée ── */}
+        {isDelivered && !isClosed && (
+          <AppPressable onPress={() => setShowJourney((v) => !v)} style={styles.journeyToggle}>
+            <AppText variant="label" color={colors.text.body}>
+              {showJourney ? 'Masquer le parcours' : 'Voir le parcours de la commande'}
+            </AppText>
+          </AppPressable>
+        )}
+        {!isClosed && (!isDelivered || showJourney) && (
         <View style={styles.card}>
           <View style={styles.cardTitleRow}>
             <Truck size={15} color={accent.DEFAULT} />
@@ -884,6 +848,7 @@ export default function OrderTrackingScreen() {
             })}
           </View>
         </View>
+        )}
 
         {/* ── Livreur ── */}
         {driver && (
@@ -996,7 +961,8 @@ export default function OrderTrackingScreen() {
           )}
 
         {/* ── Litige ── */}
-        {order.status !== 'cancelled' && order.status !== 'delivered' && (
+        {/* Même règle que report_delivery_dispute : possible jusqu'à la clôture, y compris après la remise. */}
+        {!['cancelled', 'completed', 'disputed'].includes(order.status) && assignment?.status !== 'disputed' && (
           <AppPressable
             onPress={() => setIsDisputeOpen(true)}
             style={styles.disputeBtn}
@@ -1046,6 +1012,15 @@ export default function OrderTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
+  journeyToggle: {
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+    marginBottom: spacing[3],
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    backgroundColor: colors.bg.surface,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.bg.DEFAULT,
@@ -1137,20 +1112,6 @@ const styles = StyleSheet.create({
   itemInfo: {
     flex: 1,
     gap: 1,
-  },
-  paymentPendingCard: {
-    backgroundColor: colors.status.warningLight,
-    borderColor: colors.status.warningBorder,
-    borderWidth: 1,
-    borderRadius: radii.xl,
-    padding: spacing[4],
-    gap: spacing[2],
-    marginBottom: spacing[3],
-  },
-  paymentPendingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
   },
   verifyBtn: {
     marginTop: spacing[2],

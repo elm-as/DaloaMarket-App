@@ -1,88 +1,55 @@
 import { supabase } from '../supabase';
 
-function normalizeIvorianPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '');
-  if (digits.startsWith('225') && digits.length === 13) return `+${digits}`;
-  if (digits.length === 10 && digits.startsWith('0')) return `+225${digits.slice(1)}`;
-  if (digits.length === 9) return `+225${digits}`;
-  return raw;
-}
-
+/*
+ * Livreurs affiliés d'un vendeur.
+ *
+ * Ce service interrogeait une table `affiliated_deliverers` qui n'existe pas :
+ * l'écran « Mes livreurs » de l'app était entièrement en erreur. La table
+ * réelle est `seller_delivery_affiliations` (statuts pending | active |
+ * rejected), la même que celle du web et de l'app livreur.
+ */
 export const affiliationsService = {
   async getSellerAffiliatedDeliverers(sellerId: string) {
     const { data, error } = await supabase
-      .from('affiliated_deliverers')
-      .select('*, delivery_persons(*)')
+      .from('seller_delivery_affiliations')
+      .select(
+        'id, seller_id, delivery_person_id, status, created_at, delivery_persons(id, name, phone, photo_url, is_available, vehicle_type, rating)'
+      )
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    // La relation revient en tableau ou en objet selon le client : un seul livreur par ligne.
+    return (data || []).map((row) => ({
+      ...row,
+      delivery_persons: Array.isArray(row.delivery_persons) ? row.delivery_persons[0] ?? null : row.delivery_persons,
+    }));
   },
 
-  async requestAffiliation(sellerId: string, deliveryPersonId: string, customFee?: number | null) {
-    const { data, error } = await supabase
-      .from('affiliated_deliverers')
-      .upsert({
-        seller_id: sellerId,
-        delivery_person_id: deliveryPersonId,
-        custom_delivery_fee: customFee || null,
-        status: 'pending',
-      })
-      .select()
-      .single();
-
+  /**
+   * Invite un livreur par son numéro. La RPC vérifie le droit du vendeur
+   * (Pro ou phase de lancement), retrouve le livreur et crée la demande.
+   */
+  async inviteByPhone(_sellerId: string, rawPhone: string): Promise<{ success: boolean; message: string }> {
+    const { data, error } = await supabase.rpc('invite_delivery_driver_by_phone', {
+      p_phone: rawPhone.trim(),
+    });
     if (error) throw error;
-    return data;
-  },
 
-  async updateAffiliationStatus(affiliationId: string, status: 'accepted' | 'rejected') {
-    const { error } = await supabase
-      .from('affiliated_deliverers')
-      .update({ status })
-      .eq('id', affiliationId);
-
-    if (error) throw error;
-  },
-
-  async inviteByPhone(sellerId: string, rawPhone: string): Promise<{ success: boolean; message: string }> {
-    const normalized = normalizeIvorianPhone(rawPhone);
-
-    const { data: person } = await supabase
-      .from('delivery_persons')
-      .select('id, name, phone, vehicle_type, photo_url')
-      .or(`phone.eq.${rawPhone},phone.eq.${normalized}`)
-      .maybeSingle();
-
-    if (!person) {
-      return { success: false, message: "Aucun livreur DaloaDelivery trouvé avec ce numéro." };
-    }
-
-    const { data: existing } = await supabase
-      .from('affiliated_deliverers')
-      .select('id, status')
-      .eq('seller_id', sellerId)
-      .eq('delivery_person_id', person.id)
-      .maybeSingle();
-
-    if (existing) {
-      const msg = existing.status === 'pending'
-        ? "Une invitation est déjà en attente pour ce livreur."
-        : "Ce livreur est déjà affilié à votre boutique.";
-      return { success: false, message: msg };
-    }
-
-    const { error } = await supabase
-      .from('affiliated_deliverers')
-      .insert({ seller_id: sellerId, delivery_person_id: person.id, status: 'pending' });
-
-    if (error) throw error;
-    return { success: true, message: `Invitation envoyée à ${person.name} !` };
+    const res = data as { success?: boolean; message?: string } | null;
+    return {
+      success: !!res?.success,
+      message:
+        res?.message ||
+        (res?.success
+          ? 'Invitation envoyée.'
+          : "Aucun livreur DaloaDelivery trouvé avec ce numéro."),
+    };
   },
 
   async removeAffiliation(affiliationId: string): Promise<void> {
     const { error } = await supabase
-      .from('affiliated_deliverers')
+      .from('seller_delivery_affiliations')
       .delete()
       .eq('id', affiliationId);
 

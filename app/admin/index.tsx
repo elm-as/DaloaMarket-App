@@ -204,12 +204,6 @@ export default function AdminScreen() {
               accent={accent.DEFAULT}
             />
             <ToggleRow
-              title="Remontée d’annonce (bump)"
-              value={active.enable_bump}
-              onChange={(v) => patch({ enable_bump: v })}
-              accent={accent.DEFAULT}
-            />
-            <ToggleRow
               title="Badge Vendeur Pro"
               value={active.enable_seller_badge}
               onChange={(v) => patch({ enable_seller_badge: v })}
@@ -241,29 +235,9 @@ export default function AdminScreen() {
 
           {/* Valeurs numériques */}
           <AppText variant="overline" color={colors.text.muted} style={styles.sectionLabel}>
-            Plafonds et commission
+            Commission
           </AppText>
           <View style={styles.card}>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldLabel}>
-                <AppText variant="body" color={colors.text.body}>
-                  Annonces gratuites
-                </AppText>
-                <AppText variant="caption" color={colors.text.muted}>
-                  Vide = illimité
-                </AppText>
-              </View>
-              <TextInput
-                style={styles.input}
-                keyboardType="number-pad"
-                placeholder="∞"
-                placeholderTextColor={colors.text.subtle}
-                value={active.max_free_listings >= 999999 ? '' : String(active.max_free_listings)}
-                onChangeText={(t) =>
-                  patch({ max_free_listings: t.trim() === '' ? 999999 : Math.max(0, parseInt(t, 10) || 0) })
-                }
-              />
-            </View>
             <View style={[styles.fieldRow, styles.fieldRowLast]}>
               <View style={styles.fieldLabel}>
                 <AppText variant="body" color={colors.text.body}>

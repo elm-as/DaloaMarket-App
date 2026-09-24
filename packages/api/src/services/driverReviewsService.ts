@@ -65,19 +65,8 @@ export const driverReviewsService = {
 
     if (error) throw error;
 
-    const { data: all } = await supabase
-      .from('delivery_person_reviews')
-      .select('rating')
-      .eq('delivery_person_id', params.deliveryPersonId);
-
-    const total = all?.length || 0;
-    const avg = total > 0 ? all!.reduce((s, r: any) => s + r.rating, 0) / total : 0;
-
-    await supabase
-      .from('delivery_persons')
-      .update({ rating: Math.round(avg * 10) / 10, total_reviews: total })
-      .eq('id', params.deliveryPersonId);
-
+    // La note moyenne est recalculée par la base (trigger refresh_driver_rating) :
+    // l'ancien UPDATE client était annulé par protect_delivery_persons_columns.
     return review as DriverReview;
   },
 };

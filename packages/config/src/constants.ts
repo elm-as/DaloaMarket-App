@@ -267,7 +267,7 @@ export const normalizePayoutNetwork = (network?: string): string => {
  * n'existe volontairement pas de constante de numéro appelable — la remettre
  * ferait réapparaître des liens `tel:` que personne ne décrochera.
  */
-export const DEFAULT_SUPPORT_WHATSAPP = '2250173801559';
+export const DEFAULT_SUPPORT_WHATSAPP = '2250704163361';
 export const DEFAULT_SUPPORT_EMAIL = 'support@daloamarket.com';
 
 /**

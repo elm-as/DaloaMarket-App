@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import { PayoutSettings } from '@daloa/types';
+import { PayoutSettings, TablesUpdate } from '@daloa/types';
 import { normalizePayoutNetwork } from '@daloa/config';
 
 /**
@@ -64,7 +64,7 @@ export const payoutService = {
     const cleanedPhone = (settings.phone || '').replace(/\D/g, '');
     const canonicalNetwork = normalizePayoutNetwork(settings.network);
 
-    const dpUpdates: Record<string, any> = {
+    const dpUpdates: TablesUpdate<'delivery_persons'> = {
       payout_network: canonicalNetwork,
       payout_number: cleanedPhone,
       updated_at: new Date().toISOString(),
@@ -83,7 +83,7 @@ export const payoutService = {
       throw dpError;
     }
 
-    const userUpdates: Record<string, any> = {
+    const userUpdates: TablesUpdate<'users'> = {
       payout_network: canonicalNetwork,
       payout_number: cleanedPhone,
     };
@@ -137,22 +137,29 @@ export const payoutService = {
         .from('orders')
         .select('product_amount, platform_commission')
         .eq('seller_id', userId)
-        .eq('status', 'delivered'),
+        // Seul l'argent passé par le séquestre est versé par DaloaMarket : en
+        // espèces, le vendeur l'a déjà encaissé lui-même.
+        .eq('payment_method', 'online')
+        .in('status', ['delivered', 'completed']),
       supabase
         .from('orders')
         .select('product_amount, platform_commission')
         .eq('seller_id', userId)
-        .in('status', ['awaiting_pickup', 'picked_up', 'in_transit', 'pending_payment']),
+        // Statuts réels de `orders` : payé en ligne mais pas encore remis.
+        .eq('payment_method', 'online')
+        .in('status', ['paid', 'in_transit']),
       supabase
         .from('payouts')
         .select('amount')
         .eq('user_id', userId)
-        .eq('status', 'confirmed'),
+        // `confirmed` n'existe pas pour `payouts` : l'argent déjà versé n'était
+        // jamais déduit et le « disponible » restait gonflé.
+        .in('status', ['paid', 'completed']),
       supabase
         .from('payouts')
         .select('amount')
         .eq('user_id', userId)
-        .eq('status', 'pending'),
+        .in('status', ['pending', 'processing']),
     ]);
 
     const totalEarned = (deliveredRes.data || []).reduce(

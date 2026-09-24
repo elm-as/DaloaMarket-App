@@ -9,7 +9,7 @@ import { supabase } from '@daloa/api';
 
 /**
  * Écran de blocage pour compte suspendu/banni :
- * Affiche le motif du ban, un formulaire de recours direct (ban_appeals)
+ * Affiche le motif du ban, un formulaire de recours (RPC submit_ban_appeal)
  * et permet la déconnexion immédiate.
  */
 export const BannedScreen: React.FC = () => {
@@ -25,13 +25,13 @@ export const BannedScreen: React.FC = () => {
     }
     try {
       setIsSubmitting(true);
-      await supabase.from('ban_appeals').insert({
-        user_id: user?.id || 'anonymous',
-        full_name: profile?.full_name || 'Utilisateur',
-        phone: profile?.phone || '',
-        reason: appealReason.trim(),
-        status: 'pending',
+      // `ban_appeals` n'existe pas : l'insert échouait et l'écran annonçait
+      // quand même « transmis ». Le recours est enregistré sur le compte par
+      // la RPC, que l'admin web lit déjà.
+      const { error } = await supabase.rpc('submit_ban_appeal', {
+        p_reason: appealReason.trim(),
       });
+      if (error) throw error;
       showAlert('Demande transmise', 'Votre recours a été envoyé aux administrateurs de DaloaMarket.');
       setAppealReason('');
     } catch (err: any) {

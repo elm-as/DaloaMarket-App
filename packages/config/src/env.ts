@@ -46,7 +46,7 @@ export function getSupportWhatsAppUrl(customMessage?: string): string {
 }
 
 /**
- * Le même numéro, mais lisible : « +225 01 73 80 15 59 ».
+ * Le même numéro, mais lisible : « +225 07 04 16 33 61 ».
  *
  * Dérivé de SUPPORT_WHATSAPP plutôt qu'écrit à côté : un numéro affiché ne peut
  * donc jamais diverger de celui que le lien compose réellement.

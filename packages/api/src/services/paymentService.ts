@@ -1,5 +1,5 @@
 import { ENV_CONFIG } from '@daloa/config';
-import { PaymentIntentRequest, PaymentIntentResponse, PayoutRequest } from '@daloa/types';
+import { PaymentIntentRequest, PaymentIntentResponse } from '@daloa/types';
 import { supabase } from '../supabase';
 
 export type PaymentType =
@@ -12,7 +12,14 @@ export type PaymentType =
 
 export interface InitiatePaymentInput {
   type: PaymentType;
+  /**
+   * Indicatif seulement : pour le Pass Pro et les packs, le serveur fixe
+   * lui-même le prix. Seul le montant d'une commande est recalculé à partir
+   * des articles.
+   */
   amount: number;
+  /** Formule du Pass Pro (`type: 'seller_badge'`). */
+  plan?: 'monthly' | 'yearly';
   userId: string;
   customerName: string;
   customerPhone: string;
@@ -163,32 +170,6 @@ export const paymentService = {
     return {
       status: data.status,
       isPaid: confirmedPaidStatuses.includes(data.status),
-    };
-  },
-
-  /**
-   * Demande un reversement Mobile Money (Vendeur ou Livreur)
-   */
-  async requestPayout(payload: PayoutRequest): Promise<{ success: boolean; message: string }> {
-    const fee = 0; // Pas de frais de retrait en Phase 0
-    const netAmount = payload.amount - fee;
-
-    const { error } = await supabase.from('payouts').insert({
-      user_id: payload.userId,
-      recipient_type: payload.recipientType,
-      amount: payload.amount,
-      fee,
-      net_amount: netAmount,
-      network: payload.network,
-      phone: payload.phone,
-      status: 'pending',
-    });
-
-    if (error) throw error;
-
-    return {
-      success: true,
-      message: 'Demande de retrait transmise. Vous recevrez vos fonds sous 24 heures.',
     };
   },
 };

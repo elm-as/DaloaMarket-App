@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ListingCard, colors, radii, spacing, AppText, useAccent } from '@daloa/ui';
-import { CheckCircle2, AlertCircle, ShieldCheck, Truck, Package, Sparkles } from 'lucide-react-native';
+import { CheckCircle2, AlertCircle, ShieldCheck, Truck, Sparkles } from 'lucide-react-native';
 
 interface StepSummaryPreviewProps {
   photos: string[];
@@ -10,7 +10,6 @@ interface StepSummaryPreviewProps {
   originalPrice: string;
   district: string;
   stock: number;
-  acceptsDelivery: boolean;
 }
 
 const FALLBACK_PHOTO =
@@ -23,7 +22,6 @@ export const StepSummaryPreview: React.FC<StepSummaryPreviewProps> = ({
   originalPrice,
   district,
   stock,
-  acceptsDelivery,
 }) => {
   const accent = useAccent();
   const numPrice = parseFloat(price) || 0;
@@ -57,12 +55,10 @@ export const StepSummaryPreview: React.FC<StepSummaryPreviewProps> = ({
     },
     {
       ok: true,
-      icon: acceptsDelivery ? Truck : Package,
-      color: acceptsDelivery ? accent[700] : colors.text.muted,
-      bg: acceptsDelivery ? accent[50] : colors.bg.subtle,
-      label: acceptsDelivery
-        ? 'Livraison DaloaDelivery activée'
-        : 'Retrait en main propre uniquement',
+      icon: Truck,
+      color: accent[700],
+      bg: accent[50],
+      label: 'Livraison selon les réglages de votre boutique',
     },
     {
       ok: stock >= 1,

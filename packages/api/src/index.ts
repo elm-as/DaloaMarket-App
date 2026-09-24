@@ -20,3 +20,4 @@ export * from './services/deliveryPersonService';
 export * from './services/referralService';
 export * from './queries/index';
 export * from './lib/feedCuration';
+export * from './lib/rpc';

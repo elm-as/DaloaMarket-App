@@ -7,7 +7,6 @@ export interface PhaseContextValue {
   phase: 0 | 1;
   isPhase0: boolean;
   showMonetisation: boolean;
-  maxFreeListings: number;
   allowCodForAll: boolean;
   allowPickupForAll: boolean;
   allowAffiliatedDeliverers: boolean;
@@ -87,7 +86,6 @@ export function PhaseProvider({ children }: { children: React.ReactNode }) {
     const isPhase0 = phaseConfig.phase === 0;
     const hasAnyMonetisation =
       phaseConfig.enable_boost ||
-      phaseConfig.enable_bump ||
       phaseConfig.enable_seller_badge;
 
     return {
@@ -95,14 +93,11 @@ export function PhaseProvider({ children }: { children: React.ReactNode }) {
       phase: phaseConfig.phase,
       isPhase0,
       showMonetisation: !isPhase0 || hasAnyMonetisation,
-      maxFreeListings:
-        isPhase0 && phaseConfig.max_free_listings >= 999999
-          ? Number.POSITIVE_INFINITY
-          : phaseConfig.max_free_listings,
       allowCodForAll: phaseConfig.allow_cod_for_all,
       allowPickupForAll: phaseConfig.allow_pickup_for_all,
       allowAffiliatedDeliverers: phaseConfig.allow_affiliated_deliverers_for_all,
-      sellerFeeOverride: phaseConfig.seller_fee_override ?? (isPhase0 ? 0 : null),
+      // Même règle que la base : null = taux standard, quelle que soit la phase.
+      sellerFeeOverride: phaseConfig.seller_fee_override ?? null,
       enableSellerBadge: phaseConfig.enable_seller_badge,
       switchPhase,
       savePhaseConfig,

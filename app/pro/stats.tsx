@@ -16,33 +16,42 @@ interface SellerStats {
   netEarnings: number;
 }
 
+/**
+ * Les trois requêtes visaient des colonnes inexistantes (`listings.seller_id`,
+ * `listings.views_count`, `orders.seller_fee`) : chacune échouait et l'écran
+ * affichait 0 partout. Colonnes réelles : `user_id`, `view_count`, et la
+ * commission vendeur dans `platform_commission`.
+ */
 async function fetchSellerStats(userId: string): Promise<SellerStats> {
-  const [listingsRes, deliveredRes, activeRes] = await Promise.all([
+  const [listingsRes, soldRes, activeRes] = await Promise.all([
     supabase
       .from('listings')
-      .select('views_count')
-      .eq('seller_id', userId)
+      .select('view_count')
+      .eq('user_id', userId)
       .neq('status', 'deleted'),
     supabase
       .from('orders')
-      .select('product_amount, seller_fee')
+      .select('product_amount, platform_commission')
       .eq('seller_id', userId)
-      .eq('status', 'delivered'),
+      .in('status', ['delivered', 'completed']),
     supabase
       .from('listings')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_id', userId)
+      .eq('user_id', userId)
       .eq('status', 'active'),
   ]);
 
+  const firstError = listingsRes.error || soldRes.error || activeRes.error;
+  if (firstError) throw firstError;
+
   const totalViews = (listingsRes.data || []).reduce(
-    (s, l) => s + (l.views_count || 0),
+    (s, l) => s + (l.view_count || 0),
     0
   );
 
-  const salesCount = (deliveredRes.data || []).length;
-  const netEarnings = (deliveredRes.data || []).reduce(
-    (s, o) => s + Math.max(0, (o.product_amount || 0) - (o.seller_fee || 0)),
+  const salesCount = (soldRes.data || []).length;
+  const netEarnings = (soldRes.data || []).reduce(
+    (s, o) => s + Math.max(0, (o.product_amount || 0) - (o.platform_commission || 0)),
     0
   );
 

@@ -1,8 +1,44 @@
 import { supabase } from '../supabase';
+import { rpcOutcome } from '../lib/rpc';
 import { decodeBase64ToArrayBuffer } from '../lib/base64';
-import { ListingFull, ListingFilters, ListingCreateInput, ListingVariant } from '@daloa/types';
+import { ListingFull, ListingFilters, ListingCreateInput, ListingVariant, Json } from '@daloa/types';
+import { generateUuidV4 } from '@daloa/utils';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Champs d'annonce communs à la création et à la modification, alignés sur le
+ * web (`ListingCreatePage`) :
+ *  - chaque variante a un `id` UUID (conservé s'il existe) : le panier, le
+ *    paiement et le stock retrouvent la variante par cet `id`. L'app créait des
+ *    variantes sans `id`, impossibles à acheter ;
+ *  - avec des variantes, le stock de l'annonce est la somme de leurs stocks.
+ */
+function listingContentFields(input: ListingCreateInput) {
+  const variants = (input.variants || []).map((v) => ({
+    id: v.id || generateUuidV4(),
+    label: v.label,
+    price: v.price ?? null,
+    stock: Math.max(0, Math.floor(Number(v.stock) || 0)),
+    active: v.active !== false,
+  }));
+  const stock = variants.length > 0
+    ? variants.reduce((sum, v) => sum + v.stock, 0)
+    : Math.max(1, Math.floor(input.stock || 1));
+
+  return {
+    title: input.title,
+    description: input.description,
+    price: input.price,
+    original_price: input.original_price || null,
+    category: input.category,
+    condition: input.condition,
+    district: input.district,
+    photos: input.photos,
+    stock,
+    variants: variants as unknown as Json,
+  };
+}
 
 export const listingsService = {
   /**
@@ -33,9 +69,8 @@ export const listingsService = {
     if (filters.maxPrice != null) {
       query = query.lte('price', filters.maxPrice);
     }
-    if (filters.acceptsDeliveryOnly) {
-      query = query.eq('accepts_delivery', true);
-    }
+    // `acceptsDeliveryOnly` est ignoré : la colonne `accepts_delivery`
+    // n'existe pas (le filtre faisait échouer toute la requête).
     if (filters.sellerId) {
       query = query.eq('user_id', filters.sellerId);
     }
@@ -172,21 +207,28 @@ export const listingsService = {
   },
 
   /**
+   * Modifie une annonce existante (mêmes champs que la création).
+   *
+   * Le statut, les vues et le boost ne sont pas touchés : ils sont protégés par
+   * `protect_listings_columns` et gérés par leurs propres RPC.
+   */
+  async updateListing(listingId: string, input: ListingCreateInput): Promise<ListingFull> {
+    const { error } = await supabase
+      .from('listings')
+      .update(listingContentFields(input))
+      .eq('id', listingId);
+
+    if (error) throw error;
+    return this.getListingById(listingId);
+  },
+
+  /**
    * Crée une nouvelle annonce avec variantes optionnelles
    */
   async createListing(userId: string, input: ListingCreateInput): Promise<ListingFull> {
     const listingPayload = {
       user_id: userId,
-      title: input.title,
-      description: input.description,
-      price: input.price,
-      original_price: input.original_price || null,
-      category: input.category,
-      condition: input.condition,
-      district: input.district,
-      photos: input.photos,
-      stock: input.stock,
-      variants: input.variants || [],
+      ...listingContentFields(input),
       status: 'active',
       view_count: 0,
     };
@@ -203,23 +245,6 @@ export const listingsService = {
   },
 
   /**
-   * Met à jour une annonce
-   */
-  async updateListing(
-    listingId: string,
-    updates: Partial<ListingCreateInput>
-  ): Promise<ListingFull> {
-    const { error } = await supabase
-      .from('listings')
-      .update(updates)
-      .eq('id', listingId);
-
-    if (error) throw error;
-
-    return this.getListingById(listingId);
-  },
-
-  /**
    * Supprime une annonce de façon sécurisée
    */
   async deleteListing(listingId: string): Promise<void> {
@@ -227,7 +252,7 @@ export const listingsService = {
       const { data, error } = await supabase.rpc('delete_listing_secure', {
         p_listing_id: listingId,
       });
-      if (!error && data?.success) return;
+      if (!error && rpcOutcome(data)?.success) return;
     } catch {
       // Fallback si RPC non disponible
     }
@@ -296,25 +321,35 @@ export const listingsService = {
   },
 
   /**
-   * Booster une annonce (tente d'abord le slot gratuit Pro ou applique l'expiration)
+   * Booste une annonce en dépensant des crédits (1 jour = 1, 2 jours = 2,
+   * 7 jours = 5), via la RPC qui débite le solde et prolonge `boosted_until`.
+   *
+   * Remplace `boostListing`, jamais appelé, dont le repli écrivait
+   * `boosted_until` directement : colonne protégée, écriture annulée en silence.
    */
-  async boostListing(listingId: string, durationDays = 7): Promise<void> {
-    try {
-      const { data, error } = await supabase.rpc('free_boost_listing', {
-        p_listing_id: listingId,
-      });
-      if (!error && data?.success) return;
-    } catch {
-      // Poursuivre avec fallback si RPC non disponible
-    }
-
-    const boostedUntil = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabase
-      .from('listings')
-      .update({ boosted_until: boostedUntil })
-      .eq('id', listingId);
-
+  async boostWithCredits(
+    listingId: string,
+    durationDays: 1 | 2 | 7
+  ): Promise<{ boostedUntil: string; newBalance: number }> {
+    const { data, error } = await supabase.rpc('buy_boost_with_credits', {
+      p_listing_id: listingId,
+      p_duration_days: durationDays,
+    });
     if (error) throw error;
+
+    const res = data as
+      | { success?: boolean; reason?: string; boosted_until?: string; new_balance?: number; cost?: number; balance?: number }
+      | null;
+    if (!res?.success) {
+      const messages: Record<string, string> = {
+        insufficient_credits: `Crédits insuffisants (${res?.balance ?? 0} disponible${(res?.balance ?? 0) > 1 ? 's' : ''}, ${res?.cost ?? '?'} nécessaires).`,
+        unauthorized: "Cette annonce n'est pas la vôtre.",
+        listing_not_found: 'Annonce introuvable.',
+        invalid_duration: 'Durée de boost invalide.',
+      };
+      throw new Error(messages[res?.reason || ''] || 'Boost impossible.');
+    }
+    return { boostedUntil: res.boosted_until || '', newBalance: res.new_balance ?? 0 };
   },
 
   /**
@@ -330,8 +365,9 @@ export const listingsService = {
     });
 
     if (error) throw error;
-    if (data && data.success === false) {
-      throw new Error(data.reason || 'Impossible de marquer cette annonce comme vendue.');
+    const sold = rpcOutcome(data);
+    if (sold && sold.success === false) {
+      throw new Error(sold.reason || 'Impossible de marquer cette annonce comme vendue.');
     }
   },
 
@@ -368,7 +404,7 @@ export const listingsService = {
 
       if (readErr) throw readErr;
 
-      variants = ((current?.variants as ListingVariant[]) || []).map((v, i) => ({
+      variants = ((current?.variants as unknown as ListingVariant[]) || []).map((v, i) => ({
         ...v,
         stock: variantStocks[v.id ?? String(i)] ?? v.stock ?? 0,
       }));
@@ -377,15 +413,16 @@ export const listingsService = {
     const { data, error } = await supabase.rpc('relist_listing', {
       p_listing_id: listingId,
       p_stock: Math.max(1, Math.floor(stock || 0)),
-      p_variants: variants,
+      p_variants: (variants ?? null) as unknown as Json,
     });
 
     if (error) throw error;
-    if (data && data.success === false) {
+    const relisted = rpcOutcome(data);
+    if (relisted && relisted.success === false) {
       throw new Error(
-        data.reason === 'stock_required'
+        relisted.reason === 'stock_required'
           ? 'Indiquez au moins une unité en stock.'
-          : data.reason || 'Remise en vente impossible.'
+          : relisted.reason || 'Remise en vente impossible.'
       );
     }
   },

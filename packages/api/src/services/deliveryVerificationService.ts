@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { rpcOutcome } from '../lib/rpc';
 import { Coordinates } from '@daloa/types';
 
 export interface VerifyPickupParams {
@@ -41,7 +42,7 @@ export const deliveryVerificationService = {
 
     // Tentative via fonction RPC Postgres atomique
     try {
-      const { data: rpcData, error: rpcError } = await supabase.rpc('verify_pickup', {
+      const { data: rpcRaw, error: rpcError } = await supabase.rpc('verify_pickup', {
         p_assignment_id: params.assignmentId,
         p_otp: trimmedOtp,
         p_photo_url: params.photoUrl,
@@ -49,11 +50,12 @@ export const deliveryVerificationService = {
         p_gps_lng: params.driverCoords.lng,
       });
 
+      const rpcData = rpcOutcome<{ attempts?: number; max_attempts?: number; distance?: number }>(rpcRaw);
       if (!rpcError && rpcData) {
         if (!rpcData.success) {
           if (rpcData.reason === 'invalid_otp') {
             throw new Error(
-              `Code OTP Vendeur incorrect (tentative ${rpcData.attempts || '?'}/${rpcData.max_attempts || 3}).`
+              `Code OTP Vendeur incorrect (tentative ${rpcData.attempts || '?'}/${rpcData.max_attempts || 5}).`
             );
           }
           if (rpcData.reason === 'too_many_attempts') {
@@ -106,7 +108,7 @@ export const deliveryVerificationService = {
 
     // Tentative via fonction RPC Postgres atomique
     {
-      const { data: rpcData, error: rpcError } = await supabase.rpc('verify_delivery', {
+      const { data: rpcRaw, error: rpcError } = await supabase.rpc('verify_delivery', {
         p_assignment_id: params.assignmentId,
         p_otp: trimmedOtp,
         p_photo_url: params.photoUrl,
@@ -114,11 +116,12 @@ export const deliveryVerificationService = {
         p_gps_lng: params.driverCoords.lng,
       });
 
+      const rpcData = rpcOutcome<{ attempts?: number; max_attempts?: number; distance?: number }>(rpcRaw);
       if (!rpcError && rpcData) {
         if (!rpcData.success) {
           if (rpcData.reason === 'invalid_otp') {
             throw new Error(
-              `Code OTP Client incorrect (tentative ${rpcData.attempts || '?'}/${rpcData.max_attempts || 3}).`
+              `Code OTP Client incorrect (tentative ${rpcData.attempts || '?'}/${rpcData.max_attempts || 5}).`
             );
           }
           if (rpcData.reason === 'too_many_attempts') {
@@ -173,8 +176,9 @@ export const deliveryVerificationService = {
     });
 
     if (error) throw error;
-    if (data && !data.success) {
-      throw new Error(data.reason || 'Signalement du litige refusé par le serveur.');
+    const res = rpcOutcome(data);
+    if (res && !res.success) {
+      throw new Error(res.reason || 'Signalement du litige refusé par le serveur.');
     }
   },
 };

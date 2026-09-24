@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Platform, Linking as RNLinking } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
+import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,6 +9,7 @@ import { colors, radii, spacing, Button, AppText, AppPressable, useAccent, showA
 import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
+import { openPaymentGateway } from '../../src/lib/openPaymentGateway';
 
 const PERKS = [
   { title: 'Badge PRO certifié', desc: 'Renforcez la confiance des acheteurs sur toutes vos annonces.' },
@@ -45,6 +44,7 @@ export default function BecomeProScreen() {
       const result = await paymentService.initiatePayment({
         type: 'seller_badge',
         amount: planPrice,
+        plan: billingPlan === 'annual' ? 'yearly' : 'monthly',
         userId: user.id,
         customerName: profile?.full_name || 'Vendeur DaloaMarket',
         customerPhone: profile?.phone || '',
@@ -55,23 +55,9 @@ export default function BecomeProScreen() {
         throw new Error('Lien de paiement indisponible. Réessayez.');
       }
 
-      // Sur le Web : redirection directe pour éviter le bloqueur de fenêtres surgissantes
-      if (Platform.OS === 'web') {
-        window.location.href = result.paymentUrl;
-        return;
-      }
-
-      // Sur Mobile : session de paiement avec retour automatique
-      const redirectUrl = Linking.createURL('payment/success');
-      try {
-        await WebBrowser.openAuthSessionAsync(result.paymentUrl, redirectUrl);
-      } catch {
-        try {
-          await WebBrowser.openBrowserAsync(result.paymentUrl);
-        } catch {
-          await RNLinking.openURL(result.paymentUrl);
-        }
-      }
+      await openPaymentGateway(result.paymentUrl);
+      // Sur le web, la page est quittée : rien à faire après la redirection.
+      if (Platform.OS === 'web') return;
 
       // Laisse un instant au webhook, puis resynchronise le profil.
       await new Promise((r) => setTimeout(r, 1500));

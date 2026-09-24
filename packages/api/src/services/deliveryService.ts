@@ -5,8 +5,9 @@ import {
   DriverDailyStats,
   DeliveryPersonRow,
   Coordinates,
+  DeliveryRunStatus,
 } from '@daloa/types';
-import { haversineDistance, isLocationInDaloa } from '@daloa/utils';
+import { haversineDistance, isLocationInDaloa, serializeGeoPoint } from '@daloa/utils';
 import { DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
 import {
   deliveryVerificationService,
@@ -74,7 +75,7 @@ export const deliveryService = {
   async updateDriverLocation(driverId: string, coords: Coordinates): Promise<void> {
     await supabase
       .from('delivery_persons')
-      .update({ current_location: coords })
+      .update({ current_location: serializeGeoPoint(coords) })
       .eq('id', driverId);
   },
 
@@ -256,14 +257,17 @@ export const deliveryService = {
     return {
       assignmentId: data.id,
       orderId: data.order_id,
-      status: data.status,
+      status: data.status as DeliveryRunStatus,
       pickupConfirmedBySeller: data.pickup_confirmed_by_seller,
       pickupConfirmedAt: data.pickup_confirmed_at,
       deliveredAt: data.delivered_at,
       pickupPhotoUrl: data.pickup_photo_url,
       deliveryPhotoUrl: data.delivery_photo_url,
       pickupLocation: data.pickup_location,
-      dropoffLocation: data.dropoff_location || data.dropoff_address || dropoff.address || 'Adresse client',
+      dropoffLocation:
+        (typeof data.dropoff_location === 'string' && data.dropoff_location) ||
+        (typeof data.dropoff_address === 'string' && data.dropoff_address) ||
+        dropoff.address || 'Adresse client',
       pickupDistrict: seller.district || listing.district || 'Daloa Centre',
       dropoffDistrict: dropoff.district || 'Daloa',
       pickupCoordinates: pickupCoords,
@@ -438,7 +442,7 @@ export const deliveryService = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return ((data as DeliveryPersonRow[]) || []).filter(
+    return ((data as unknown as DeliveryPersonRow[]) || []).filter(
       (d) => Boolean(d.name && d.name.trim().length > 0 && d.phone && d.phone.trim().length > 0)
     );
   },

@@ -152,7 +152,6 @@ export default function CheckoutScreen() {
     : calculateOrderBreakdown({
         productPrice: activePrice, quantity, distanceKm, deliveryMode,
         isProSeller: Boolean(listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()),
-        deliveryFeeOverride: listing?.delivery_fee_override,
       });
 
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({

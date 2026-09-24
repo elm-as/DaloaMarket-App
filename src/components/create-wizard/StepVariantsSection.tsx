@@ -5,6 +5,8 @@ import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } 
 import { formatFCFA, Haptics } from '@daloa/utils';
 
 export interface DraftVariant {
+  /** Présent pour une variante existante (édition) : à conserver tel quel. */
+  id?: string;
   title: string;
   price?: number | null;
   stock: number;

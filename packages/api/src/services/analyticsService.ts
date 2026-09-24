@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import type { Json } from '@daloa/types';
 
 /**
  * Journalisation comportementale côté serveur (table `events`).
@@ -40,7 +41,7 @@ export const analyticsService = {
         event_name: eventName,
         user_id: userId ?? null,
         listing_id: listingId ?? null,
-        props: props ?? {},
+        props: (props ?? {}) as Json,
       })
       .then(({ error }) => {
         if (error && typeof __DEV__ !== 'undefined' && __DEV__) {
@@ -68,4 +69,3 @@ export const analyticsService = {
 };
 
 declare const __DEV__: boolean | undefined;
-

@@ -3,8 +3,8 @@ import { Database } from './database.types';
 export type ListingRow = Database['public']['Tables']['listings']['Row'];
 export type ListingInsert = Database['public']['Tables']['listings']['Insert'];
 export type ListingUpdate = Database['public']['Tables']['listings']['Update'];
-export type ListingVariantRow = Database['public']['Tables']['listing_variants']['Row'];
 
+/** Variantes stockées dans la colonne JSON `listings.variants` (il n'existe pas de table dédiée). */
 export interface ListingVariant {
   id?: string;
   listing_id?: string;
@@ -35,7 +35,7 @@ export interface SellerInfo {
   created_at: string;
 }
 
-export interface ListingFull extends ListingRow {
+export interface ListingFull extends Omit<ListingRow, 'variants'> {
   seller?: SellerInfo | null;
   variants?: ListingVariant[];
   is_favorite?: boolean;
@@ -65,8 +65,8 @@ export interface ListingCreateInput {
   condition: 'new' | 'like_new' | 'good' | 'used';
   district: string;
   photos: string[];
+  /** Ignoré s'il y a des variantes : le stock est alors la somme de leurs stocks. */
   stock: number;
-  accepts_delivery: boolean;
-  delivery_fee_override?: number | null;
-  variants?: Array<Omit<ListingVariant, 'id' | 'listing_id'>>;
+  /** `id` conservé à l'édition : les commandes passées y font référence. */
+  variants?: Array<Omit<ListingVariant, 'listing_id'>>;
 }

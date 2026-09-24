@@ -24,6 +24,10 @@ const SELLER_RPC_ERRORS: Record<string, string> = {
   assignment_not_found: 'Aucune course rattachée à cette commande.',
   invalid_status: "Cette commande n'est plus dans un état permettant cette action.",
   locked: 'Trop de tentatives : la commande est passée en litige.',
+  not_authenticated: 'Session expirée. Reconnectez-vous.',
+  not_cod_delivery: 'Cette action ne concerne que les livraisons payées à la livraison.',
+  otp_required: "Commande payée en ligne : saisissez le code communiqué par l'acheteur.",
+  reason_required: 'Décrivez le problème pour ouvrir un litige.',
 };
 
 export const ordersService = {
@@ -90,9 +94,9 @@ export const ordersService = {
       p_delivery_mode: payload.delivery_mode,
       p_payment_method: payload.payment_method,
       p_delivery_address: fullAddress,
-      p_delivery_lat: payload.delivery_lat ?? null,
-      p_delivery_lng: payload.delivery_lng ?? null,
-      p_delivery_district: payload.delivery_district || null,
+      p_delivery_lat: payload.delivery_lat ?? undefined,
+      p_delivery_lng: payload.delivery_lng ?? undefined,
+      p_delivery_district: payload.delivery_district || undefined,
       p_road_km: roadKmBySeller,
     });
 
@@ -135,9 +139,9 @@ export const ordersService = {
       p_delivery_mode: opts.deliveryMode,
       p_payment_method: opts.paymentMethod,
       p_delivery_address: opts.fullAddress,
-      p_delivery_lat: opts.deliveryLat ?? null,
-      p_delivery_lng: opts.deliveryLng ?? null,
-      p_delivery_district: opts.deliveryDistrict ?? null,
+      p_delivery_lat: opts.deliveryLat ?? undefined,
+      p_delivery_lng: opts.deliveryLng ?? undefined,
+      p_delivery_district: opts.deliveryDistrict ?? undefined,
       p_road_km: opts.roadKmBySeller || {},
     });
 
@@ -276,36 +280,23 @@ export const ordersService = {
   },
 
   /**
-   * Annuler une commande par l'acheteur
+   * Annuler une commande par l'acheteur.
+   *
+   * Passe uniquement par `cancel_order_buyer`, qui rembourse le séquestre et
+   * applique la limite d'annulations. Le repli qui écrivait `orders.status`
+   * directement a été retiré : `protect_orders_columns` l'annulait en silence,
+   * et l'écran annonçait une annulation qui n'avait pas eu lieu.
    */
-  async cancelOrder(orderId: string, reason: string): Promise<void> {
-    try {
-      const { data, error } = await supabase.rpc('cancel_order_buyer', {
-        p_order_id: orderId,
-      });
-
-      if (!error && data) {
-        if (!data.success) {
-          throw new Error(data.message || 'Impossible d’annuler cette commande.');
-        }
-        return;
-      }
-    } catch (rpcErr: any) {
-      if (rpcErr.message && !rpcErr.message.includes('function') && !rpcErr.message.includes('schema')) {
-        throw rpcErr;
-      }
-    }
-
-    // Fallback direct si la RPC n'est pas déployée
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        status: 'cancelled',
-        cancel_reason: reason,
-      })
-      .eq('id', orderId);
-
+  async cancelOrder(orderId: string, _reason?: string): Promise<void> {
+    const { data, error } = await supabase.rpc('cancel_order_buyer', {
+      p_order_id: orderId,
+    });
     if (error) throw error;
+
+    const res = data as { success?: boolean; message?: string } | null;
+    if (!res?.success) {
+      throw new Error(res?.message || 'Impossible d’annuler cette commande.');
+    }
   },
 
   /**
@@ -316,12 +307,17 @@ export const ordersService = {
    * en `in_transit`, puis valide l'encaissement via `complete_pickup_order`.
    */
   async dispatchCodOrder(orderId: string): Promise<void> {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: 'in_transit' })
-      .eq('id', orderId);
-
+    // Un UPDATE direct sur `orders.status` est annulé en silence par
+    // `protect_orders_columns` : la transition passe par une RPC.
+    const { data, error } = await supabase.rpc('dispatch_cod_order', {
+      p_order_id: orderId,
+    });
     if (error) throw error;
+
+    const res = data as { success?: boolean; reason?: string } | null;
+    if (!res?.success) {
+      throw new Error(SELLER_RPC_ERRORS[res?.reason || ''] || res?.reason || 'Expédition impossible.');
+    }
   },
 
   /**
@@ -345,38 +341,23 @@ export const ordersService = {
   },
 
   /**
-   * Déclarer un litige sur une commande
+   * Déclarer un litige sur une commande, avec ou sans course.
+   *
+   * `report_order_dispute` couvre aussi les retraits en boutique (aucune course)
+   * et inscrit le litige dans `order_disputes`, ce qui alerte l'administration.
+   * L'ancien repli écrivait `orders.status` directement et restait sans effet.
    */
   async reportDispute(orderId: string, reason: string): Promise<void> {
-    try {
-      const { data: assignment } = await supabase
-        .from('delivery_assignments')
-        .select('id')
-        .eq('order_id', orderId)
-        .maybeSingle();
-
-      if (assignment?.id) {
-        const { data, error } = await supabase.rpc('report_delivery_dispute', {
-          p_assignment_id: assignment.id,
-          p_reason: reason,
-        });
-        if (!error && data?.success) {
-          return;
-        }
-      }
-    } catch {
-      // Poursuivre avec fallback si RPC non disponible
-    }
-
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        status: 'disputed',
-        cancel_reason: reason,
-      })
-      .eq('id', orderId);
-
+    const { data, error } = await supabase.rpc('report_order_dispute', {
+      p_order_id: orderId,
+      p_reason: reason,
+    });
     if (error) throw error;
+
+    const res = data as { success?: boolean; reason?: string } | null;
+    if (!res?.success) {
+      throw new Error(SELLER_RPC_ERRORS[res?.reason || ''] || res?.reason || 'Signalement impossible.');
+    }
   },
 
   /**
@@ -407,7 +388,7 @@ export const ordersService = {
   async completePickupOrder(orderId: string, enteredOtp?: string): Promise<void> {
     const { data, error } = await supabase.rpc('complete_pickup_order', {
       p_order_id: orderId,
-      p_entered_otp: enteredOtp?.trim() || null,
+      p_entered_otp: enteredOtp?.trim() || undefined,
     });
     if (error) throw error;
 

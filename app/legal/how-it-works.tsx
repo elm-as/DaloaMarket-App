@@ -134,7 +134,7 @@ export default function HowItWorksScreen() {
 
         <View style={styles.actionCard}>
           <AppText variant="bodyStrong">Un problème sur une commande ?</AppText>
-          <AppText variant="caption" color={colors.text.muted}>Notre arbitrage local intervient sous 24h pour étudier votre situation.</AppText>
+          <AppText variant="caption" color={colors.text.muted}>Notre arbitrage local intervient sous 48 h pour étudier votre situation.</AppText>
           <Button
             title="Contacter le Support Litiges"
             variant="whatsapp"

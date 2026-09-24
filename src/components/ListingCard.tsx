@@ -32,7 +32,6 @@ export const ListingCard: React.FC<ListingCardProps> = ({
     createdAt: listing.created_at,
     isBoosted: Boolean(listing.boosted_until && new Date(listing.boosted_until) > new Date()),
     isPro: Boolean(listing.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()),
-    acceptsDelivery: listing.accepts_delivery,
     stock: listing.stock,
     cartQty,
     variants: listing.variants || [],

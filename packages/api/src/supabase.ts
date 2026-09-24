@@ -24,7 +24,7 @@ const fetchWithTimeout = (input: RequestInfo | URL, init?: RequestInit): Promise
   });
 };
 
-export const supabase = createClient<any>(
+export const supabase = createClient<Database>(
   ENV_CONFIG.SUPABASE_URL,
   ENV_CONFIG.SUPABASE_ANON_KEY,
   {

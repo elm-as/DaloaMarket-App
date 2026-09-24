@@ -1,3 +1,5 @@
+import { VISIBILITY } from './legal-facts';
+
 export interface LegalArticle {
   id: string;
   number: string;
@@ -108,7 +110,7 @@ export const TERMS_ARTICLES: LegalArticle[] = [
       'Le Pass Vendeur Pro est proposé à 2 500 FCFA / mois ou 25 000 FCFA / an (2 mois offerts).',
       'Il confère le badge Vendeur Pro vérifié, une priorité de classement et la commission réduite à 2,5% lorsque la grille de commission entrera en vigueur.',
       'Pendant la phase de lancement, la publication illimitée, le paiement à la livraison, le retrait sur place et l’affiliation de coursiers sont ouverts à tous les vendeurs, Pro ou non. Ces fonctionnalités redeviendront des avantages réservés au Pass Vendeur Pro à l’issue de cette phase.',
-      'Options de visibilité à la carte : Boost Vedette 7 jours (500 FCFA) et Bump de tête de liste (200 FCFA).',
+      `Options de visibilité : Boost payé en crédits (${VISIBILITY.boostOptions}), crédits achetés en packs (${VISIBILITY.creditPacks}).`,
     ],
   },
   {

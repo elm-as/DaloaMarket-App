@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { serializeGeoPoint } from '@daloa/utils';
 
 export interface CreateDeliveryPersonPayload {
   user_id: string;
@@ -65,7 +66,10 @@ export const deliveryPersonService = {
         coverage_zones: payload.coverage_zones,
         pricing_description: payload.pricing_description || '',
         description: payload.description || '',
-        current_location: payload.current_location || null,
+        // Colonne text : même format JSON `{lat,lng}` que le site livreur.
+        current_location: payload.current_location
+          ? serializeGeoPoint({ lat: payload.current_location.latitude, lng: payload.current_location.longitude })
+          : null,
         payout_network: payload.payout_network || null,
         payout_number: payload.payout_number || null,
         rating: 0,

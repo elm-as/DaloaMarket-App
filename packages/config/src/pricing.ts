@@ -47,11 +47,7 @@ export const PRICING_CONFIG = {
     annualPrice: 25000, // FCFA / an (2 mois offerts)
   },
 
-  // Boosts & Bumps
-  boosts: {
-    boost7Days: 500, // 500 FCFA pour 7 jours de mise en avant
-    bumpToListTop: 200, // 200 FCFA pour remonter en tête de liste
-  },
+  // Le boost se paie en crédits : voir BOOST_CREDIT_OPTIONS.
 
   // Packs d'annonces
   packs: [
@@ -69,6 +65,17 @@ export const PRICING_CONFIG = {
     disableListingPublishFees: true,
   },
 };
+
+/**
+ * Boost d'une annonce, payé en crédits. Doit rester identique à la RPC
+ * `buy_boost_with_credits` (1 jour = 1, 2 jours = 2, 7 jours = 5) et à
+ * `BOOST_CREDIT_COSTS` du web.
+ */
+export const BOOST_CREDIT_OPTIONS = [
+  { days: 1, credits: 1, label: '24 heures' },
+  { days: 2, credits: 2, label: '2 jours' },
+  { days: 7, credits: 5, label: '7 jours' },
+] as const;
 
 /** Applique les bornes du devis à une distance brute (en km, 1 décimale). */
 export function clampBillableDistanceKm(distanceKm: number): number {
