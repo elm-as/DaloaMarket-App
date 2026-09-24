@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useOrderDetail, ordersService } from '@daloa/api';
@@ -31,73 +30,6 @@ import {
 } from 'lucide-react-native';
 import { formatDate, formatFCFA, Haptics, isPickupMode } from '@daloa/utils';
 import { OrderStatusHero } from '../../src/components/orders/OrderStatusHero';
-
-/* ─── helpers ─────────────────────────────────────────────────────── */
-
-/**
- * Libellés alignés sur la contrainte CHECK de `orders.status` :
- * pending | paid | in_transit | delivered | completed | cancelled | disputed.
- *
- * Les `case` précédents portaient sur `pending_payment`, `paid_escrow`,
- * `awaiting_pickup`, `picked_up` — des valeurs qui ne sont écrites nulle part
- * (`awaiting_pickup` et `picked_up` appartiennent à `delivery_assignments`).
- * Résultat : les deux statuts les plus fréquents, `pending` et `paid`, tombaient
- * sur le `default` et s'affichaient en anglais brut.
- */
-function getStatusMeta(status: string, accent: any) {
-  switch (status) {
-    case 'pending':
-      return {
-        label: 'En attente de paiement',
-        bg: colors.status.warningLight,
-        text: colors.status.warningDark,
-        border: colors.status.warningBorder,
-      };
-    case 'paid':
-      return {
-        label: 'Paiement sécurisé',
-        bg: colors.status.infoLight,
-        text: colors.status.infoDark,
-        border: colors.status.infoBorder,
-      };
-    case 'in_transit':
-      return {
-        label: 'En livraison',
-        bg: accent[50],
-        text: accent[700],
-        border: accent[200],
-      };
-    case 'delivered':
-    case 'completed':
-      return {
-        label: 'Livrée',
-        bg: colors.status.successLight,
-        text: colors.status.successDark,
-        border: colors.status.successBorder,
-      };
-    case 'disputed':
-      return {
-        label: 'Litige en cours',
-        bg: colors.status.warningLight,
-        text: colors.status.warningDark,
-        border: colors.status.warningBorder,
-      };
-    case 'cancelled':
-      return {
-        label: 'Annulée',
-        bg: colors.status.errorLight,
-        text: colors.status.errorDark,
-        border: colors.status.errorBorder,
-      };
-    default:
-      return {
-        label: 'En cours',
-        bg: colors.bg.subtle,
-        text: colors.text.body,
-        border: colors.border.DEFAULT,
-      };
-  }
-}
 
 /* ─── SummaryRow ──────────────────────────────────────────────────── */
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -308,18 +240,12 @@ export default function OrderTrackingScreen() {
   if (isLoading || (!order && !isError)) {
     return (
       <View style={[styles.container, { paddingTop: 0 }]}>
-        <LinearGradient
-          colors={[accent[400], accent[600], accent[700]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + spacing[2] }]}
-        >
-          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn}>
-            <ArrowLeft size={20} color={colors.text.inverse} />
+        <View style={[styles.header, { paddingTop: insets.top + spacing[2] }]}>
+          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn} accessibilityLabel="Retour">
+            <ArrowLeft size={20} color={colors.text.DEFAULT} />
           </AppPressable>
-          <AppText variant="overline" color={accent[100]}>COMMANDE</AppText>
-          <AppText variant="h2" color={colors.text.inverse}>Suivi en direct</AppText>
-        </LinearGradient>
+          <AppText variant="bodyStrong">Suivi en direct</AppText>
+        </View>
         <View style={styles.loadingBox}>
           <ActivityIndicator color={accent.DEFAULT} />
           <AppText variant="caption" color={colors.text.muted}>
@@ -334,18 +260,12 @@ export default function OrderTrackingScreen() {
   if (isError || !order) {
     return (
       <View style={[styles.container, { paddingTop: 0 }]}>
-        <LinearGradient
-          colors={[accent[400], accent[600], accent[700]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + spacing[2] }]}
-        >
-          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn}>
-            <ArrowLeft size={20} color={colors.text.inverse} />
+        <View style={[styles.header, { paddingTop: insets.top + spacing[2] }]}>
+          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn} accessibilityLabel="Retour">
+            <ArrowLeft size={20} color={colors.text.DEFAULT} />
           </AppPressable>
-          <AppText variant="overline" color={accent[100]}>COMMANDE</AppText>
-          <AppText variant="h2" color={colors.text.inverse}>Suivi de commande</AppText>
-        </LinearGradient>
+          <AppText variant="bodyStrong">Suivi de commande</AppText>
+        </View>
         <View style={styles.errorBox}>
           <AlertTriangle size={36} color={colors.status.error} />
           <AppText variant="bodyStrong" color={colors.text.body} center style={{ marginTop: spacing[2] }}>
@@ -379,7 +299,6 @@ export default function OrderTrackingScreen() {
   const deliveryOtp = assignment?.delivery_otp;
   const pickupOtp = assignment?.pickup_otp;
   const isSeller = Boolean(user && seller && user.id === seller.id);
-  const statusMeta = getStatusMeta(order.status, accent);
 
   const listing = order.listing;
   const photoUrl = listing?.photos?.[0];
@@ -491,58 +410,27 @@ export default function OrderTrackingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* ── Hero gradient ── */}
-      <LinearGradient
-        colors={[accent[400], accent[600], accent[700]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.hero, { paddingTop: insets.top + spacing[2] }]}
-      >
-        <View style={styles.heroTop}>
-          <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn}>
-            <ArrowLeft size={20} color={colors.text.inverse} />
-          </AppPressable>
-          <View style={[styles.statusPill, { backgroundColor: statusMeta.bg, borderColor: statusMeta.border }]}>
-            <AppText variant="overline" color={statusMeta.text}>
-              {statusMeta.label}
-            </AppText>
+      {/* ── En-tête sobre : le statut et le montant sont dans l'encadré d'état et le récapitulatif ── */}
+      <View style={[styles.header, { paddingTop: insets.top + spacing[2] }]}>
+        <AppPressable onPress={() => router.back()} rippleBorderless style={styles.backBtn} accessibilityLabel="Retour">
+          <ArrowLeft size={20} color={colors.text.DEFAULT} />
+        </AppPressable>
+        {photoUrl ? (
+          <Image source={{ uri: photoUrl }} style={styles.headerThumb} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.headerThumb, styles.headerThumbFallback]}>
+            <Package size={18} color={colors.grey[400]} />
           </View>
-        </View>
-
-        <View style={styles.heroBody}>
-          <View style={styles.heroInfo}>
-            <AppText variant="overline" color={accent[100]}>
-              COMMANDE #{order.id.slice(0, 8).toUpperCase()}
-            </AppText>
-            <AppText variant="h2" color={colors.text.inverse} numberOfLines={2}>
-              {listing?.title || 'Commande DaloaMarket'}
-            </AppText>
-            <AppText variant="caption" color={accent[100]}>
-              {formatDate(order.created_at, true)}
-            </AppText>
-          </View>
-          {photoUrl ? (
-            <Image
-              source={{ uri: photoUrl }}
-              style={styles.heroThumb}
-              contentFit="cover"
-              transition={200}
-            />
-          ) : (
-            <View style={[styles.heroThumb, styles.heroThumbFallback]}>
-              <Package size={22} color={accent[300]} />
-            </View>
-          )}
-        </View>
-
-        {/* Total */}
-        <View style={styles.heroTotal}>
-          <AppText variant="caption" color={accent[100]}>{amountLabel}</AppText>
-          <AppText variant="h2" color={colors.text.inverse} style={styles.tnum}>
-            {formatFCFA(order.total_amount)}
+        )}
+        <View style={styles.headerInfo}>
+          <AppText variant="bodyStrong" numberOfLines={1}>
+            {listing?.title || 'Commande DaloaMarket'}
+          </AppText>
+          <AppText variant="caption" color={colors.text.muted}>
+            #{order.id.slice(0, 8).toUpperCase()} · {formatDate(order.created_at, true)}
           </AppText>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -851,7 +739,8 @@ export default function OrderTrackingScreen() {
         )}
 
         {/* ── Livreur ── */}
-        {driver && (
+        {/* Commande annulée : le livreur n'a plus de rôle, sa fiche encombrait l'écran. */}
+        {driver && order.status !== 'cancelled' && (
           <View style={styles.card}>
             <View style={styles.cardTitleRow}>
               <Bike size={15} color={colors.status.successDark} />
@@ -1025,59 +914,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg.DEFAULT,
   },
-  // ── Hero ──
-  hero: {
-    paddingHorizontal: spacing[4],
-    paddingBottom: spacing[4],
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    gap: spacing[3],
-  },
-  heroTop: {
+  // ── En-tête ──
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[3],
+    backgroundColor: colors.bg.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.DEFAULT,
   },
   backBtn: {
     width: 38,
     height: 38,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: colors.bg.subtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusPill: {
-    paddingHorizontal: spacing[3],
-    paddingVertical: 5,
-    borderRadius: radii.full,
-    borderWidth: 1,
+  headerThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.lg,
+    backgroundColor: colors.bg.subtle,
   },
-  heroBody: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing[3],
+  headerThumbFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  heroInfo: {
+  headerInfo: {
     flex: 1,
-    gap: 3,
-  },
-  heroThumb: {
-    width: 68,
-    height: 68,
-    borderRadius: radii.xl,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    flexShrink: 0,
-  },
-  heroThumbFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroTotal: {
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    borderRadius: radii.xl,
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    alignItems: 'flex-start',
+    minWidth: 0,
   },
   // ── Scroll content ──
   scrollContent: {
