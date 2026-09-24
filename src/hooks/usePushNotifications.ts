@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
@@ -139,6 +139,17 @@ export function usePushNotifications() {
           const ordId = data.url.split('/order/')[1].split('/').filter(Boolean)[0];
           if (ordId) router.push(`/order/${ordId}` as any);
           return;
+        }
+
+        // 4. Tout autre lien (notifications envoyées depuis l'admin) : une page
+        // DaloaMarket s'ouvre dans l'app, qui a les mêmes chemins que le site
+        // (/create-listing, /c/mode, /devenir-pro, /search…) ; seul un lien
+        // externe (chaîne WhatsApp…) sort de l'app.
+        const path = data.url.replace(/^https?:\/\/(www\.)?daloamarket\.com/i, '') || '/';
+        if (path.startsWith('/')) {
+          router.push(path as any);
+        } else if (/^https?:\/\//i.test(path)) {
+          Linking.openURL(path).catch(() => {});
         }
       }
     };
