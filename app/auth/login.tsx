@@ -31,7 +31,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!emailOrPhone.trim()) {
-      setErrorMsg('Veuillez saisir votre email ou numéro de téléphone');
+      setErrorMsg('Veuillez saisir votre adresse e-mail');
       return;
     }
     if (!password) {
@@ -138,8 +138,8 @@ export default function LoginScreen() {
           </View>
 
           <Input
-            label="Adresse email ou téléphone"
-            placeholder="ex: 07 01 02 03 04 ou email@daloa.ci"
+            label="Adresse e-mail"
+            placeholder="ex : vous@gmail.com"
             value={emailOrPhone}
             onChangeText={setEmailOrPhone}
             autoCapitalize="none"

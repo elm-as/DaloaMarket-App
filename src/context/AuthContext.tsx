@@ -97,13 +97,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async function syncUserProfile() {
       try {
         const { data: p } = await supabase
-          .from('users')
+          .from('users_private')
           .select('*')
           .eq('id', user.id)
           .maybeSingle();
 
         if (!isCancelled && p) {
-          const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) };
+          const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) } as unknown as UserProfile;
           setProfile(prof);
           void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(prof));
 
@@ -164,12 +164,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshProfile = async () => {
     if (user?.id) {
       const { data: p } = await supabase
-        .from('users')
+        .from('users_private')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
       if (p) {
-        const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) };
+        const prof = { ...p, isPro: Boolean(p.pro_until && new Date(p.pro_until) > new Date()) } as unknown as UserProfile;
         setProfile(prof);
         void SecureStorageAdapter.setItem(CACHED_PROFILE_KEY, JSON.stringify(prof));
       }

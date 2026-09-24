@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Share, Linking, ActivityIndicator } from 
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase, useListings } from '@daloa/api';
+import { supabase, useListings, PUBLIC_USER_COLUMNS, attachContactPhones } from '@daloa/api';
 import { SellerInfo } from '@daloa/types';
 import {
   colors, radii, spacing, Avatar, RatingStars, ProBadge, Button,
@@ -44,11 +44,11 @@ export default function SellerShopScreen() {
 
         // 1. Si c'est un UUID valide (ex: 8856277b-...)
         if (UUID_REGEX.test(id)) {
-          const { data } = await supabase.from('users').select('*').eq('id', id).maybeSingle();
+          const { data } = await supabase.from('users').select(PUBLIC_USER_COLUMNS).eq('id', id).maybeSingle();
           sellerRecord = data;
         } else {
           // 2. Recherche par shop_slug (ex: "elmas-tresor")
-          const { data: bySlug } = await supabase.from('users').select('*').eq('shop_slug', id).maybeSingle();
+          const { data: bySlug } = await supabase.from('users').select(PUBLIC_USER_COLUMNS).eq('shop_slug', id).maybeSingle();
           if (bySlug) {
             sellerRecord = bySlug;
           } else {
@@ -59,13 +59,13 @@ export default function SellerShopScreen() {
               const maxRaw = cleanHex.padEnd(32, 'f');
               const minUuid = `${minRaw.slice(0, 8)}-${minRaw.slice(8, 12)}-${minRaw.slice(12, 16)}-${minRaw.slice(16, 20)}-${minRaw.slice(20, 32)}`;
               const maxUuid = `${maxRaw.slice(0, 8)}-${maxRaw.slice(8, 12)}-${maxRaw.slice(12, 16)}-${maxRaw.slice(16, 20)}-${maxRaw.slice(20, 32)}`;
-              const { data: byPrefix } = await supabase.from('users').select('*').gte('id', minUuid).lte('id', maxUuid).limit(1).maybeSingle();
+              const { data: byPrefix } = await supabase.from('users').select(PUBLIC_USER_COLUMNS).gte('id', minUuid).lte('id', maxUuid).limit(1).maybeSingle();
               if (byPrefix) sellerRecord = byPrefix;
             }
 
             // 4. Recherche par nom de boutique
             if (!sellerRecord) {
-              const { data: byName } = await supabase.from('users').select('*').ilike('shop_name', id).maybeSingle();
+              const { data: byName } = await supabase.from('users').select(PUBLIC_USER_COLUMNS).ilike('shop_name', id).maybeSingle();
               sellerRecord = byName;
             }
           }
@@ -74,6 +74,9 @@ export default function SellerShopScreen() {
         if (!active) return;
 
         if (sellerRecord) {
+          // Téléphone du bouton WhatsApp : via get_contact_phones (vendeur en ligne).
+          await attachContactPhones([sellerRecord as any]);
+          if (!active) return;
           setSeller(sellerRecord as any);
           if (sellerRecord.rating) setAvgRating(Number(sellerRecord.rating));
 

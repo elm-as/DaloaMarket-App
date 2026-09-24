@@ -39,7 +39,7 @@ export const payoutService = {
     }
 
     const { data: userData } = await supabase
-      .from('users')
+      .from('users_private')
       .select('payout_network, payout_number, phone, full_name')
       .eq('id', userId)
       .maybeSingle();

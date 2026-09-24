@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { attachContactPhones } from '../lib/contacts';
 import {
   AvailableDeliveryRun,
   ActiveDeliveryRunDetails,
@@ -85,12 +86,16 @@ export const deliveryService = {
   async getAvailableRuns(driverCoords?: Coordinates | null): Promise<AvailableDeliveryRun[]> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, phone, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, phone))')
+      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name))')
       .eq('status', 'awaiting_pickup')
       .is('delivery_person_id', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
+
+    // Téléphones via get_contact_phones : avant l'acceptation, seul celui d'un
+    // vendeur en ligne est visible ; celui de l'acheteur l'est une fois la course prise.
+    await attachContactPhones((data || []).flatMap((item: any) => [item.orders?.seller, item.orders?.buyer]));
 
     return (data || []).map((item: any) => {
       const order = item.orders || {};
@@ -228,13 +233,15 @@ export const deliveryService = {
   async getActiveRun(driverId: string): Promise<ActiveDeliveryRunDetails | null> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, phone, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, phone))')
+      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name))')
       .eq('delivery_person_id', driverId)
       .in('status', ['accepted', 'picked_up', 'in_transit'])
       .order('created_at', { ascending: false })
       .maybeSingle();
 
     if (error || !data) return null;
+
+    await attachContactPhones([(data as any).orders?.seller, (data as any).orders?.buyer]);
 
     const order = data.orders || {};
     const listing = order.listings || {};
@@ -278,9 +285,9 @@ export const deliveryService = {
       driverNetGain: deliveryPrice - driverFee,
       isPrivate: data.is_private ?? false,
       sellerName: seller.shop_name || seller.full_name || 'Vendeur',
-      sellerPhone: seller.phone || null,
+      sellerPhone: (seller as { phone?: string | null }).phone || null,
       buyerName: buyer.full_name || 'Client',
-      buyerPhone: buyer.phone || null,
+      buyerPhone: (buyer as { phone?: string | null }).phone || null,
       productTitle: listing.title,
       productPhoto: listing.photos?.[0] || null,
       createdAt: data.created_at,

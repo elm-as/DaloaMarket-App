@@ -22,7 +22,7 @@ export const favoritesService = {
     const { data, error } = await supabase
       .from('favorites')
       .select(
-        'listing:listing_id(*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at))'
+        'listing:listing_id(*, users:user_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at))'
       )
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -60,7 +60,7 @@ export const favoritesService = {
     if (!ids || ids.length === 0) return [];
     const { data, error } = await supabase
       .from('listings')
-      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at)')
+      .select('*, users:user_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at)')
       .in('id', ids);
 
     if (error) throw error;

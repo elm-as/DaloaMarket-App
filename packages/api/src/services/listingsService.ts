@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { attachContactPhones } from '../lib/contacts';
 import { rpcOutcome } from '../lib/rpc';
 import { decodeBase64ToArrayBuffer } from '../lib/base64';
 import { ListingFull, ListingFilters, ListingCreateInput, ListingVariant, Json } from '@daloa/types';
@@ -51,7 +52,7 @@ export const listingsService = {
   ): Promise<{ data: ListingFull[]; hasMore: boolean; totalCount?: number }> {
     let query = supabase
       .from('listings')
-      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at)', { count: 'exact' })
+      .select('*, users:user_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until, created_at)', { count: 'exact' })
       .eq('status', filters.status || 'active');
 
     if (filters.category) {
@@ -142,7 +143,7 @@ export const listingsService = {
    */
   async getListingById(id: string): Promise<ListingFull> {
     const selectCols =
-      '*, users:user_id(id, full_name, phone, avatar_url, shop_name, shop_description, shop_logo_url, shop_banner_url, shop_slug, district, shop_latitude, shop_longitude, rating, pro_until, created_at)';
+      '*, users:user_id(id, full_name, avatar_url, shop_name, shop_description, shop_logo_url, shop_banner_url, shop_slug, district, shop_latitude, shop_longitude, rating, pro_until, created_at)';
 
     let data: any = null;
 
@@ -173,6 +174,9 @@ export const listingsService = {
 
     if (!data) throw new Error('Annonce introuvable');
 
+    // Téléphone du vendeur (bouton WhatsApp) : public tant qu'il a une annonce en ligne.
+    await attachContactPhones([data.users]);
+
     return {
       ...data,
       seller: data.users || null,
@@ -191,7 +195,7 @@ export const listingsService = {
   async getSimilarListings(category: string, currentId: string, limit = 30): Promise<ListingFull[]> {
     const { data, error } = await supabase
       .from('listings')
-      .select('*, users:user_id(id, full_name, phone, avatar_url, shop_name, rating, pro_until)')
+      .select('*, users:user_id(id, full_name, avatar_url, shop_name, rating, pro_until)')
       .eq('category', category)
       .eq('status', 'active')
       .neq('id', currentId)

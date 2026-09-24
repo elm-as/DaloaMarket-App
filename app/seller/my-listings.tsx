@@ -44,7 +44,7 @@ export default function MyListingsScreen() {
 
       // Solde de crédits pour le boost (non exposé par le profil de session).
       const { data: me } = await supabase
-        .from('users')
+        .from('users_private')
         .select('listing_credits')
         .eq('id', user.id)
         .maybeSingle();

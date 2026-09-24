@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { attachContactPhones } from '../lib/contacts';
 import { OrderWithDetails, CheckoutPayload, OrderStatus } from '@daloa/types';
 
 /*
@@ -166,7 +167,7 @@ export const ordersService = {
   ): Promise<OrderWithDetails[]> {
     let query = supabase
       .from('orders')
-      .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating), buyer:buyer_id(id, full_name, phone, avatar_url), delivery_assignments(*)')
+      .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating), buyer:buyer_id(id, full_name, avatar_url), delivery_assignments(*)')
       .order('created_at', { ascending: false });
 
     if (role === 'buyer') {
@@ -181,6 +182,8 @@ export const ordersService = {
 
     const { data, error } = await query;
     if (error) throw error;
+
+    await attachContactPhones((data || []).flatMap((item: any) => [item.seller, item.buyer]));
 
     return (data || []).map((item: any) => ({
       ...item,
@@ -231,7 +234,7 @@ export const ordersService = {
     let rawData: any = null;
     const { data, error } = await supabase
       .from('orders')
-      .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, phone, avatar_url), delivery_assignments(*), order_items(*, listings:listing_id(id, title, photos, price))')
+      .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, avatar_url), delivery_assignments(*), order_items(*, listings:listing_id(id, title, photos, price))')
       .eq('id', orderId)
       .single();
 
@@ -239,7 +242,7 @@ export const ordersService = {
       // Repli sans jointure imbriquée order_items si un problème de relation survient
       const { data: fallbackData, error: fallbackErr } = await supabase
         .from('orders')
-        .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, phone, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, phone, avatar_url), delivery_assignments(*)')
+        .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, avatar_url), delivery_assignments(*)')
         .eq('id', orderId)
         .single();
 
@@ -267,6 +270,9 @@ export const ordersService = {
         .maybeSingle();
       deliveryPerson = dp;
     }
+
+    // Téléphones de l'acheteur et du vendeur : visibles des parties de la commande.
+    await attachContactPhones([rawData.seller, rawData.buyer]);
 
     return {
       ...rawData,

@@ -63,12 +63,13 @@ export const authService = {
 
     const userId = session.user.id;
 
-    // Récupérer le profil utilisateur
+    // Profil complet (colonnes privées comprises) : la vue `users_private`
+    // ne rend que la ligne de l'utilisateur connecté.
     const { data: profile } = await supabase
-      .from('users')
+      .from('users_private')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     // Récupérer le profil livreur s'il existe (un utilisateur DaloaMarket peut aussi être livreur DaloaDelivery)
     const { data: deliveryProfile } = await supabase
@@ -79,7 +80,7 @@ export const authService = {
 
     return {
       user: session.user,
-      profile: profile ? { ...profile, isPro: Boolean(profile.pro_until && new Date(profile.pro_until) > new Date()) } : null,
+      profile: profile ? ({ ...profile, isPro: Boolean(profile.pro_until && new Date(profile.pro_until) > new Date()) } as unknown as UserProfile) : null,
       deliveryProfile,
     };
   },
@@ -88,22 +89,12 @@ export const authService = {
    * Connexion par Email ou Téléphone et mot de passe
    */
   async login({ emailOrPhone, password }: LoginInput): Promise<{ user: User; profile: UserProfile | null }> {
-    let email = emailOrPhone.trim();
+    // Connexion par e-mail uniquement, comme sur le site. La connexion par
+    // téléphone retrouvait l'e-mail d'un compte à partir de son numéro, ce qui
+    // obligeait à laisser les e-mails et téléphones lisibles par tous.
+    const email = emailOrPhone.trim();
     if (!email.includes('@')) {
-      const cleanPhone = email.replace(/[^\d+]/g, '');
-      const lastDigits = cleanPhone.slice(-8);
-      const { data: matchedUser } = await supabase
-        .from('users')
-        .select('email')
-        .or(`phone.eq.${cleanPhone},phone.ilike.%${lastDigits}%`)
-        .limit(1)
-        .maybeSingle();
-
-      if (matchedUser?.email) {
-        email = matchedUser.email;
-      } else {
-        email = `${cleanPhone.replace(/\D/g, '')}@daloamarket.ci`;
-      }
+      throw new Error('Connectez-vous avec votre adresse e-mail.');
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -115,14 +106,14 @@ export const authService = {
     if (!data.user) throw new Error('Utilisateur introuvable');
 
     const { data: profile } = await supabase
-      .from('users')
+      .from('users_private')
       .select('*')
       .eq('id', data.user.id)
       .maybeSingle();
 
     return {
       user: data.user,
-      profile: profile ? { ...profile, isPro: Boolean(profile.pro_until && new Date(profile.pro_until) > new Date()) } : null,
+      profile: profile ? ({ ...profile, isPro: Boolean(profile.pro_until && new Date(profile.pro_until) > new Date()) } as unknown as UserProfile) : null,
     };
   },
 
@@ -168,13 +159,19 @@ export const authService = {
       userPayload.shop_name = input.shopName;
     }
 
-    const { data: profile, error: profileErr } = await supabase
+    // Pas de `.select()` sur `users` : la relecture de la ligne renverrait des
+    // colonnes privées. Le profil complet se lit dans `users_private`.
+    const { error: profileErr } = await supabase
       .from('users')
-      .upsert(userPayload, { onConflict: 'id' })
-      .select()
-      .maybeSingle();
+      .upsert(userPayload, { onConflict: 'id' });
 
     if (profileErr) console.warn('Avertissement profil:', profileErr.message);
+
+    const { data: profile } = await supabase
+      .from('users_private')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
     // Si inscription livreur, créer l'entrée delivery_persons
     if (input.role === 'delivery') {
@@ -193,7 +190,7 @@ export const authService = {
 
     return {
       user: data.user,
-      profile: profile || null,
+      profile: (profile as unknown as UserProfile) || null,
     };
   },
 
@@ -212,22 +209,32 @@ export const authService = {
    * Mise à jour du profil
    */
   async updateProfile(userId: string, updates: UserUpdate): Promise<UserProfile> {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('users')
       .update(updates)
-      .eq('id', userId)
-      .select()
-      .single();
-
+      .eq('id', userId);
     if (error) throw error;
-    return data;
+
+    // Relecture par `users_private` : `users` ne rend plus les colonnes privées.
+    const { data, error: readError } = await supabase
+      .from('users_private')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (readError) throw readError;
+    return data as unknown as UserProfile;
   },
 
   /**
    * Mot de passe oublié
    */
   async resetPassword(email: string): Promise<void> {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // Sans adresse de retour, le lien de l'e-mail menait à l'accueil du site,
+    // qui ne propose pas de choisir un nouveau mot de passe. Le compte est
+    // commun aux deux apps et au site : la page du site sert à tous.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://daloamarket.com/auth/update-password',
+    });
     if (error) throw error;
   },
 

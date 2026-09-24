@@ -278,5 +278,17 @@ export const DEFAULT_SUPPORT_EMAIL = 'support@daloamarket.com';
  */
 export const VEHICLES_REQUIRING_LICENCE = ['Moto', 'Voiture', 'Triporteur'] as const;
 
+/**
+ * Identifiant de véhicule (`moto`, `velo`…) quelle que soit l'écriture reçue.
+ * La base contient les deux formes : « Moto » (inscription, site) et « moto »
+ * (ancienne édition de profil de l'app).
+ */
+export const normalizeVehicleId = (vehicleType?: string | null): string =>
+  (vehicleType || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+/** Libellé enregistré en base (« Moto », « Vélo »…), le même que le site. */
+export const vehicleLabel = (vehicleType?: string | null): string =>
+  VEHICLE_TYPES.find((v) => v.id === normalizeVehicleId(vehicleType))?.label || (vehicleType || '');
+
 export const requiresDrivingLicence = (vehicleType?: string | null): boolean =>
-  VEHICLES_REQUIRING_LICENCE.includes((vehicleType || '') as any);
+  VEHICLES_REQUIRING_LICENCE.some((v) => normalizeVehicleId(v) === normalizeVehicleId(vehicleType));

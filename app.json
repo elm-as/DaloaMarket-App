@@ -37,11 +37,283 @@
           "data": [
             {
               "scheme": "https",
-              "host": "daloamarket.com"
+              "host": "daloamarket.com",
+              "pathPrefix": "/l/"
             },
             {
               "scheme": "https",
-              "host": "www.daloamarket.com"
+              "host": "daloamarket.com",
+              "pathPrefix": "/listings/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/listing/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/item/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/b/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/boutique/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/shop/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/seller/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/vendeur/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/profile/seller/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/c/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/suivi/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/order/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/messages/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "pathPrefix": "/checkout/"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/electronique"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/mode"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/vehicules"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/maison-deco"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/alimentaire"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/cosmetiques"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/livres"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/sports-loisirs"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/mes-commandes"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/panier"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/search"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/devenir-pro"
+            },
+            {
+              "scheme": "https",
+              "host": "daloamarket.com",
+              "path": "/create-listing"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/l/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/listings/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/listing/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/item/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/b/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/boutique/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/shop/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/seller/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/vendeur/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/profile/seller/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/c/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/suivi/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/order/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/messages/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "pathPrefix": "/checkout/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/electronique"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/mode"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/vehicules"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/maison-deco"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/alimentaire"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/cosmetiques"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/livres"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/sports-loisirs"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/mes-commandes"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/panier"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/search"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/devenir-pro"
+            },
+            {
+              "scheme": "https",
+              "host": "www.daloamarket.com",
+              "path": "/create-listing"
             }
           ],
           "category": [
@@ -51,10 +323,11 @@
         }
       ],
       "permissions": [
-        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
     },
