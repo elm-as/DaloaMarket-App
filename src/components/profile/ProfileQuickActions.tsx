@@ -27,18 +27,7 @@ export const ProfileQuickActions: React.FC<ProfileQuickActionsProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Bouton principal : Publier une annonce */}
-      <AppPressable
-        onPress={onPublishListing}
-        style={[styles.publishBtn, { backgroundColor: accent.DEFAULT }]}
-        accessibilityLabel="Publier une nouvelle annonce"
-      >
-        <PlusCircle size={18} color={colors.text.inverse} />
-        <AppText variant="bodyStrong" color={colors.text.inverse} style={styles.publishText}>
-          Publier une nouvelle annonce
-        </AppText>
-      </AppPressable>
-
+      {/* « Publier » est l'onglet central « Vendre » : pas de second bouton ici. */}
       {/* Grille des raccourcis marchands */}
       <View style={styles.grid}>
         {/* 1. Mes Annonces */}

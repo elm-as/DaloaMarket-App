@@ -218,12 +218,6 @@ export default function ProfileScreen() {
           onSetupPayout={() => router.push('/settings/payout' as any)}
         />
 
-        {/* 4. Bannière Pass Pro Vendeur */}
-        <ProfileProBanner
-          isPro={isPro}
-          onBecomePro={() => router.push('/pro/become-pro' as any)}
-        />
-
         {/* 5. Grille des actions rapides marchandes */}
         <ProfileQuickActions
           onPublishListing={() => router.push('/listing/create' as any)}
@@ -252,6 +246,12 @@ export default function ProfileScreen() {
           onOpenTerms={() => router.push('/legal/terms' as any)}
           onOpenDisputes={() => router.push('/legal/how-it-works' as any)}
           onLogout={handleLogout}
+        />
+
+        {/* Pass Pro en fin de page : une offre, pas une information sur le compte */}
+        <ProfileProBanner
+          isPro={isPro}
+          onBecomePro={() => router.push('/pro/become-pro' as any)}
         />
       </ScrollView>
 

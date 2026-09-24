@@ -15,7 +15,6 @@ import { formatFCFA, Haptics, getListingPriceRange, getUnavailabilityReason } fr
 import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
 import { ListingSellerBox } from '../../src/components/listing-detail/ListingSellerBox';
 import { ListingStickyFooter } from '../../src/components/listing-detail/ListingStickyFooter';
-import { ListingTrustBadges } from '../../src/components/listing-detail/ListingTrustBadges';
 import { ListingReviewsSection } from '../../src/components/listing-detail/ListingReviewsSection';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
@@ -497,12 +496,6 @@ export default function ListingDetailScreen() {
               )}
             </View>
           ) : null}
-
-          {/* ③ Trust badges */}
-          <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
-            Garanties & livraison
-          </AppText>
-          <ListingTrustBadges />
 
           {/* ④ Seller card */}
           <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>

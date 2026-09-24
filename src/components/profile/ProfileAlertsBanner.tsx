@@ -22,11 +22,15 @@ export const ProfileAlertsBanner: React.FC<ProfileAlertsBannerProps> = ({
 }) => {
   // Ne pas afficher d'alerte si l'utilisateur n'est pas vendeur et n'a aucune annonce
   if (!hasListings && !isSeller) return null;
+  // Une seule alerte à la fois, la plus urgente : sans compte de retrait, le
+  // vendeur ne peut pas être payé. La position boutique vient ensuite.
+  if (hasPayoutAccount && hasShopGps) return null;
+  const showGps = hasPayoutAccount && !hasShopGps;
 
   return (
     <View style={styles.container}>
       {/* Alerte 1 : Position GPS boutique manquante */}
-      {!hasShopGps && (
+      {showGps && (
         <AppPressable
           onPress={onDefineGps}
           style={[styles.alertCard, styles.gpsAlert]}
