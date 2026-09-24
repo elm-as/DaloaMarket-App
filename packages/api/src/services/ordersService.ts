@@ -1,8 +1,20 @@
 import { supabase } from '../supabase';
 import { OrderWithDetails, CheckoutPayload, OrderStatus } from '@daloa/types';
-import { calculateOrderBreakdown, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
-import { haversineDistance, generateSecureOtp, isLocationInDaloa } from '@daloa/utils';
-import { systemSettingsService } from './systemSettingsService';
+
+/*
+ * Plus aucun calcul de montant ici : distance, frais et commissions sont
+ * décidés par la RPC `create_cod_order`. Les imports de tarification et de
+ * géolocalisation ont été retirés pour que personne ne rebranche un second
+ * calcul par mégarde — c'était la cause du prix affiché différent du prix payé.
+ */
+
+/** Traduction des `reason` renvoyés par `create_cod_order`. */
+const COD_RPC_ERRORS: Record<string, string> = {
+  unauthenticated: 'Session expirée. Reconnectez-vous pour commander.',
+  empty_cart: 'Votre panier est vide.',
+  unsupported_payment_method: 'Ce mode de paiement ne passe pas par ce chemin.',
+  no_active_listing: "Ces articles ne sont plus disponibles à la vente.",
+};
 
 /** Traduction des `reason` renvoyés par les RPC vendeur. */
 const SELLER_RPC_ERRORS: Record<string, string> = {
@@ -16,75 +28,23 @@ const SELLER_RPC_ERRORS: Record<string, string> = {
 
 export const ordersService = {
   /**
-   * Crée la commande côté client (paiement à la livraison).
+   * Crée une commande en espèces (COD ou retrait boutique).
    *
-   * Note : contrairement à ce que laissait entendre l'ancien commentaire, ce
-   * chemin ne crée AUCUN séquestre — le séquestre n'existe que pour le paiement
-   * en ligne, créé par l'API dans `/create-payment`.
+   * Les montants ne sont plus composés ici : la RPC `create_cod_order` relit les
+   * prix, résout les positions, calcule la distance et les frais, puis écrit la
+   * commande, ses lignes et la course. Le client ne transmet que les articles,
+   * la position et la distance routière qu'il a mesurée — distance que la base
+   * ne retient que si elle est plausible (voir `fn_reconcile_road_km`).
+   *
+   * Ce chemin ne crée AUCUN séquestre : le séquestre n'existe que pour le
+   * paiement en ligne, créé par l'API dans `/create-payment`.
    */
-  async createOrder(buyerId: string, payload: CheckoutPayload): Promise<OrderWithDetails> {
-    // 1. Récupérer l'annonce et les infos vendeur
-    const { data: listing, error: listingErr } = await supabase
-      .from('listings')
-      .select('*, users:user_id(*)')
-      .eq('id', payload.listing_id)
-      .single();
-
-    if (listingErr || !listing) throw new Error('Article introuvable');
-
-    const seller = listing.users;
-    const isPro = Boolean(seller?.pro_until && new Date(seller.pro_until) > new Date());
-
-    // 2. Calcul de la distance
-    const rawSellerLat = seller?.shop_latitude ?? seller?.latitude;
-    const rawSellerLng = seller?.shop_longitude ?? seller?.longitude;
-    let sellerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
-    if (rawSellerLat != null && rawSellerLng != null && isLocationInDaloa(Number(rawSellerLat), Number(rawSellerLng))) {
-      sellerCoords = { lat: Number(rawSellerLat), lng: Number(rawSellerLng) };
-    } else {
-      const sellerDistrict = seller?.district || listing.district;
-      const districtPoint = sellerDistrict ? (DALOA_DISTRICT_COORDINATES as any)[sellerDistrict] : null;
-      if (districtPoint) {
-        sellerCoords = { lat: districtPoint.latitude, lng: districtPoint.longitude };
-      }
-    }
-
-    const rawBuyerLat = payload.delivery_lat;
-    const rawBuyerLng = payload.delivery_lng;
-    let buyerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
-    if (rawBuyerLat != null && rawBuyerLng != null && isLocationInDaloa(Number(rawBuyerLat), Number(rawBuyerLng))) {
-      buyerCoords = { lat: Number(rawBuyerLat), lng: Number(rawBuyerLng) };
-    } else {
-      const buyerDistrict = payload.delivery_district;
-      const districtPoint = buyerDistrict ? (DALOA_DISTRICT_COORDINATES as any)[buyerDistrict] : null;
-      if (districtPoint) {
-        buyerCoords = { lat: districtPoint.latitude, lng: districtPoint.longitude };
-      }
-    }
-    const distanceKm = Math.min(15.0, Math.max(0.5, Number(haversineDistance(sellerCoords, buyerCoords).toFixed(1))));
-
-    // Override de commission autoritaire depuis la config de phase (Phase 0 = 0%).
-    // Lu ici pour garantir la cohérence web/mobile quel que soit l'appelant.
-    let sellerFeeOverride: number | null = null;
-    try {
-      const { phaseConfig } = await systemSettingsService.getSettings();
-      sellerFeeOverride = phaseConfig.seller_fee_override;
-    } catch {
-      // en cas d'échec, grille par défaut (fail-safe)
-    }
-
-    // 3. Calcul de la ventilation des montants
-    const breakdown = calculateOrderBreakdown({
-      productPrice: listing.price,
-      quantity: payload.quantity,
-      distanceKm,
-      isProSeller: isPro,
-      deliveryMode: payload.delivery_mode,
-      deliveryFeeOverride: listing.delivery_fee_override,
-      sellerFeeOverride,
-    });
-
-    // 3b. Anti-doublon : réutilise une commande 'pending' récente identique plutôt
+  async createOrder(
+    buyerId: string,
+    payload: CheckoutPayload,
+    roadKm?: number | null
+  ): Promise<OrderWithDetails> {
+    // Anti-doublon : réutilise une commande 'pending' récente identique plutôt
     // que d'en créer une nouvelle à chaque tentative (évite les orphelins créés
     // quand le paiement échoue ou que l'utilisateur réessaie).
     const { data: existingPending } = await supabase
@@ -102,103 +62,53 @@ export const ordersService = {
       return this.getOrderById(existingPending.id);
     }
 
-    // 4. Insertion de la commande
     const fullAddress = payload.delivery_district
       ? `${payload.delivery_address || ''} (${payload.delivery_district})`.trim()
       : payload.delivery_address || 'Daloa';
 
-    const orderPayload = {
-      buyer_id: buyerId,
-      seller_id: listing.user_id,
-      listing_id: payload.listing_id,
-      variant_id: payload.variant_id || null,
-      variant_label: payload.variant_label || null,
-      unit_price: listing.price,
-      quantity: payload.quantity || 1,
-      product_amount: Math.round(breakdown.productSubtotal),
-      delivery_fee: Math.round(breakdown.deliveryFee),
-      platform_commission: Math.round(breakdown.sellerCommission),
-      reserve_fee: Math.round(breakdown.buyerServiceFee),
-      total_amount: Math.round(breakdown.totalAmount),
-      status: 'pending',
-      // `pickup_point` est la valeur canonique, celle qu'ecrit le web. En ecrivant
-      // `pickup`, les commandes retrait creees sur mobile n'etaient reconnues que
-      // par le mobile. Les deux valeurs restent acceptees en lecture.
-      delivery_mode: payload.delivery_mode === 'pickup' ? 'pickup_point' : 'delivery',
-      payment_method: payload.payment_method,
-      delivery_address: fullAddress,
-      delivery_lat: payload.delivery_lat || null,
-      delivery_lng: payload.delivery_lng || null,
-    };
-
-    const { data: order, error: orderErr } = await supabase
-      .from('orders')
-      .insert(orderPayload)
-      .select()
-      .single();
-
-    if (orderErr) {
-      console.error('[ordersService] Erreur création commande:', orderErr);
-      throw orderErr;
+    // La distance routière est transmise par vendeur : on a donc besoin de
+    // l'identifiant du vendeur de cette annonce.
+    let roadKmBySeller: Record<string, number> = {};
+    if (roadKm != null && roadKm > 0) {
+      const { data: owner } = await supabase
+        .from('listings')
+        .select('user_id')
+        .eq('id', payload.listing_id)
+        .maybeSingle();
+      if (owner?.user_id) roadKmBySeller = { [owner.user_id]: roadKm };
     }
 
-    // 4b. Décrémenter le stock et marquer comme vendu si stock = 0
-    try {
-      const prevStock = Number(listing.stock) || 1;
-      const orderQty = payload.quantity || 1;
-      const newStock = Math.max(0, prevStock - orderQty);
-      const updateData: any = {
-        stock: newStock,
-        status: newStock === 0 ? 'sold' : listing.status,
-      };
-      if (Array.isArray(listing.variants) && payload.variant_id) {
-        updateData.variants = listing.variants.map((v: any) => {
-          if (v.id === payload.variant_id) {
-            const vStock = Math.max(0, (Number(v.stock) || 0) - orderQty);
-            return { ...v, stock: vStock, active: vStock > 0 };
-          }
-          return v;
-        });
-      }
-      await supabase.from('listings').update(updateData).eq('id', payload.listing_id);
-    } catch (stockErr) {
-      console.warn('[ordersService] Erreur mise à jour stock:', stockErr);
+    const { data, error } = await supabase.rpc('create_cod_order', {
+      p_items: [
+        {
+          listing_id: payload.listing_id,
+          variant_id: payload.variant_id || null,
+          variant_label: payload.variant_label || null,
+          quantity: payload.quantity || 1,
+        },
+      ],
+      p_delivery_mode: payload.delivery_mode,
+      p_payment_method: payload.payment_method,
+      p_delivery_address: fullAddress,
+      p_delivery_lat: payload.delivery_lat ?? null,
+      p_delivery_lng: payload.delivery_lng ?? null,
+      p_delivery_district: payload.delivery_district || null,
+      p_road_km: roadKmBySeller,
+    });
+
+    if (error) throw error;
+
+    const res = data as { success?: boolean; reason?: string; first_order_id?: string } | null;
+    if (!res?.success || !res.first_order_id) {
+      throw new Error(COD_RPC_ERRORS[res?.reason || ''] || res?.reason || 'Commande impossible.');
     }
 
-    // 5. Si livraison demandée, créer le delivery_assignment avec ses deux codes.
-    //    OTP sur 6 chiffres pour s'aligner sur le serveur (createOrderFromEscrow) :
-    //    4 chiffres ne font que 10 000 combinaisons pour un code qui déclenche un
-    //    virement. Le scanner QR accepte déjà \d{4,6}.
-    if (payload.delivery_mode === 'delivery') {
-      const pickupOtp = generateSecureOtp(6);
-      const deliveryOtp = generateSecureOtp(6);
-
-      const { error: assignErr } = await supabase.from('delivery_assignments').insert({
-        order_id: order.id,
-        seller_id: listing.user_id,
-        // Aligné sur le chemin de paiement en ligne : le vendeur doit confirmer
-        // qu'il a l'article (confirm_seller_availability) avant qu'un livreur
-        // puisse prendre la course. Sinon un livreur se déplace pour rien.
-        status: 'pending_seller_confirmation',
-        pickup_location: `${seller?.shop_name || 'Boutique'} (${seller?.district || listing.district})`,
-        dropoff_location: fullAddress,
-        delivery_price: Math.round(breakdown.deliveryFee),
-        pickup_otp: pickupOtp,
-        delivery_otp: deliveryOtp,
-        pickup_confirmed_by_seller: false,
-      });
-
-      if (assignErr) {
-        console.warn('[ordersService] Erreur création delivery_assignment:', assignErr.message);
-      }
-    }
-
-    return this.getOrderById(order.id);
+    return this.getOrderById(res.first_order_id);
   },
 
   /**
-   * Crée les commandes d'un panier COD/espèces : regroupées PAR VENDEUR
-   * (une commande + N order_items + une livraison par vendeur, transport 1×/vendeur).
+   * Crée les commandes d'un panier en espèces : la RPC les regroupe PAR VENDEUR
+   * (une commande + N lignes + une course par vendeur, transport 1×/vendeur).
    * Retourne l'id de la première commande créée.
    */
   async createCartOrders(
@@ -210,152 +120,37 @@ export const ordersService = {
       fullAddress: string;
       deliveryLat?: number | null;
       deliveryLng?: number | null;
+      deliveryDistrict?: string | null;
+      /** Distance routière mesurée, par identifiant de vendeur. */
+      roadKmBySeller?: Record<string, number>;
     }
   ): Promise<string | null> {
-    // Regrouper par vendeur
-    const groups = new Map<string, { seller: any; items: typeof items }>();
-    for (const ci of items) {
-      const sellerId = ci.listing.user_id || ci.listing.seller?.id;
-      if (!sellerId) continue;
-      if (!groups.has(sellerId)) groups.set(sellerId, { seller: ci.listing.seller || ci.listing.users || {}, items: [] });
-      groups.get(sellerId)!.items.push(ci);
+    const { data, error } = await supabase.rpc('create_cod_order', {
+      p_items: items.map((ci) => ({
+        listing_id: ci.listing.id,
+        variant_id: ci.variant?.id || null,
+        variant_label: ci.variant?.label || null,
+        quantity: ci.quantity,
+      })),
+      p_delivery_mode: opts.deliveryMode,
+      p_payment_method: opts.paymentMethod,
+      p_delivery_address: opts.fullAddress,
+      p_delivery_lat: opts.deliveryLat ?? null,
+      p_delivery_lng: opts.deliveryLng ?? null,
+      p_delivery_district: opts.deliveryDistrict ?? null,
+      p_road_km: opts.roadKmBySeller || {},
+    });
+
+    if (error) throw error;
+
+    const res = data as { success?: boolean; reason?: string; first_order_id?: string } | null;
+    if (!res?.success) {
+      throw new Error(COD_RPC_ERRORS[res?.reason || ''] || res?.reason || 'Commande impossible.');
     }
 
-    // Override commission de phase (0 en Phase 0)
-    let sellerFeeOverride: number | null = null;
-    try {
-      const { phaseConfig } = await systemSettingsService.getSettings();
-      sellerFeeOverride = phaseConfig.seller_fee_override;
-    } catch {
-      /* fail-safe */
-    }
-
-    const rawBuyerLat = opts.deliveryLat;
-    const rawBuyerLng = opts.deliveryLng;
-    let buyerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
-    if (rawBuyerLat != null && rawBuyerLng != null && isLocationInDaloa(Number(rawBuyerLat), Number(rawBuyerLng))) {
-      buyerCoords = { lat: Number(rawBuyerLat), lng: Number(rawBuyerLng) };
-    }
-    let firstOrderId: string | null = null;
-
-    for (const [sellerId, group] of groups.entries()) {
-      const seller = group.seller || {};
-      const rawSellerLat = seller.shop_latitude ?? seller.latitude;
-      const rawSellerLng = seller.shop_longitude ?? seller.longitude;
-      let sellerCoords = { lat: DALOA_CENTER.lat, lng: DALOA_CENTER.lng };
-      if (rawSellerLat != null && rawSellerLng != null && isLocationInDaloa(Number(rawSellerLat), Number(rawSellerLng))) {
-        sellerCoords = { lat: Number(rawSellerLat), lng: Number(rawSellerLng) };
-      } else {
-        const sellerDistrict = seller.district || group.items[0]?.listing?.district;
-        const districtPoint = sellerDistrict ? (DALOA_DISTRICT_COORDINATES as any)[sellerDistrict] : null;
-        if (districtPoint) {
-          sellerCoords = { lat: districtPoint.latitude, lng: districtPoint.longitude };
-        }
-      }
-      const distanceKm = Math.min(15.0, Math.max(0.5, Number(haversineDistance(sellerCoords, buyerCoords).toFixed(1))));
-      const productAmount = group.items.reduce(
-        (s, ci) => s + (ci.variant?.price ?? ci.listing.price) * ci.quantity,
-        0
-      );
-      const totalQty = group.items.reduce((s, ci) => s + ci.quantity, 0);
-      const isPro = Boolean(seller?.pro_until && new Date(seller.pro_until) > new Date());
-
-      const breakdown = calculateOrderBreakdown({
-        productPrice: productAmount,
-        quantity: 1,
-        distanceKm,
-        isProSeller: isPro,
-        deliveryMode: opts.deliveryMode,
-        sellerFeeOverride,
-      });
-
-      const first = group.items[0];
-      const { data: order, error: orderErr } = await supabase
-        .from('orders')
-        .insert({
-          buyer_id: buyerId,
-          seller_id: sellerId,
-          listing_id: first.listing.id,
-          variant_id: first.variant?.id || null,
-          variant_label: first.variant?.label || null,
-          unit_price: first.variant?.price ?? first.listing.price,
-          quantity: totalQty,
-          product_amount: Math.round(breakdown.productSubtotal),
-          delivery_fee: Math.round(breakdown.deliveryFee),
-          // Doit porter la commission VENDEUR, comme createOrder ci-dessus.
-          // Stockait buyerServiceFee (0 %), donc la commission d'une commande
-          // panier était enregistrée à 0 quelle que soit la phase.
-          platform_commission: Math.round(breakdown.sellerCommission),
-          reserve_fee: Math.round(breakdown.buyerServiceFee),
-          total_amount: Math.round(breakdown.totalAmount),
-          status: 'pending',
-          delivery_mode: opts.deliveryMode === 'pickup' ? 'pickup_point' : 'delivery',
-          payment_method: opts.paymentMethod,
-          delivery_address: opts.fullAddress,
-          delivery_lat: opts.deliveryLat || null,
-          delivery_lng: opts.deliveryLng || null,
-        })
-        .select('id')
-        .single();
-
-      if (orderErr || !order) throw orderErr || new Error('Erreur création commande');
-      if (!firstOrderId) firstOrderId = order.id;
-
-      // Lignes d'articles
-      await supabase.from('order_items').insert(
-        group.items.map((ci) => ({
-          order_id: order.id,
-          listing_id: ci.listing.id,
-          variant_id: ci.variant?.id || null,
-          variant_label: ci.variant?.label || null,
-          unit_price: ci.variant?.price ?? ci.listing.price,
-          quantity: ci.quantity,
-          product_amount: (ci.variant?.price ?? ci.listing.price) * ci.quantity,
-        }))
-      );
-
-      // Décrémenter le stock pour chaque article du panier
-      for (const ci of group.items) {
-        try {
-          const prevStock = Number(ci.listing.stock) || 1;
-          const newStock = Math.max(0, prevStock - ci.quantity);
-          const updateData: any = {
-            stock: newStock,
-            status: newStock === 0 ? 'sold' : ci.listing.status,
-          };
-          if (Array.isArray(ci.listing.variants) && ci.variant?.id) {
-            updateData.variants = ci.listing.variants.map((v: any) => {
-              if (v.id === ci.variant.id) {
-                const vStock = Math.max(0, (Number(v.stock) || 0) - ci.quantity);
-                return { ...v, stock: vStock, active: vStock > 0 };
-              }
-              return v;
-            });
-          }
-          await supabase.from('listings').update(updateData).eq('id', ci.listing.id);
-        } catch (stockErr) {
-          console.warn('[ordersService] Erreur mise à jour stock panier:', stockErr);
-        }
-      }
-
-      // Une livraison par vendeur
-      if (opts.deliveryMode === 'delivery') {
-        await supabase.from('delivery_assignments').insert({
-          order_id: order.id,
-          seller_id: sellerId,
-          status: 'pending_seller_confirmation',
-          pickup_location: `${seller?.shop_name || 'Boutique'} (${seller?.district || ''})`.trim(),
-          dropoff_location: opts.fullAddress,
-          delivery_price: Math.round(breakdown.deliveryFee),
-          pickup_otp: generateSecureOtp(6),
-          delivery_otp: generateSecureOtp(6),
-          pickup_confirmed_by_seller: false,
-        });
-      }
-    }
-
-    return firstOrderId;
+    return res.first_order_id || null;
   },
+
 
   /**
    * Récupère la liste des commandes d'un utilisateur (acheteur ou vendeur)

@@ -12,7 +12,6 @@ interface CheckoutStepLocationProps {
   deliveryCoords: { latitude: number; longitude: number } | null;
   onDeliveryCoordsChange: (coords: { latitude: number; longitude: number }) => void;
   sellerCoords?: { latitude: number; longitude: number } | null;
-  onDistanceChange: (dist: number) => void;
   deliveryAddress: string;
   onDeliveryAddressChange: (text: string) => void;
   buyerPhone: string;
@@ -32,7 +31,6 @@ export function CheckoutStepLocation({
   deliveryCoords,
   onDeliveryCoordsChange,
   sellerCoords,
-  onDistanceChange,
   deliveryAddress,
   onDeliveryAddressChange,
   buyerPhone,
@@ -119,7 +117,6 @@ export function CheckoutStepLocation({
               longitude={deliveryCoords?.longitude ?? null}
               sellerCoords={sellerCoords}
               onChangeLocation={onDeliveryCoordsChange}
-              onDistanceChange={onDistanceChange}
             />
           </View>
 

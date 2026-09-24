@@ -29,7 +29,6 @@ import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
 import { HomeHero } from '../../src/components/home/HomeHero';
 import { HomeDeliveryBanner } from '../../src/components/home/HomeDeliveryBanner';
-import { HomeTrendingSection } from '../../src/components/home/HomeTrendingSection';
 import { HomeForYouSection } from '../../src/components/home/HomeForYouSection';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
@@ -90,28 +89,43 @@ export default function HomeScreen() {
 
   const listingsList = data?.pages.flatMap((p) => p.data) || [];
 
-  // 1. Populaire à Daloa (Vélocité temporelle avec décroissance gravité)
-  const trendingRecommendations = useMemo(() => {
-    if (!listingsList.length || selectedCategory) return [];
-    return getTrendingRecommendations(listingsList, { limit: 8 });
-  }, [listingsList, selectedCategory]);
-
-  // 2. Pour vous (ML On-Device & préférences utilisateur)
-  const personalizedRecommendations = useMemo(() => {
-    if (!listingsList.length || selectedCategory) return [];
-    const onDevice = userBehaviorService.getPersonalizedListings(listingsList, { limit: 8 });
-    if (onDevice.length > 0) return onDevice;
-    const favs = favoriteListings || [];
-    if (favs.length > 0) {
-      return getRecommendationsForUser(listingsList, favs as any, { limit: 8 });
-    }
-    return [];
-  }, [listingsList, favoriteListings, selectedCategory]);
-
-  // 3. Curation Anti-Monopole vendeurs sur le fil principal
+  // 1. Curation Anti-Monopole vendeurs sur le fil principal
   const curatedListings = useMemo(() => {
     return interleaveSellerListings(listingsList, 2);
   }, [listingsList]);
+
+  /* 2. Une seule section de recommandations.
+     « Populaire à Daloa » et « Pour vous » puisaient dans la même page de
+     résultats que le fil juste en dessous : le même article pouvait apparaître
+     trois fois sur un écran. Le personnalisé passe devant, la tendance complète
+     les places restantes, et les articles déjà visibles en tête de fil sont
+     écartés. */
+  const forYouRecommendations = useMemo(() => {
+    if (!listingsList.length || selectedCategory) return [];
+
+    const visibleFeedIds = new Set(curatedListings.slice(0, 8).map((l: any) => l.id));
+
+    const onDevice = userBehaviorService.getPersonalizedListings(listingsList, { limit: 8 });
+    const favs = favoriteListings || [];
+    const personalized =
+      onDevice.length > 0
+        ? onDevice
+        : favs.length > 0
+        ? getRecommendationsForUser(listingsList, favs as any, { limit: 8 })
+        : [];
+
+    const kept = personalized.filter((r: any) => !visibleFeedIds.has(r.item.id));
+    const excludeIds = [...visibleFeedIds, ...kept.map((r: any) => r.item.id)];
+
+    if (kept.length >= 8) return kept.slice(0, 8);
+
+    const fill = getTrendingRecommendations(listingsList, {
+      limit: 8 - kept.length,
+      excludeIds,
+    });
+
+    return [...kept, ...fill].slice(0, 8);
+  }, [listingsList, curatedListings, favoriteListings, selectedCategory]);
 
   const getCartQty = useCallback(
     (listingId: string) => {
@@ -199,27 +213,15 @@ export default function HomeScreen() {
       <HomeHero />
       <HomeDeliveryBanner />
 
-      {/* 1. Section Populaire à Daloa (Vélocité temporelle / Billboard Top Chart) */}
-      <HomeTrendingSection
-        recommendations={trendingRecommendations}
+      {/* Recommandations : personnalisé d'abord, tendance en complément */}
+      <HomeForYouSection
+        recommendations={forYouRecommendations}
         onPressItem={(item) => router.push(`/listing/${item.id}` as any)}
         onAddToCart={(item) => handleAddToCart(item.id)}
         onToggleFavorite={(id) => toggleFavorite(id)}
         isFavorited={(id) => isFavorited(id)}
         getCartQty={getCartQty}
       />
-
-      {/* 2. Section Pour vous (Curation ML Personnalisée / Fiches Paysage) */}
-      {personalizedRecommendations.length > 0 && (
-        <HomeForYouSection
-          recommendations={personalizedRecommendations}
-          onPressItem={(item) => router.push(`/listing/${item.id}` as any)}
-          onAddToCart={(item) => handleAddToCart(item.id)}
-          onToggleFavorite={(id) => toggleFavorite(id)}
-          isFavorited={(id) => isFavorited(id)}
-          getCartQty={getCartQty}
-        />
-      )}
 
       <View style={styles.sectionHeader}>
         <AppText variant="title">Catégories</AppText>
