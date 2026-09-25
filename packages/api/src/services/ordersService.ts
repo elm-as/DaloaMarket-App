@@ -15,6 +15,8 @@ const COD_RPC_ERRORS: Record<string, string> = {
   empty_cart: 'Votre panier est vide.',
   unsupported_payment_method: 'Ce mode de paiement ne passe pas par ce chemin.',
   no_active_listing: "Ces articles ne sont plus disponibles à la vente.",
+  cod_not_allowed: 'Le paiement à la livraison n’est pas disponible pour cet article. Choisissez le paiement en ligne.',
+  pickup_not_allowed: 'Le retrait en boutique n’est pas disponible pour cet article. Choisissez la livraison.',
 };
 
 /** Traduction des `reason` renvoyés par les RPC vendeur. */

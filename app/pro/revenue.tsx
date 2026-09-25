@@ -5,9 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePayoutSettings, usePayoutHistory, payoutService } from '@daloa/api';
-import { colors, radii, spacing, CurrencyText, StatusPill, EmptyState, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { colors, radii, spacing, CurrencyText, StatusPill, EmptyState, AppText, AppPressable, useAccent, typography, CodDebtNotice } from '@daloa/ui';
 import { Wallet, ArrowDownRight, Clock, ArrowLeft, TrendingUp, ShoppingBag } from 'lucide-react-native';
-import { formatDate } from '@daloa/utils';
+import { formatDate, formatFCFA } from '@daloa/utils';
 
 interface Balance {
   available: number;
@@ -31,11 +31,18 @@ export default function RevenueScreen() {
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Commission à reverser sur les ventes encaissées en espèces (retrait boutique).
+  const [codDebt, setCodDebt] = useState({ count: 0, total: 0 });
+
   const loadBalance = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const b = await payoutService.getSellerBalance(user.id);
+      const [b, debt] = await Promise.all([
+        payoutService.getSellerBalance(user.id),
+        payoutService.getOwnCodDebt(user.id),
+      ]);
       setBalance(b);
+      setCodDebt(debt);
     } catch {
       // conserver dernière valeur
     } finally {
@@ -125,6 +132,7 @@ export default function RevenueScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={accent.DEFAULT} />
         }
       >
+        <CodDebtNotice count={codDebt.count} total={codDebt.total} role="seller" formatAmount={formatFCFA} />
         {/* Compte de versement automatique */}
         <View style={styles.withdrawCard}>
           <View style={styles.withdrawTop}>

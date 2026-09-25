@@ -56,11 +56,11 @@ export const PRICING_CONFIG = {
     { id: 'gold', name: 'Pack Or', credits: 30, price: 2000, popular: false },
   ],
 
-  // Feature Flags de Phase 0 vs Phase 1 (Actuellement Phase 0 active — tests/lancement)
-  // Phase 0 : tout gratuit et débloqué (boutique, COD, 0 commission). Repasser
-  // isFreeModeActive à false pour réactiver la Phase 1 (monétisation).
+  // La phase n'est plus codée ici : elle vient de system_settings.phase_config
+  // (commission via `sellerFeeOverride`, 0 en phase 0). L'ancien interrupteur
+  // `isFreeModeActive`, figé à true, faisait afficher 0 % de commission par
+  // l'app même en phase 1, alors que la base prélève 3,5 % / 2,5 %.
   phase0: {
-    isFreeModeActive: true,
     maxFreeListingsPerUser: 999999,
     disableListingPublishFees: true,
   },
@@ -157,12 +157,11 @@ export function calculateOrderBreakdown(params: {
     ? PRICING_CONFIG.marketplace.proSellerFeeRate
     : PRICING_CONFIG.marketplace.standardSellerFeeRate;
 
-  // Priorité à l'override de phase (0 = gratuit), puis flag Phase 0, sinon grille.
+  // Même règle que create_cod_order et Railway : commission imposée par la
+  // phase (`seller_fee_override`, 0 en phase 0) si elle existe, sinon grille.
   const sellerCommission =
     params.sellerFeeOverride != null
       ? Math.round(productSubtotal * params.sellerFeeOverride)
-      : PRICING_CONFIG.phase0.isFreeModeActive
-      ? 0
       : Math.round(productSubtotal * sellerFeeRate);
 
   const sellerNetPayout = productSubtotal - sellerCommission;

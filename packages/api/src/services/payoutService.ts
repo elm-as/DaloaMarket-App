@@ -102,6 +102,22 @@ export const payoutService = {
   },
 
   /**
+   * Commission à reverser à DaloaMarket sur les ventes ou courses encaissées en
+   * espèces (paiement à la livraison) : créances `cod_receivables` de
+   * l'utilisateur, encore ouvertes. La règle d'accès ne rend que les siennes.
+   */
+  async getOwnCodDebt(userId: string): Promise<{ count: number; total: number }> {
+    const { data, error } = await (supabase as any)
+      .from('cod_receivables')
+      .select('amount')
+      .eq('debtor_user_id', userId)
+      .eq('status', 'outstanding');
+    if (error || !data) return { count: 0, total: 0 };
+    const rows = data as { amount: number | null }[];
+    return { count: rows.length, total: rows.reduce((s, r) => s + (Number(r.amount) || 0), 0) };
+  },
+
+  /**
    * Récupère l'historique des reversements d'un utilisateur
    */
   async getPayoutHistory(userId: string, type?: string) {

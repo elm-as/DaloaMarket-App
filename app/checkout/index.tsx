@@ -60,10 +60,26 @@ export default function CheckoutScreen() {
   const [isDistrictPickerOpen, setIsDistrictPickerOpen] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [buyerPhone, setBuyerPhone] = useState<string>(profile?.phone || '');
-  const { isPhase0, phaseConfig } = usePhase();
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
-    phaseConfig?.default_payment_method === 'cod' || isPhase0 ? 'cod' : 'online'
+  const { isPhase0, phaseConfig, allowCodForAll, allowPickupForAll } = usePhase();
+  // Même règle que create_cod_order : hors phase 0, paiement à la livraison et
+  // retrait réservés aux vendeurs Pro. En panier multi-vendeurs, on reste
+  // prudent (la base vérifie chaque vendeur).
+  const isSellerPro = Boolean(
+    !isCartMode && listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()
   );
+  const isCodAllowed = allowCodForAll || isSellerPro;
+  const isPickupAllowed = allowPickupForAll || isSellerPro;
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
+    (phaseConfig?.default_payment_method === 'cod' || isPhase0) && isCodAllowed ? 'cod' : 'online'
+  );
+
+  // L'annonce arrive après le premier rendu : si le mode choisi n'est plus
+  // autorisé pour ce vendeur, on bascule sur un mode permis.
+  useEffect(() => {
+    if (!isPickupAllowed && deliveryMode === 'pickup') setDeliveryMode('delivery');
+    if (!isCodAllowed && paymentMode === 'cod') setPaymentMode('online');
+    if (!isPickupAllowed && paymentMode === 'cash_at_shop') setPaymentMode('online');
+  }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode]);
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
 
   // Coordonnées résolues du vendeur (en mode panier, prend le premier article du panier)
@@ -152,6 +168,8 @@ export default function CheckoutScreen() {
     : calculateOrderBreakdown({
         productPrice: activePrice, quantity, distanceKm, deliveryMode,
         isProSeller: Boolean(listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()),
+        // Même règle que la base : commission imposée par la phase si elle existe.
+        sellerFeeOverride: phaseConfig?.seller_fee_override ?? null,
       });
 
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({
@@ -272,6 +290,7 @@ export default function CheckoutScreen() {
                 else if (m === 'delivery' && paymentMode === 'cash_at_shop') setPaymentMode('online');
               }}
               onNext={() => { setErrorMsg(null); setStep(2); }}
+              isPickupAllowed={isPickupAllowed}
             />
           )}
 
@@ -320,7 +339,7 @@ export default function CheckoutScreen() {
               onPaymentModeChange={setPaymentMode}
               operator={operator}
               onOperatorChange={setOperator}
-              isCodAllowed={Boolean((listing as any)?.accepts_cod ?? true)}
+              isCodAllowed={isCodAllowed}
               quantity={quantity}
               activePrice={activePrice}
               deliveryFee={breakdown.deliveryFee}

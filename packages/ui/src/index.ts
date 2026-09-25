@@ -10,6 +10,7 @@ export * from './components/ProBadge';
 export * from './components/Input';
 export * from './components/SearchInput';
 export * from './components/OtpInput';
+export * from './components/CodDebtNotice';
 export * from './components/CurrencyText';
 export * from './components/RatingStars';
 export * from './components/RevealablePhone';

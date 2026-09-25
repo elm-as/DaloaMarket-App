@@ -13,6 +13,7 @@ import {
   PAYMENT_NETWORKS,
   MAX_CONSECUTIVE_CANCELLATIONS,
 } from '../../src/legal/legal-facts';
+import { usePhaseFacts, PhaseFacts } from '../../src/legal/usePhaseFacts';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -26,7 +27,8 @@ interface FaqItemData {
   a: string;
 }
 
-const FAQ_ITEMS: FaqItemData[] = [
+/** Questions-réponses, rédigées d'après le régime en vigueur (lu en base). */
+const buildFaqItems = (phase: PhaseFacts): FaqItemData[] => [
   {
     category: 'escrow',
     q: "Qu'est-ce que le paiement séquestre (Escrow) ?",
@@ -55,17 +57,19 @@ const FAQ_ITEMS: FaqItemData[] = [
   {
     category: 'seller',
     q: "Combien coûte la publication d'annonces pour un vendeur ?",
-    a: `Pendant la phase de lancement, la publication est gratuite et sans plafond, et DaloaMarket ne prélève aucune commission sur vos ventes. À la fin de cette phase, une commission vendeur de ${FEES.sellerStandardPct} s'appliquera (${FEES.sellerProPct} pour les Vendeurs Pro). Vous serez prévenu avant toute mise en application.`,
+    a: phase.noSellerCommission
+      ? `La publication est gratuite et sans plafond, et pendant la phase de lancement DaloaMarket ne prélève aucune commission sur vos ventes. À la fin de cette phase, une commission vendeur de ${FEES.sellerStandardPct} s'appliquera (${FEES.sellerProPct} pour les Vendeurs Pro). Vous serez prévenu avant toute mise en application.`
+      : `La publication est gratuite et sans plafond. Une commission vendeur de ${phase.sellerFeeText} est prélevée uniquement sur les articles effectivement vendus.`,
   },
   {
     category: 'seller',
     q: 'Quels sont les tarifs et avantages du Pass Vendeur Pro ?',
-    a: `Le Pass Vendeur Pro est à ${PRO_PASS.monthly} / mois ou ${PRO_PASS.yearly} / an (2 mois offerts). Il donne le badge Pro vérifié, une priorité de classement et la commission réduite à ${FEES.sellerProPct} au lieu de ${FEES.sellerStandardPct} lorsque la grille entrera en vigueur. Pendant la phase de lancement, les annonces illimitées, le paiement à la livraison, le retrait sur place et les livreurs affiliés sont ouverts à tous les vendeurs.`,
+    a: `Le Pass Vendeur Pro est à ${PRO_PASS.monthly} / mois ou ${PRO_PASS.yearly} / an (2 mois offerts). Il donne le badge Pro vérifié, une priorité de classement et la commission réduite à ${FEES.sellerProPct} au lieu de ${FEES.sellerStandardPct}${phase.noSellerCommission ? ' lorsque la grille entrera en vigueur' : ''}. ${phase.proFeaturesOpenToAll ? 'Pendant la phase de lancement, le paiement à la livraison, le retrait sur place et les livreurs affiliés sont ouverts à tous les vendeurs.' : 'Il donne aussi accès au paiement à la livraison, au retrait sur place et aux livreurs affiliés.'}`,
   },
   {
     category: 'seller',
     q: 'Comment fonctionnent les Livreurs Affiliés ?',
-    a: "Un vendeur peut inviter ses propres livreurs de confiance via leur numéro de téléphone, pour leur attribuer ses courses et les autoriser à encaisser en espèces à la livraison. Cette possibilité est ouverte à tous les vendeurs pendant la phase de lancement.",
+    a: `Un vendeur peut inviter ses propres livreurs de confiance via leur numéro de téléphone, pour leur attribuer ses courses et les autoriser à encaisser en espèces à la livraison. ${phase.proFeaturesOpenToAll ? 'Cette possibilité est ouverte à tous les vendeurs pendant la phase de lancement.' : 'Cette possibilité est réservée aux Vendeurs Pro.'}`,
   },
   {
     category: 'escrow',
@@ -85,7 +89,7 @@ const FAQ_ITEMS: FaqItemData[] = [
   {
     category: 'buyer',
     q: 'Quels moyens de paiement sont acceptés ?',
-    a: `Nous acceptons ${PAYMENT_NETWORKS} via passerelle sécurisée. Le paiement en espèces à la livraison est également disponible : pendant la phase de lancement, il est ouvert à tous les vendeurs et proposé par défaut.`,
+    a: `Nous acceptons ${PAYMENT_NETWORKS} via passerelle sécurisée. ${phase.codOpenToAll ? 'Le paiement en espèces à la livraison est également disponible : il est actuellement ouvert à tous les vendeurs.' : 'Le paiement en espèces à la livraison est proposé pour les articles des Vendeurs Pro.'}`,
   },
   {
     category: 'buyer',
@@ -112,12 +116,14 @@ export default function FaqScreen() {
   const accent = useAccent();
   const insets = useSafeAreaInsets();
   const [selectedCat, setSelectedCat] = useState<FaqCategory>('all');
+  const phase = usePhaseFacts();
+  const FAQ_ITEMS = useMemo(() => buildFaqItems(phase), [phase]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   const filteredFaqs = useMemo(() => {
     if (selectedCat === 'all') return FAQ_ITEMS;
     return FAQ_ITEMS.filter((item) => item.category === selectedCat);
-  }, [selectedCat]);
+  }, [selectedCat, FAQ_ITEMS]);
 
   const toggleExpand = (idx: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

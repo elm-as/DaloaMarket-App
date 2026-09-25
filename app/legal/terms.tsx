@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,13 +10,16 @@ import {
   ChevronDown,
   CheckCircle2,
 } from 'lucide-react-native';
-import { TERMS_ARTICLES, TERMS_LAST_UPDATE, LegalArticle } from '../../src/legal/terms-data';
+import { buildTermsArticles, TERMS_LAST_UPDATE, LegalArticle } from '../../src/legal/terms-data';
+import { usePhaseFacts } from '../../src/legal/usePhaseFacts';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 export default function TermsScreen() {
+  const phase = usePhaseFacts();
+  const TERMS_ARTICLES = useMemo(() => buildTermsArticles(phase), [phase]);
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();

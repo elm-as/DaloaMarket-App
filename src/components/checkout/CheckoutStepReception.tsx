@@ -13,6 +13,8 @@ interface CheckoutStepReceptionProps {
   deliveryMode: 'delivery' | 'pickup';
   onDeliveryModeChange: (mode: 'delivery' | 'pickup') => void;
   onNext: () => void;
+  /** Retrait non proposé (vendeur non Pro hors lancement) : l'option est masquée, sans mention « Pro » côté acheteur. */
+  isPickupAllowed?: boolean;
 }
 
 export function CheckoutStepReception({
@@ -24,6 +26,7 @@ export function CheckoutStepReception({
   deliveryMode,
   onDeliveryModeChange,
   onNext,
+  isPickupAllowed = true,
 }: CheckoutStepReceptionProps) {
   const accent = useAccent();
 
@@ -98,6 +101,7 @@ export function CheckoutStepReception({
             </View>
           </AppPressable>
 
+          {isPickupAllowed && (
           <AppPressable
             haptic="selection"
             onPress={() => handleSelectMode('pickup')}
@@ -129,6 +133,7 @@ export function CheckoutStepReception({
               {deliveryMode === 'pickup' && <View style={styles.radioDot} />}
             </View>
           </AppPressable>
+          )}
         </View>
       </View>
 

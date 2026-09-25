@@ -1,4 +1,5 @@
-import { VISIBILITY } from './legal-facts';
+import { FEES, VISIBILITY } from './legal-facts';
+import type { PhaseFacts } from './usePhaseFacts';
 
 export interface LegalArticle {
   id: string;
@@ -16,7 +17,8 @@ export interface LegalArticle {
 
 export const TERMS_LAST_UPDATE = '16 septembre 2026';
 
-export const TERMS_ARTICLES: LegalArticle[] = [
+/** Articles des CGU, rédigés d'après le régime en vigueur (lu en base). */
+export const buildTermsArticles = (phase: PhaseFacts): LegalArticle[] => [
   {
     id: 'acceptance',
     number: '1',
@@ -67,7 +69,7 @@ export const TERMS_ARTICLES: LegalArticle[] = [
     paragraphs: [
       'Les annonces doivent porter sur des biens licites en Côte d’Ivoire dont l’utilisateur est le propriétaire légitime.',
       'Chaque annonce doit afficher un prix réel en FCFA, des photos authentiques et récentes, et une description sincère de son état.',
-      'Pendant la phase de lancement, la publication d’annonces est gratuite et sans plafond, pour tous les comptes. Un plafond d’annonces actives pourra être rétabli à l’issue de cette phase pour les comptes Vendeurs Standards, la publication illimitée devenant un avantage du Pass Vendeur Pro ; les utilisateurs en seront informés au préalable.',
+      'La publication d’annonces est gratuite et sans plafond, pour tous les comptes. Aucune limite d’annonces actives simultanées n’est appliquée.',
     ],
     bullets: [
       'Interdiction absolue : contrefaçons, objets volés ou sans facture',
@@ -86,7 +88,9 @@ export const TERMS_ARTICLES: LegalArticle[] = [
       'DaloaMarket propose un paiement sécurisé tiers de confiance (escrow) : l’acheteur règle par Mobile Money (Wave, Orange, MTN, Moov). Les fonds sont bloqués jusqu’à la livraison effective.',
       'Pour être parfaitement clair : DaloaMarket n’est pas un établissement de paiement et ne détient pas de compte de cantonnement bancaire. Les sommes sont détenues par Money Fusion, prestataire agréé, jusqu’au déblocage. Le mot « séquestre » décrit ce blocage technique, et non un compte séparé ouvert par DaloaMarket.',
       'Frais de service acheteur : 2% du montant des articles. Ces frais couvrent la sécurisation du paiement, la garantie anti-fraude et le fonctionnement de l’infrastructure locale. Le détail est affiché ligne par ligne avant validation de la commande ; aucun frais n’est ajouté ensuite.',
-      'Commission vendeur : pendant la phase de lancement, aucune commission n’est prélevée sur les ventes : le vendeur reçoit l’intégralité du prix de son article. À l’issue de cette phase, la commission sera de 3,5% en compte standard et de 2,5% pour les membres Pass Vendeur Pro. Ce changement sera annoncé avant son entrée en vigueur.',
+      phase.noSellerCommission
+        ? `Commission vendeur : pendant la phase de lancement, aucune commission n’est prélevée sur les ventes : le vendeur reçoit l’intégralité du prix de son article. À l’issue de cette phase, la commission sera de ${FEES.sellerStandardPct} en compte standard et de ${FEES.sellerProPct} pour les membres Pass Vendeur Pro. Ce changement sera annoncé avant son entrée en vigueur.`
+        : `Commission vendeur : ${phase.sellerFeeText} du prix des articles vendus. Elle est déduite du montant versé au vendeur pour un paiement en ligne ; pour une vente encaissée en espèces, elle est due à DaloaMarket et doit lui être reversée.`,
       'La libération des fonds au vendeur est conditionnée à la saisie du code secret OTP remis par l’acheteur lors de la remise physique du colis.',
     ],
   },
@@ -108,8 +112,10 @@ export const TERMS_ARTICLES: LegalArticle[] = [
     summary: 'Avantages Pro, badge certifié, livreurs affiliés et options Boost.',
     paragraphs: [
       'Le Pass Vendeur Pro est proposé à 2 500 FCFA / mois ou 25 000 FCFA / an (2 mois offerts).',
-      'Il confère le badge Vendeur Pro vérifié, une priorité de classement et la commission réduite à 2,5% lorsque la grille de commission entrera en vigueur.',
-      'Pendant la phase de lancement, la publication illimitée, le paiement à la livraison, le retrait sur place et l’affiliation de coursiers sont ouverts à tous les vendeurs, Pro ou non. Ces fonctionnalités redeviendront des avantages réservés au Pass Vendeur Pro à l’issue de cette phase.',
+      `Il confère le badge Vendeur Pro vérifié, une priorité de classement et la commission réduite à ${FEES.sellerProPct}${phase.noSellerCommission ? ' lorsque la grille de commission entrera en vigueur' : ''}.`,
+      phase.proFeaturesOpenToAll
+        ? 'Pendant la phase de lancement, le paiement à la livraison, le retrait sur place et l’affiliation de coursiers sont ouverts à tous les vendeurs, Pro ou non. Ces fonctionnalités redeviendront des avantages réservés au Pass Vendeur Pro à l’issue de cette phase.'
+        : 'Le paiement à la livraison, le retrait sur place et l’affiliation de coursiers sont réservés aux titulaires du Pass Vendeur Pro.',
       `Options de visibilité : Boost payé en crédits (${VISIBILITY.boostOptions}), crédits achetés en packs (${VISIBILITY.creditPacks}).`,
     ],
   },
