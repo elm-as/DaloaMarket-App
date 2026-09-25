@@ -25,7 +25,7 @@ import {
   Lock,
   type LucideIcon,
 } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { adminService, useSystemSettings, type AdminKpis, type AdminPendingCounts } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   rowBorder: { borderTopWidth: 1, borderTopColor: colors.border.DEFAULT },
   countPill: { minWidth: 24, paddingHorizontal: 6, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  countText: { fontWeight: '700' },
+  countText: { fontFamily: typography.families.bold },
   statePill: { paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radii.full },
   manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   manageTile: {
