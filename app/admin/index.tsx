@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import {
   ArrowLeft,
   ShieldCheck,
@@ -22,7 +22,6 @@ import {
   Wrench,
   ChevronRight,
   ExternalLink,
-  Lock,
   type LucideIcon,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
@@ -65,21 +64,10 @@ export default function AdminHomeScreen() {
     setRefreshing(false);
   };
 
+  // Pas (ou plus) admin : retour automatique au profil, au lieu d'un écran
+  // « Accès réservé » dont le bouton Retour pouvait n'avoir rien derrière.
   if (!authLoading && !isAdmin) {
-    return (
-      <View style={[styles.container, styles.denied, { paddingTop: insets.top + spacing[10] }]}>
-        <View style={styles.deniedIcon}>
-          <Lock size={26} color={colors.status.errorDark} />
-        </View>
-        <AppText variant="title">Accès réservé</AppText>
-        <AppText variant="body" color={colors.text.muted} style={styles.center}>
-          Cette console est réservée à l’administration de DaloaMarket.
-        </AppText>
-        <AppPressable onPress={() => router.back()} style={[styles.primaryBtn, { backgroundColor: accent.DEFAULT }]}>
-          <AppText variant="bodyStrong" color={colors.text.inverse}>Retour</AppText>
-        </AppPressable>
-      </View>
-    );
+    return <Redirect href={'/(tabs)/profile' as any} />;
   }
 
   const openWeb = (path: string) => Linking.openURL(path.startsWith('http') ? path : `${WEB_ADMIN}${path}`);
@@ -219,7 +207,6 @@ export default function AdminHomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
   flex: { flex: 1 },
-  center: { textAlign: 'center' },
   tnum: { fontVariant: ['tabular-nums'] },
   hero: {
     paddingHorizontal: spacing[4],
@@ -279,14 +266,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
   },
   manageIcon: { width: 34, height: 34, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
-  denied: { alignItems: 'center', paddingHorizontal: spacing[6], gap: spacing[3] },
-  deniedIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.status.errorLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtn: { marginTop: spacing[2], paddingHorizontal: spacing[6], paddingVertical: spacing[3], borderRadius: radii.lg },
 });
