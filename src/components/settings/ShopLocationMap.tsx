@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator, Linking } from 'react-native';
-import { Image } from 'expo-image';
+import React from 'react';
+import { View, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { LeafletMapView } from '../maps/LeafletMapView';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
-import { MapPin, Navigation, LocateFixed, AlertTriangle, Plus, Minus, ExternalLink } from 'lucide-react-native';
+import { DALOA_CENTER } from '@daloa/config';
+import { MapPin, LocateFixed, AlertTriangle, ExternalLink } from 'lucide-react-native';
 import { Haptics, isLocationInDaloa } from '@daloa/utils';
 
 interface ShopLocationMapProps {
@@ -22,52 +22,16 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
   isLocating = false,
 }) => {
   const accent = useAccent();
-  const [zoom, setZoom] = useState(14);
   const isValidCoords = latitude != null && longitude != null && isLocationInDaloa(latitude, longitude);
   const isOutsideDaloa = latitude != null && longitude != null && !isLocationInDaloa(latitude, longitude);
   const currentLat = isValidCoords ? latitude : DALOA_CENTER.lat;
   const currentLng = isValidCoords ? longitude : DALOA_CENTER.lng;
-  const hasCustomCoords = isValidCoords;
 
   const handleOpenGoogleMaps = () => {
     Haptics.selection();
     const url = `https://www.google.com/maps/search/?api=1&query=${currentLat},${currentLng}`;
     Linking.openURL(url).catch(() => {});
   };
-
-  const activeToken = MAPBOX_PUBLIC_TOKEN;
-  const [mapError, setMapError] = useState(false);
-
-  const staticMapUrl = useMemo(() => {
-    if (mapError || !activeToken) {
-      return `https://staticmap.openstreetmap.de/staticmap.php?center=${currentLat.toFixed(5)},${currentLng.toFixed(5)}&zoom=${zoom}&size=640x360&maptype=mapnik`;
-    }
-    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+EA580C(${currentLng.toFixed(5)},${currentLat.toFixed(5)})/${currentLng.toFixed(5)},${currentLat.toFixed(5)},${zoom},0/640x360@2x?access_token=${activeToken}`;
-  }, [currentLat, currentLng, zoom, activeToken, mapError]);
-
-  // HTML interactif Leaflet OpenStreetMap autonome
-  const mapHtml = useMemo(() => {
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup("<b>Boutique</b><br>Déplacez pour ajuster").openPopup();function notifyParent(newLat,newLng){if(window.parent){window.parent.postMessage(JSON.stringify({type:'SHOP_COORDS',latitude:newLat,longitude:newLng}),'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notifyParent(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notifyParent(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
-  }, [currentLat, currentLng]);
-
-  // Écoute des messages envoyés par l'iframe (Web)
-  React.useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const payload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (payload?.type === 'SHOP_COORDS' && payload.latitude && payload.longitude) {
-          onChangeLocation({ latitude: payload.latitude, longitude: payload.longitude });
-        }
-      } catch {
-        // Ignorer les messages non JSON
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onChangeLocation]);
 
   return (
     <View style={styles.container}>
@@ -128,58 +92,25 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
 
       {/* Cadre de la carte */}
       <View style={styles.mapFrame}>
-        {Platform.OS === 'web' ? (
-          // @ts-ignore
-          <iframe
-            srcDoc={mapHtml}
-            style={styles.iframe}
-            title="Carte d'emplacement de boutique à Daloa"
-          />
-        ) : (
-          <View style={styles.nativeMapContainer}>
-            <Image
-              source={{ uri: staticMapUrl }}
-              style={styles.staticMapImage}
-              contentFit="cover"
-              transition={150}
-              cachePolicy="memory-disk"
-              onError={() => setMapError(true)}
-            />
-            {/* Boutons de zoom natifs */}
-            <View style={styles.zoomButtons}>
-              <AppPressable
-                haptic="light"
-                onPress={() => setZoom((z) => Math.min(18, z + 1))}
-                style={styles.zoomBtn}
-                accessibilityLabel="Zoom avant"
-              >
-                <Plus size={15} color={colors.text.DEFAULT} strokeWidth={2.5} />
-              </AppPressable>
-              <View style={styles.zoomDivider} />
-              <AppPressable
-                haptic="light"
-                onPress={() => setZoom((z) => Math.max(11, z - 1))}
-                style={styles.zoomBtn}
-                accessibilityLabel="Zoom arrière"
-              >
-                <Minus size={15} color={colors.text.DEFAULT} strokeWidth={2.5} />
-              </AppPressable>
-            </View>
+        <LeafletMapView
+          pin={{ latitude: currentLat, longitude: currentLng }}
+          pinLabel="Ma boutique"
+          onPinChange={onChangeLocation}
+          initialZoom={14}
+        />
 
-            {/* Bouton Ouvrir dans Google Maps */}
-            <AppPressable
-              haptic="selection"
-              onPress={handleOpenGoogleMaps}
-              style={styles.googleMapsFloatingBtn}
-              accessibilityLabel="Ouvrir dans Google Maps"
-            >
-              <ExternalLink size={12} color={colors.text.inverse} />
-              <AppText variant="caption" color={colors.text.inverse} style={styles.googleMapsText}>
-                Google Maps
-              </AppText>
-            </AppPressable>
-          </View>
-        )}
+        {/* Ouvrir dans Google Maps */}
+        <AppPressable
+          haptic="selection"
+          onPress={handleOpenGoogleMaps}
+          style={styles.googleMapsFloatingBtn}
+          accessibilityLabel="Ouvrir dans Google Maps"
+        >
+          <ExternalLink size={12} color={colors.text.inverse} />
+          <AppText variant="caption" color={colors.text.inverse} style={styles.googleMapsText}>
+            Google Maps
+          </AppText>
+        </AppPressable>
 
         {/* Badge indicateur de coordonnées */}
         <View style={styles.coordsBadge}>
@@ -240,7 +171,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.families.bold,
   },
   mapFrame: {
-    height: 220,
+    height: 260,
     borderRadius: radii.xl,
     overflow: 'hidden',
     borderWidth: 1.5,

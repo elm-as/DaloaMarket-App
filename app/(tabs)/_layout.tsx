@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, radii, useAccent, typography } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
-import { useConversations } from '@daloa/api';
+import { useConversations, useInboxRealtime } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 
 function TabBadge({ count, color }: { count: number; color: string }) {
@@ -81,6 +81,7 @@ export default function TabLayout() {
   const accent = useAccent();
   const { user } = useAuth();
   const { data: conversations } = useConversations(user?.id);
+  useInboxRealtime(user?.id);
 
   const unreadCount = useMemo(
     () => (conversations || []).reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0),

@@ -1,11 +1,11 @@
-import React, { useMemo, useEffect, useState } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
-import { WebView } from 'react-native-webview';
+import React, { useEffect, useState } from 'react';
+import { LeafletMapView } from '../maps/LeafletMapView';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { DALOA_CENTER, MAPBOX_PUBLIC_TOKEN } from '@daloa/config';
+import { DALOA_CENTER } from '@daloa/config';
 import { MapPin, Navigation, LocateFixed } from 'lucide-react-native';
-import { haversineDistance, getDrivingRoute, DrivingRouteResult, Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
+import { getDrivingRoute, DrivingRouteResult, Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
 
 interface DeliveryLocationMapProps {
   latitude: number | null;
@@ -88,36 +88,6 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
     }
   };
 
-  // HTML autonome Leaflet & Mapbox pour Web et WebView
-  const mapHtml = useMemo(() => {
-    const sLat = sellerCoords?.latitude ?? null;
-    const sLng = sellerCoords?.longitude ?? null;
-    const hasSeller = sLat != null && sLng != null;
-    const leafletCoords = (routeInfo.coordinates || []).map(([lng, lat]) => [lat, lng]);
-    const sellerSnippet = hasSeller ? `var sM=L.circleMarker([${sLat},${sLng}],{radius:8,fillColor:'#10B981',color:'#fff',weight:2,fillOpacity:0.9}).addTo(map);sM.bindPopup('<b>Boutique Vendeur</b>');` : '';
-    const routeSnippet = leafletCoords.length > 0 ? `var poly=L.polyline(${JSON.stringify(leafletCoords)},{color:'${accent.DEFAULT}',weight:4,opacity:0.85}).addTo(map);map.fitBounds(poly.getBounds(),{padding:[30,30]});` : '';
-
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}body,html,#map{width:100%;height:100%;background:#e5e7eb;}</style></head><body><div id="map"></div><script>var lat=${currentLat};var lng=${currentLng};var map=L.map('map',{zoomControl:false}).setView([lat,lng],14);L.control.zoom({position:'topright'}).addTo(map);var tileUrl='${MAPBOX_PUBLIC_TOKEN ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}` : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'}';L.tileLayer(tileUrl,{maxZoom:20,attribution:'© CARTO © OSM'}).addTo(map);var marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.bindPopup('<b>Lieu de livraison</b>').openPopup();${sellerSnippet}${routeSnippet}function notify(nLat,nLng){var m=JSON.stringify({type:'DELIVERY_COORDS',latitude:nLat,longitude:nLng});if(window.ReactNativeWebView&&window.ReactNativeWebView.postMessage){window.ReactNativeWebView.postMessage(m);}else if(window.parent){window.parent.postMessage(m,'*');}}marker.on('dragend',function(e){var p=marker.getLatLng();notify(p.lat,p.lng);});map.on('click',function(e){marker.setLatLng(e.latlng);notify(e.latlng.lat,e.latlng.lng);});</script></body></html>`;
-  }, [currentLat, currentLng, sellerCoords, routeInfo.coordinates, accent.DEFAULT]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const payload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (payload?.type === 'DELIVERY_COORDS' && payload.latitude && payload.longitude) {
-          onChangeLocation({ latitude: payload.latitude, longitude: payload.longitude });
-        }
-      } catch {
-        // Ignorer les messages non JSON
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onChangeLocation]);
-
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
@@ -158,39 +128,15 @@ export const DeliveryLocationMap: React.FC<DeliveryLocationMapProps> = ({
 
       {/* Cadre de la carte */}
       <View style={styles.mapCard}>
-        {Platform.OS === 'web' ? (
-          // @ts-ignore
-          <iframe
-            srcDoc={mapHtml}
-            style={styles.iframe}
-            title="Carte de livraison à Daloa"
-          />
-        ) : (
-          /* Le natif n'affichait qu'une image statique : impossible d'y
-             « toucher ou glisser le repère » comme le promettait le libellé, et
-             les boutons +/- n'avaient aucun effet dès qu'un vendeur était
-             épinglé (l'URL statique utilisait un cadrage automatique). La carte
-             Leaflet existait déjà, elle n'était rendue que sur le web. */
-          <WebView
-            originWhitelist={['*']}
-            source={{ html: mapHtml }}
-            style={styles.webview}
-            scrollEnabled={false}
-            javaScriptEnabled
-            domStorageEnabled
-            setSupportMultipleWindows={false}
-            onMessage={(event) => {
-              try {
-                const payload = JSON.parse(event.nativeEvent.data);
-                if (payload?.type === 'DELIVERY_COORDS' && payload.latitude && payload.longitude) {
-                  onChangeLocation({ latitude: payload.latitude, longitude: payload.longitude });
-                }
-              } catch {
-                // message non JSON : ignoré
-              }
-            }}
-          />
-        )}
+        <LeafletMapView
+          pin={{ latitude: currentLat, longitude: currentLng }}
+          pinLabel="Lieu de livraison"
+          onPinChange={onChangeLocation}
+          secondary={sellerCoords ?? null}
+          secondaryLabel="Boutique du vendeur"
+          route={routeInfo.coordinates || []}
+          routeColor={accent.DEFAULT}
+        />
       </View>
 
       {/* Bannière de distance calculée en direct */}
@@ -247,7 +193,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.surface,
   },
   mapCard: {
-    height: 175,
+    height: 260,
     borderRadius: radii.xl,
     overflow: 'hidden',
     borderWidth: 1,

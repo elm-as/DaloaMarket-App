@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { supabase } from '../supabase';
 import { listingsService } from '../services/listingsService';
 import { ordersService } from '../services/ordersService';
 import { deliveryService } from '../services/deliveryService';
@@ -174,12 +176,38 @@ export function useDeliverersDirectory(vehicleType?: string, zone?: string) {
 // CHAT & MESSAGING QUERIES
 // ==========================================
 
+/**
+ * Boîte de réception en temps réel : un message reçu (ou marqué lu) recharge
+ * les conversations et le fil concerné. Remplace le sondage de toute la
+ * messagerie toutes les 8 s (et du fil ouvert toutes les 4 s), qui tournait
+ * en permanence depuis la barre d'onglets.
+ */
+export function useInboxRealtime(userId?: string | null) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!userId) return;
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', userId] });
+      queryClient.invalidateQueries({ queryKey: ['chat_messages', userId] });
+    };
+    const channel = supabase
+      .channel(`inbox_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userId}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `sender_id=eq.${userId}` }, refresh)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
+}
+
 export function useConversations(userId?: string | null) {
   return useQuery({
     queryKey: ['conversations', userId],
     queryFn: () => (userId ? chatService.getConversations(userId) : []),
     enabled: Boolean(userId),
-    refetchInterval: 8000,
+    // Filet de sécurité si la connexion temps réel décroche.
+    refetchInterval: 60000,
   });
 }
 
@@ -188,7 +216,7 @@ export function useChatMessages(currentUserId?: string | null, partnerId?: strin
     queryKey: ['chat_messages', currentUserId, partnerId, listingId || 'support'],
     queryFn: () => (currentUserId && partnerId ? chatService.getMessages(currentUserId, partnerId, listingId) : []),
     enabled: Boolean(currentUserId && partnerId),
-    refetchInterval: 4000,
+    refetchInterval: 30000, // filet de sécurité : le temps réel (useInboxRealtime) recharge à chaque message
   });
 }
 

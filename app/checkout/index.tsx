@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, KeyboardScreen } from '@daloa/ui';
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import * as Location from 'expo-location';
-import { calculateOrderBreakdown, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
+import { calculateOrderBreakdown, calculateDeliveryFee, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
 import { Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
 import { useListingDetail, analyticsService, useSystemSettings, supabase } from '@daloa/api';
 import { useQuery } from '@tanstack/react-query';
@@ -113,6 +113,27 @@ export default function CheckoutScreen() {
     );
   }, [baseListing, sellerPlace]);
 
+  // Panier multi-vendeurs : une livraison par vendeur, chacune à sa distance
+  // réelle — exactement ce que facture le serveur (payments.js). L'ancien
+  // forfait de 500 F par vendeur sous-estimait tout vendeur éloigné.
+  const cartSellerIds = useMemo(
+    () => Array.from(new Set(cartItems.map((ci) => ci.listing.user_id || ci.listing.seller?.id).filter(Boolean))) as string[],
+    [cartItems]
+  );
+  const { data: cartSellerPlaces } = useQuery({
+    queryKey: ['seller-points', cartSellerIds],
+    enabled: isCartMode && cartSellerIds.length > 0,
+    staleTime: 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('id, shop_latitude, shop_longitude, district')
+        .in('id', cartSellerIds);
+      return (data ?? []) as { id: string; shop_latitude: number | null; shop_longitude: number | null; district: string | null }[];
+    },
+  });
+  const [cartDeliveryFees, setCartDeliveryFees] = useState<number[] | null>(null);
+
   const [isLocatingGps, setIsLocatingGps] = useState(false);
 
   const handleRequestGps = useCallback(async (isSilent = false) => {
@@ -164,6 +185,8 @@ export default function CheckoutScreen() {
 
   // Calcul dynamique de la distance via Mapbox dès que les positions vendeur ou acheteur changent
   useEffect(() => {
+    // En panier, la distance vient du calcul par vendeur ci-dessous.
+    if (isCartMode) return;
     let active = true;
     const buyerPoint = resolveBuyerPoint(deliveryCoords, deliveryDistrict);
 
@@ -176,10 +199,42 @@ export default function CheckoutScreen() {
     return () => {
       active = false;
     };
-  }, [sellerCoords, deliveryCoords, deliveryDistrict]);
+  }, [isCartMode, sellerCoords, deliveryCoords, deliveryDistrict]);
 
-  const estimatedCartDelivery = deliveryMode === 'pickup' ? 0 : PRICING_CONFIG.delivery.baseFee * Math.max(1, cartSellerCount);
-  const cartBuyerServiceFee = Math.round(cartProductTotal * PRICING_CONFIG.marketplace.buyerServiceFeeRate);
+  useEffect(() => {
+    if (!isCartMode || !cartSellerPlaces || cartSellerPlaces.length === 0) {
+      setCartDeliveryFees(null);
+      return;
+    }
+    let active = true;
+    const buyerPoint = resolveBuyerPoint(deliveryCoords, deliveryDistrict);
+    Promise.all(
+      cartSellerPlaces.map(async (place) => {
+        const km = await resolveBillableDistanceKm(resolveSellerPoint({ seller: place }), buyerPoint);
+        return { km, fee: calculateDeliveryFee(km) };
+      })
+    ).then((rows) => {
+      if (!active) return;
+      setCartDeliveryFees(rows.map((r) => r.fee));
+      // Distance affichée : la plus longue course du panier.
+      setDistanceKm(Math.max(...rows.map((r) => r.km)));
+    });
+    return () => {
+      active = false;
+    };
+  }, [isCartMode, cartSellerPlaces, deliveryCoords, deliveryDistrict]);
+
+  const estimatedCartDelivery =
+    deliveryMode === 'pickup'
+      ? 0
+      : cartDeliveryFees
+        ? cartDeliveryFees.reduce((sum, fee) => sum + fee, 0)
+        : PRICING_CONFIG.delivery.baseFee * Math.max(1, cartSellerCount);
+  // Arrondi article par article, comme le serveur.
+  const cartBuyerServiceFee = cartItems.reduce(
+    (s, ci) => s + Math.round((ci.variant?.price ?? ci.listing.price) * ci.quantity * PRICING_CONFIG.marketplace.buyerServiceFeeRate),
+    0
+  );
 
   const breakdown = isCartMode
     ? {
