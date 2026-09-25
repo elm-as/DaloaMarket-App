@@ -8,7 +8,8 @@ import { ArrowLeft, Lock } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { calculateOrderBreakdown, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
 import { Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
-import { useListingDetail, analyticsService, useSystemSettings } from '@daloa/api';
+import { useListingDetail, analyticsService, useSystemSettings, supabase } from '@daloa/api';
+import { useQuery } from '@tanstack/react-query';
 import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCart } from '../../src/context/CartContext';
@@ -82,13 +83,35 @@ export default function CheckoutScreen() {
   }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode]);
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
 
+  // Position de la boutique relue en base à chaque ouverture du checkout.
+  // L'annonce en cache pouvait dater de plusieurs heures (ou venir d'une liste
+  // sans GPS boutique) : le vendeur retombait sur le centre de son quartier et
+  // le prix affiché ne correspondait plus à celui facturé par le serveur.
+  const baseListing: any = isCartMode ? cartItems[0]?.listing : listing;
+  const sellerId: string | undefined = baseListing?.user_id || baseListing?.seller?.id;
+  const { data: sellerPlace } = useQuery({
+    queryKey: ['seller-point', sellerId],
+    enabled: Boolean(sellerId),
+    staleTime: 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('shop_latitude, shop_longitude, district')
+        .eq('id', sellerId as string)
+        .maybeSingle();
+      return data ?? null;
+    },
+  });
+
   // Coordonnées résolues du vendeur (en mode panier, prend le premier article du panier)
   const sellerCoords = useMemo(() => {
-    if (isCartMode && cartItems.length > 0) {
-      return resolveSellerPoint(cartItems[0]?.listing);
-    }
-    return resolveSellerPoint(listing);
-  }, [isCartMode, cartItems, listing]);
+    if (!baseListing) return resolveSellerPoint(null);
+    return resolveSellerPoint(
+      sellerPlace
+        ? { latitude: baseListing.latitude, longitude: baseListing.longitude, district: baseListing.district, seller: sellerPlace }
+        : baseListing
+    );
+  }, [baseListing, sellerPlace]);
 
   const [isLocatingGps, setIsLocatingGps] = useState(false);
 
