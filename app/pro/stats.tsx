@@ -23,12 +23,10 @@ interface SellerStats {
  * commission vendeur dans `platform_commission`.
  */
 async function fetchSellerStats(userId: string): Promise<SellerStats> {
-  const [listingsRes, soldRes, activeRes] = await Promise.all([
-    supabase
-      .from('listings')
-      .select('view_count')
-      .eq('user_id', userId)
-      .neq('status', 'deleted'),
+  const [visitorsRes, soldRes, activeRes] = await Promise.all([
+    // Vraies visites (une personne par annonce, le vendeur exclu). `view_count`,
+    // pré-rempli à l'import, ne sert plus qu'au classement « Populaire ».
+    (supabase.rpc as any)('get_my_listing_visitors'),
     supabase
       .from('orders')
       .select('product_amount, platform_commission')
@@ -41,13 +39,10 @@ async function fetchSellerStats(userId: string): Promise<SellerStats> {
       .eq('status', 'active'),
   ]);
 
-  const firstError = listingsRes.error || soldRes.error || activeRes.error;
+  const firstError = visitorsRes.error || soldRes.error || activeRes.error;
   if (firstError) throw firstError;
 
-  const totalViews = (listingsRes.data || []).reduce(
-    (s, l) => s + (l.view_count || 0),
-    0
-  );
+  const totalViews = Number(visitorsRes.data) || 0;
 
   const salesCount = (soldRes.data || []).length;
   const netEarnings = (soldRes.data || []).reduce(
@@ -114,7 +109,7 @@ export default function StatsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.kpiGrid}>
           <StatCard
-            label="Vues des annonces"
+            label="Visiteurs"
             value={stats ? stats.totalViews.toLocaleString('fr-FR') : '…'}
             icon={<Eye size={16} color={accent.DEFAULT} />}
           />
