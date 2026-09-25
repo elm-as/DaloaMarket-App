@@ -114,7 +114,7 @@ export default function ChatListScreen({ isTab = false }: { isTab?: boolean }) {
         ) : (
           list.map((conv) => (
             <AppPressable
-              key={conv.partnerId}
+              key={`${conv.partnerId}|${conv.listingId || 'support'}`}
               onPress={() => {
                 router.push({
                   pathname: `/chat/${conv.partnerId}` as any,

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Settings, MapPin, Phone, Star, Camera } from 'lucide-react-native';
+import { Settings, MapPin, Phone, Star, Camera, ShieldCheck } from 'lucide-react-native';
 import { colors, spacing, Avatar, AppText, AppPressable, ProBadge, useAccent, typography } from '@daloa/ui';
 
 interface ProfileHeroProps {
@@ -13,6 +13,8 @@ interface ProfileHeroProps {
   rating?: number | null;
   isPro?: boolean;
   onOpenSettings: () => void;
+  /** Affiché seulement pour un admin. */
+  onOpenAdmin?: () => void;
   onEditAvatar?: () => void;
   isUploadingAvatar?: boolean;
   /** Chiffres affichés dans le bandeau, en tuiles translucides. */
@@ -27,6 +29,7 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
   rating,
   isPro = false,
   onOpenSettings,
+  onOpenAdmin,
   onEditAvatar,
   isUploadingAvatar = false,
   stats = [],
@@ -47,16 +50,26 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
           Mon Profil
         </AppText>
 
-        <AppPressable
-          onPress={onOpenSettings}
-          style={styles.settingsBtn}
-          accessibilityLabel="Paramètres"
-        >
-          <Settings size={17} color={colors.text.inverse} />
-          <AppText variant="caption" color={colors.text.inverse} style={styles.settingsBtnText}>
-            Paramètres
-          </AppText>
-        </AppPressable>
+        <View style={styles.topActions}>
+          {onOpenAdmin && (
+            <AppPressable onPress={onOpenAdmin} style={styles.settingsBtn} accessibilityLabel="Administration">
+              <ShieldCheck size={17} color={colors.text.inverse} />
+              <AppText variant="caption" color={colors.text.inverse} style={styles.settingsBtnText}>
+                Admin
+              </AppText>
+            </AppPressable>
+          )}
+          <AppPressable
+            onPress={onOpenSettings}
+            style={styles.settingsBtn}
+            accessibilityLabel="Paramètres"
+          >
+            <Settings size={17} color={colors.text.inverse} />
+            <AppText variant="caption" color={colors.text.inverse} style={styles.settingsBtnText}>
+              Paramètres
+            </AppText>
+          </AppPressable>
+        </View>
       </View>
 
       {/* Carte d'identité commerçant */}
@@ -150,6 +163,11 @@ export const ProfileHero: React.FC<ProfileHeroProps> = ({
 };
 
 const styles = StyleSheet.create({
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
   statsRow: {
     flexDirection: 'row',
     gap: spacing[2],

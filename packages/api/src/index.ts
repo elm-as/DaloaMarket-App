@@ -14,6 +14,7 @@ export * from './services/payoutService';
 export * from './services/affiliationsService';
 export * from './services/analyticsService';
 export * from './services/systemSettingsService';
+export * from './services/adminService';
 export * from './services/reviewsService';
 export * from './services/driverReviewsService';
 export * from './services/favoritesService';

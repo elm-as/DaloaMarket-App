@@ -60,7 +60,7 @@ export default function ChatRoomScreen() {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  const { data: messages, refetch } = useChatMessages(user?.id, partnerId);
+  const { data: messages, refetch } = useChatMessages(user?.id, partnerId, listingId);
   const messageList = messages || [];
 
   useEffect(() => {

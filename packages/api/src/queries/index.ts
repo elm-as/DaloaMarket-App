@@ -183,10 +183,10 @@ export function useConversations(userId?: string | null) {
   });
 }
 
-export function useChatMessages(currentUserId?: string | null, partnerId?: string | null) {
+export function useChatMessages(currentUserId?: string | null, partnerId?: string | null, listingId?: string | null) {
   return useQuery({
-    queryKey: ['chat_messages', currentUserId, partnerId],
-    queryFn: () => (currentUserId && partnerId ? chatService.getMessages(currentUserId, partnerId) : []),
+    queryKey: ['chat_messages', currentUserId, partnerId, listingId || 'support'],
+    queryFn: () => (currentUserId && partnerId ? chatService.getMessages(currentUserId, partnerId, listingId) : []),
     enabled: Boolean(currentUserId && partnerId),
     refetchInterval: 4000,
   });

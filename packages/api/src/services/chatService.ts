@@ -2,6 +2,16 @@ import { supabase } from '../supabase';
 import { ChatConversationPreview, ChatMessageItem } from '@daloa/types';
 import { censorMessageContent } from '@daloa/utils';
 
+/**
+ * Une conversation = une personne ET une annonce, comme sur le site. Les
+ * messages sans annonce forment le fil « support ». L'app regroupait tout par
+ * personne : deux annonces d'un même vendeur se mélangeaient dans un seul fil.
+ */
+const threadListingId = (listingId?: string | null): string | null =>
+  listingId && listingId !== 'support' && listingId !== 'null' ? listingId : null;
+
+const threadKey = (partnerId: string, listingId?: string | null) => `${partnerId}|${listingId || 'support'}`;
+
 export const chatService = {
   /**
    * Récupère la liste des conversations récentes de l'utilisateur
@@ -26,8 +36,9 @@ export const chatService = {
     (sentMessages || []).forEach((msg: any) => {
       const partner = msg.receiver || { id: msg.receiver_id, full_name: 'Utilisateur', shop_name: null, avatar_url: null };
       const partnerName = partner.shop_name?.trim() || partner.full_name || 'Utilisateur';
-      if (!conversationsMap[partner.id] || new Date(msg.created_at) > new Date(conversationsMap[partner.id].lastMessageTime)) {
-        conversationsMap[partner.id] = {
+      const key = threadKey(partner.id, msg.listing_id);
+      if (!conversationsMap[key] || new Date(msg.created_at) > new Date(conversationsMap[key].lastMessageTime)) {
+        conversationsMap[key] = {
           partnerId: partner.id,
           partnerName,
           partnerAvatar: partner.avatar_url || null,
@@ -45,11 +56,12 @@ export const chatService = {
     (receivedMessages || []).forEach((msg: any) => {
       const partner = msg.sender || { id: msg.sender_id, full_name: 'Utilisateur', shop_name: null, avatar_url: null };
       const partnerName = partner.shop_name?.trim() || partner.full_name || 'Utilisateur';
-      const current = conversationsMap[partner.id];
+      const key = threadKey(partner.id, msg.listing_id);
+      const current = conversationsMap[key];
       const isUnread = !msg.read;
 
       if (!current || new Date(msg.created_at) > new Date(current.lastMessageTime)) {
-        conversationsMap[partner.id] = {
+        conversationsMap[key] = {
           partnerId: partner.id,
           partnerName,
           partnerAvatar: partner.avatar_url || null,
@@ -74,22 +86,26 @@ export const chatService = {
   /**
    * Récupère l'historique des messages échangés entre deux utilisateurs
    */
-  async getMessages(currentUserId: string, partnerId: string): Promise<ChatMessageItem[]> {
-    const { data, error } = await supabase
+  async getMessages(currentUserId: string, partnerId: string, listingId?: string | null): Promise<ChatMessageItem[]> {
+    const lid = threadListingId(listingId);
+    let query = supabase
       .from('messages')
       .select('*')
-      .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${currentUserId})`)
-      .order('created_at', { ascending: true });
+      .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${currentUserId})`);
+    query = lid ? query.eq('listing_id', lid) : query.is('listing_id', null);
 
+    const { data, error } = await query.order('created_at', { ascending: true });
     if (error) throw error;
 
-    // Marquer les messages reçus comme lus
-    await supabase
+    // Marquer comme lus les messages reçus de CE fil seulement
+    let markRead = supabase
       .from('messages')
       .update({ read: true })
       .eq('sender_id', partnerId)
       .eq('receiver_id', currentUserId)
       .eq('read', false);
+    markRead = lid ? markRead.eq('listing_id', lid) : markRead.is('listing_id', null);
+    await markRead;
 
     return (data || []).map((msg) => ({
       ...msg,
@@ -115,7 +131,7 @@ export const chatService = {
         sender_id: params.senderId,
         receiver_id: params.receiverId,
         content: cleanContent,
-        listing_id: params.listingId || null,
+        listing_id: threadListingId(params.listingId),
         read: false,
       })
       .select()

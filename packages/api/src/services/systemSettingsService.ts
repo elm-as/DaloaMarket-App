@@ -146,6 +146,26 @@ export const systemSettingsService = {
     return this.savePhaseConfig(payload);
   },
 
+  /**
+   * Active ou coupe la maintenance (web et apps). Même RPC que la phase :
+   * le refus d'un non-admin arrive dans `data.success`, pas dans `error`.
+   */
+  async saveMaintenance(payload: MaintenanceConfig): Promise<void> {
+    const { data, error } = await supabase.rpc('update_system_setting', {
+      p_key: 'maintenance_mode',
+      p_value: payload as any,
+    });
+    if (error) throw error;
+    const res = data as { success?: boolean; reason?: string } | null;
+    if (res && res.success === false) {
+      throw new Error(
+        res.reason === 'unauthorized'
+          ? 'Accès refusé : seul un administrateur peut changer la maintenance.'
+          : res.reason || 'Erreur lors de la mise à jour de la maintenance.'
+      );
+    }
+  },
+
   /** Enregistre une configuration de phase déjà composée (réglages fins). */
   async savePhaseConfig(
     payload: PhaseConfig

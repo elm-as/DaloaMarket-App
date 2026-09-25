@@ -16,7 +16,7 @@ import { ProfileMenuSections } from '../../src/components/profile/ProfileMenuSec
 export default function ProfileScreen() {
   const router = useRouter();
   const accent = useAccent();
-  const { user, profile, logout, isAuthenticated, isLoading, refreshProfile } = useAuth();
+  const { user, profile, logout, isAuthenticated, isLoading, refreshProfile, isAdmin } = useAuth();
   const { data: activeOrders } = useActiveOrdersCount(user?.id);
 
   const [stats, setStats] = useState({
@@ -193,6 +193,7 @@ export default function ProfileScreen() {
           rating={profile?.rating}
           isPro={isPro}
           onOpenSettings={() => router.push('/settings' as any)}
+          onOpenAdmin={isAdmin ? () => router.push('/admin' as any) : undefined}
           onEditAvatar={handlePickAvatar}
           isUploadingAvatar={isUploadingAvatar}
           stats={[
