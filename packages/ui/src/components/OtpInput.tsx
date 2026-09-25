@@ -6,8 +6,11 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import { Keyboard } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../tokens';
 import { Haptics } from '@daloa/utils';
+
+const GAP = 8;
 
 export interface OtpInputProps {
   length?: number;
@@ -26,9 +29,16 @@ export const OtpInput: React.FC<OtpInputProps> = ({
 }) => {
   const inputRef = useRef<TextInput>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [rowWidth, setRowWidth] = useState(0);
 
   const digits = value.split('');
   const isSixDigits = length >= 6;
+
+  // Les cases se réduisent sur les petits écrans : 6 × 44 px + espaces = 304 px,
+  // plus que la place disponible sur un téléphone de 320 px de large.
+  const maxBox = isSixDigits ? 44 : 52;
+  const boxWidth = rowWidth > 0 ? Math.min(maxBox, Math.floor((rowWidth - GAP * (length - 1)) / length)) : maxBox;
+  const boxSize = { width: boxWidth, height: Math.round(boxWidth * 1.18) };
 
   // Laisse le temps au BottomSheet (animation slide du Modal natif ~300ms)
   // de terminer sa transition avant de requérir le focus du clavier.
@@ -60,7 +70,11 @@ export const OtpInput: React.FC<OtpInputProps> = ({
           pointerEvents="none" garantit que les View n'interceptent aucun événement tactile.
           Le clic traverse directement vers le TextInput natif placé au-dessus.
         */}
-        <View style={styles.boxesContainer} pointerEvents="none">
+        <View
+          style={styles.boxesContainer}
+          pointerEvents="none"
+          onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
+        >
           {Array.from({ length }).map((_, index) => {
             const digit = digits[index] || '';
             const isCurrent = isFocused && index === digits.length;
@@ -72,6 +86,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({
                 style={[
                   styles.box,
                   isSixDigits && styles.boxSixDigits,
+                  boxSize,
                   isFilled && styles.boxFilled,
                   isCurrent && styles.boxCurrent,
                   isError && styles.boxError,
@@ -115,24 +130,23 @@ export const OtpInput: React.FC<OtpInputProps> = ({
           selectionColor="transparent"
           style={styles.overlayInput}
           accessibilityLabel={`Saisie du code secret OTP à ${length} chiffres`}
-          accessibilityRole="text"
         />
       </View>
 
-      {/* Raccourci tactile explicite pour garantir l'ouverture du clavier sur tous les appareils */}
-      <TouchableOpacity
-        onPress={handleFocus}
-        activeOpacity={0.7}
-        style={[styles.tapHelper, isFocused && styles.tapHelperActive]}
-        accessibilityRole="button"
-        accessibilityLabel="Ouvrir le clavier de saisie OTP"
-      >
-        <Text style={[styles.tapHelperText, isFocused && styles.tapHelperTextActive]}>
-          {isFocused
-            ? `Saisie en cours (${digits.length}/${length} chiffres)`
-            : '👆 Appuyez ici pour afficher le clavier'}
-        </Text>
-      </TouchableOpacity>
+      {/* Secours si un appareil n'ouvre pas le clavier au toucher des cases.
+          Masqué pendant la saisie : les cases montrent déjà l'avancement. */}
+      {!isFocused && (
+        <TouchableOpacity
+          onPress={handleFocus}
+          activeOpacity={0.7}
+          style={styles.tapHelper}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir le clavier de saisie OTP"
+        >
+          <Keyboard size={14} color={colors.grey[600]} />
+          <Text style={styles.tapHelperText}>Toucher pour saisir le code</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -153,7 +167,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: GAP,
+    width: '100%',
   },
   overlayInput: {
     ...StyleSheet.absoluteFillObject,
@@ -209,6 +224,9 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes['2xl'],
   },
   tapHelper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginTop: spacing[3],
     paddingVertical: spacing[1],
     paddingHorizontal: spacing[3],

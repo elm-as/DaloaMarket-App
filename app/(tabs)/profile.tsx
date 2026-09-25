@@ -3,6 +3,7 @@ import { View, ScrollView, StyleSheet, Share, Linking, RefreshControl, ActivityI
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
+import { openDeliveryApp } from '../../src/lib/openDeliveryApp';
 import { supabase, authService, useActiveOrdersCount } from '@daloa/api';
 import { colors, useAccent, ConfirmDialog, showAlert } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
@@ -229,11 +230,7 @@ export default function ProfileScreen() {
           onOpenPayoutSettings={() => router.push('/settings/payout' as any)}
           onOpenFavorites={() => router.push('/favorites' as any)}
           onOpenAccountSettings={() => router.push('/settings' as any)}
-          onJoinDelivery={() => {
-            Linking.openURL('https://delivery.daloamarket.com/devenir-livreur').catch(() => {
-              router.push('/legal/how-it-works' as any);
-            });
-          }}
+          onJoinDelivery={() => openDeliveryApp('devenir-livreur')}
           onOpenHelp={() => router.push('/legal/help' as any)}
           onOpenFaq={() => router.push('/legal/faq' as any)}
           onOpenAbout={() => router.push('/legal/about' as any)}

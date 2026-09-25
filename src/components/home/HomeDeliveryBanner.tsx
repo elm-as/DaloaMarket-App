@@ -1,27 +1,14 @@
 import React from 'react';
-import { View, StyleSheet, Linking } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, StyleSheet } from 'react-native';
+import { openDeliveryApp } from '../../lib/openDeliveryApp';
 import { Bike, ChevronRight } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 export const HomeDeliveryBanner: React.FC = () => {
-  const router = useRouter();
   const accent = useAccent();
 
-  const handlePress = async () => {
-    const deepLink = 'daloadelivery://(tabs)/annuaire';
-    const webLink = 'https://delivery.daloamarket.com/annuaire';
-    try {
-      const canOpen = await Linking.canOpenURL(deepLink);
-      if (canOpen) {
-        await Linking.openURL(deepLink);
-      } else {
-        await Linking.openURL(webLink);
-      }
-    } catch {
-      await Linking.openURL(webLink).catch(() => {});
-    }
-  };
+  // Annuaire des livreurs : dans l'app DaloaDelivery si elle est installée.
+  const handlePress = () => openDeliveryApp('annuaire');
 
   return (
     <View style={styles.container}>
