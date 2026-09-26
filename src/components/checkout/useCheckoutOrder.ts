@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Haptics } from '@daloa/utils';
-import { ordersService, paymentService, analyticsService } from '@daloa/api';
+import { ordersService, paymentService, analyticsService, QUOTE_RETRY_REASONS, ServerQuote } from '@daloa/api';
 import { PaymentMode, MobileMoneyOperator } from './PaymentMethodSelector';
 import { resolveBuyerPoint } from '@daloa/utils';
 import { showAlert } from '@daloa/ui';
@@ -34,6 +34,10 @@ interface UseCheckoutOrderParams {
   operator: MobileMoneyOperator;
   onlineDisabled: boolean;
   paymentConfigNotice?: string;
+  /** Devis serveur affiché : c'est lui qui est facturé. */
+  quote?: ServerQuote | null;
+  /** Le devis n'est plus valable (expiré, déjà utilisé, article modifié) : le redemander. */
+  onQuoteInvalid?: () => void;
 }
 
 export function useCheckoutOrder(params: UseCheckoutOrderParams) {
@@ -88,7 +92,8 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
 
           const result = await paymentService.initiatePayment({
             type: 'order',
-            amount: params.breakdown.totalAmount,
+            amount: params.quote?.totalAmount ?? params.breakdown.totalAmount,
+            quoteId: params.quote?.id,
             userId: params.user.id,
             customerName: params.profile?.full_name || 'Client DaloaMarket',
             customerPhone: params.buyerPhone.trim(),
@@ -135,6 +140,7 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           deliveryLng,
           deliveryDistrict: params.deliveryDistrict,
           roadKmBySeller,
+          quoteId: params.quote?.id,
         });
         Haptics.success();
         const targetPath = firstOrderId ? `/order/${firstOrderId}` : '/(tabs)/orders';
@@ -149,7 +155,8 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
       if (params.paymentMode === 'online') {
         const result = await paymentService.initiatePayment({
           type: 'order',
-          amount: params.breakdown.totalAmount,
+          amount: params.quote?.totalAmount ?? params.breakdown.totalAmount,
+          quoteId: params.quote?.id,
           userId: params.user.id,
           customerName: params.profile?.full_name || 'Client DaloaMarket',
           customerPhone: params.buyerPhone.trim(),
@@ -207,7 +214,7 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         delivery_lat: deliveryLat,
         delivery_lng: deliveryLng,
         buyer_phone: params.buyerPhone.trim(),
-      }, params.distanceKm);
+      }, params.distanceKm, params.quote?.id);
 
       analyticsService.logEvent({
         eventName: 'purchase',
@@ -226,6 +233,13 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
       router.replace(`/order/${order.id}` as any);
     } catch (err: any) {
       let msg = err?.message || 'Échec de la commande. Veuillez réessayer.';
+      // Devis périmé ou modifié : on en redemande un, l'acheteur revoit le prix
+      // avant de valider. Rien n'a été débité.
+      if (err?.reason && QUOTE_RETRY_REASONS.includes(err.reason)) {
+        params.onQuoteInvalid?.();
+        setErrorMsg(msg);
+        return;
+      }
       if (msg.includes('insufficient_stock') || msg.includes('stock')) {
         msg = 'Le stock pour cet article est insuffisant pour valider votre commande.';
       } else if (msg.includes('network') || msg.includes('Failed to fetch')) {

@@ -7,7 +7,7 @@ export const DALOA_CENTER = {
 };
 
 /** Rayon de couverture officiel pour Daloa (en kilomètres) */
-export const DALOA_GEOFENCE_RADIUS_KM = 18;
+export const DALOA_GEOFENCE_RADIUS_KM = 10;
 
 /** Distance maximale autorisée pour valider un OTP par GPS (100 mètres) */
 export const MAX_OTP_GPS_DISTANCE_METERS = 100;

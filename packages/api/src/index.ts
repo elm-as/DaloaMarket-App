@@ -8,6 +8,7 @@ export * from './services/deliveryService';
 export * from './services/deliveryStorageService';
 export * from './services/deliveryVerificationService';
 export * from './services/paymentService';
+export * from './services/quoteService';
 export * from './services/chatService';
 export * from './services/notificationsService';
 export * from './services/payoutService';

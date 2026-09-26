@@ -17,7 +17,18 @@ const COD_RPC_ERRORS: Record<string, string> = {
   no_active_listing: "Ces articles ne sont plus disponibles à la vente.",
   cod_not_allowed: 'Le paiement à la livraison n’est pas disponible pour cet article. Choisissez le paiement en ligne.',
   pickup_not_allowed: 'Le retrait en boutique n’est pas disponible pour cet article. Choisissez la livraison.',
+  quote_expired: 'Le prix a expiré, il vient d’être recalculé. Vérifiez puis validez.',
+  quote_used: 'Ce prix a déjà servi, il vient d’être recalculé. Vérifiez puis validez.',
+  quote_stale: 'Un article a changé, le prix vient d’être recalculé. Vérifiez puis validez.',
+  quote_not_found: 'Le prix vient d’être recalculé. Vérifiez puis validez.',
+  quote_mismatch: 'Le prix vient d’être recalculé. Vérifiez puis validez.',
 };
+
+function codError(reason?: string): Error {
+  const err: any = new Error(COD_RPC_ERRORS[reason || ''] || reason || 'Commande impossible.');
+  err.reason = reason;
+  return err;
+}
 
 /** Traduction des `reason` renvoyés par les RPC vendeur. */
 const SELLER_RPC_ERRORS: Record<string, string> = {
@@ -49,7 +60,8 @@ export const ordersService = {
   async createOrder(
     buyerId: string,
     payload: CheckoutPayload,
-    roadKm?: number | null
+    roadKm?: number | null,
+    quoteId?: string | null
   ): Promise<OrderWithDetails> {
     // Anti-doublon : réutilise une commande 'pending' récente identique plutôt
     // que d'en créer une nouvelle à chaque tentative (évite les orphelins créés
@@ -101,13 +113,14 @@ export const ordersService = {
       p_delivery_lng: payload.delivery_lng ?? undefined,
       p_delivery_district: payload.delivery_district || undefined,
       p_road_km: roadKmBySeller,
-    });
+      ...(quoteId ? { p_quote_id: quoteId } : {}),
+    } as any);
 
     if (error) throw error;
 
     const res = data as { success?: boolean; reason?: string; first_order_id?: string } | null;
     if (!res?.success || !res.first_order_id) {
-      throw new Error(COD_RPC_ERRORS[res?.reason || ''] || res?.reason || 'Commande impossible.');
+      throw codError(res?.reason);
     }
 
     return this.getOrderById(res.first_order_id);
@@ -130,6 +143,8 @@ export const ordersService = {
       deliveryDistrict?: string | null;
       /** Distance routière mesurée, par identifiant de vendeur. */
       roadKmBySeller?: Record<string, number>;
+      /** Devis serveur : fait foi pour la livraison et les frais. */
+      quoteId?: string | null;
     }
   ): Promise<string | null> {
     const { data, error } = await supabase.rpc('create_cod_order', {
@@ -146,13 +161,14 @@ export const ordersService = {
       p_delivery_lng: opts.deliveryLng ?? undefined,
       p_delivery_district: opts.deliveryDistrict ?? undefined,
       p_road_km: opts.roadKmBySeller || {},
-    });
+      ...(opts.quoteId ? { p_quote_id: opts.quoteId } : {}),
+    } as any);
 
     if (error) throw error;
 
     const res = data as { success?: boolean; reason?: string; first_order_id?: string } | null;
     if (!res?.success) {
-      throw new Error(COD_RPC_ERRORS[res?.reason || ''] || res?.reason || 'Commande impossible.');
+      throw codError(res?.reason);
     }
 
     return res.first_order_id || null;

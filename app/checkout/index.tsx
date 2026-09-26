@@ -8,7 +8,7 @@ import { ArrowLeft, Lock } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { calculateOrderBreakdown, calculateDeliveryFee, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
 import { Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
-import { useListingDetail, analyticsService, useSystemSettings, supabase } from '@daloa/api';
+import { useListingDetail, analyticsService, useSystemSettings, supabase, quoteService } from '@daloa/api';
 import { useQuery } from '@tanstack/react-query';
 import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -250,13 +250,82 @@ export default function CheckoutScreen() {
         sellerFeeOverride: phaseConfig?.seller_fee_override ?? null,
       });
 
+  // ── Devis serveur ──
+  // À l'étape Paiement, le prix affiché et facturé est celui du serveur (même
+  // calcul, même itinéraire, même position de boutique). Le calcul local
+  // au-dessus ne sert plus qu'à estimer pendant le choix de la position.
+  const quoteItems = useMemo(
+    () =>
+      isCartMode
+        ? cartItems.map((ci) => ({ listing_id: ci.listing.id, variant_id: ci.variant?.id || null, quantity: ci.quantity }))
+        : listingId
+        ? [{ listing_id: listingId, variant_id: variantId || null, quantity }]
+        : [],
+    [isCartMode, cartItems, listingId, variantId, quantity]
+  );
+  const {
+    data: serverQuote,
+    isFetching: isQuoteLoading,
+    isError: isQuoteError,
+    error: quoteError,
+    refetch: refetchQuote,
+  } = useQuery({
+    queryKey: [
+      'order-quote',
+      JSON.stringify(quoteItems),
+      deliveryMode,
+      deliveryCoords?.latitude?.toFixed(5),
+      deliveryCoords?.longitude?.toFixed(5),
+      deliveryDistrict,
+      deliveryAddress.trim(),
+    ],
+    enabled: step === 3 && isAuthenticated && quoteItems.length > 0,
+    // Le devis vit 15 min côté serveur : on le redemande bien avant.
+    staleTime: 5 * 60 * 1000,
+    gcTime: 0,
+    retry: 1,
+    queryFn: () =>
+      quoteService.getQuote({
+        items: quoteItems,
+        deliveryMode,
+        deliveryLat: deliveryCoords?.latitude,
+        deliveryLng: deliveryCoords?.longitude,
+        deliveryDistrict,
+        deliveryAddress: deliveryMode === 'delivery' ? deliveryAddress.trim() : 'Retrait direct en boutique',
+      }),
+  });
+  // Refus métier (article indisponible, retrait refusé…) : bloquant. Panne
+  // technique du serveur de devis : on laisse commander par l'ancien chemin,
+  // où le serveur recalcule et refuse tout total supérieur à celui affiché.
+  const quoteIsTechnicalFailure = isQuoteError && !(quoteError as any)?.reason;
+  const priceStatus: 'loading' | 'error' | 'ready' =
+    serverQuote && !isQuoteLoading
+      ? 'ready'
+      : isQuoteError && !isQuoteLoading
+      ? quoteIsTechnicalFailure
+        ? 'ready'
+        : 'error'
+      : 'loading';
+
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({
     user, profile, listingId, variantId, variant, quantity, listing, activePrice, breakdown,
     distanceKm,
     isCartMode, cartItems, clearCart, deliveryMode, deliveryDistrict, deliveryCoords,
     deliveryAddress, buyerPhone, paymentMode, operator, onlineDisabled,
     paymentConfigNotice: paymentConfig?.notice,
+    quote: priceStatus === 'ready' && serverQuote ? serverQuote : null,
+    onQuoteInvalid: () => {
+      refetchQuote();
+    },
   });
+
+  // Erreur de devis (article indisponible, retrait refusé…) : affichée telle quelle.
+  useEffect(() => {
+    if (step === 3 && isQuoteError && quoteError && (quoteError as any).reason) {
+      setErrorMsg((quoteError as any).message || null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, isQuoteError, quoteError]);
 
   useEffect(() => {
     if (!onlineDisabled) return;
@@ -420,11 +489,16 @@ export default function CheckoutScreen() {
               isCodAllowed={isCodAllowed}
               quantity={quantity}
               activePrice={activePrice}
-              deliveryFee={breakdown.deliveryFee}
-              buyerServiceFee={breakdown.buyerServiceFee}
-              totalAmount={breakdown.totalAmount}
-              distanceKm={distanceKm}
+              deliveryFee={serverQuote ? serverQuote.deliveryTotal : breakdown.deliveryFee}
+              buyerServiceFee={serverQuote ? serverQuote.buyerFeeTotal : breakdown.buyerServiceFee}
+              totalAmount={serverQuote ? serverQuote.totalAmount : breakdown.totalAmount}
+              distanceKm={serverQuote ? serverQuote.distanceKm : distanceKm}
               isSubmitting={isSubmitting}
+              priceStatus={priceStatus}
+              onRetryPrice={() => {
+                setErrorMsg(null);
+                refetchQuote();
+              }}
               onBack={() => setStep(2)}
               onSubmit={submitOrder}
             />

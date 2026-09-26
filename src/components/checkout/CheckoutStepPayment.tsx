@@ -23,6 +23,9 @@ interface CheckoutStepPaymentProps {
   totalAmount: number;
   distanceKm: number;
   isSubmitting: boolean;
+  /** Prix serveur : en calcul, indisponible (bouton = réessayer) ou prêt. */
+  priceStatus?: 'loading' | 'error' | 'ready';
+  onRetryPrice?: () => void;
   onBack: () => void;
   onSubmit: () => void;
 }
@@ -41,6 +44,8 @@ export function CheckoutStepPayment({
   totalAmount,
   distanceKm,
   isSubmitting,
+  priceStatus = 'ready',
+  onRetryPrice,
   onBack,
   onSubmit,
 }: CheckoutStepPaymentProps) {
@@ -137,14 +142,23 @@ export function CheckoutStepPayment({
       {/* Boutons d'action pleine largeur */}
       <View style={styles.navRow}>
         <Button
-          title={isSubmitting ? 'Traitement en cours...' : actionLabel}
+          title={
+            isSubmitting
+              ? 'Traitement en cours...'
+              : priceStatus === 'loading'
+              ? 'Calcul du prix…'
+              : priceStatus === 'error'
+              ? 'Recalculer le prix'
+              : actionLabel
+          }
           variant="primary"
           size="lg"
           onPress={() => {
             Haptics.selection();
-            onSubmit();
+            if (priceStatus === 'error') onRetryPrice?.();
+            else onSubmit();
           }}
-          disabled={isSubmitting}
+          disabled={isSubmitting || priceStatus === 'loading'}
           fullWidth
         />
         <Button

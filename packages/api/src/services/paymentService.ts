@@ -26,6 +26,8 @@ export interface InitiatePaymentInput {
   metadata?: Record<string, unknown>;
   orderInput?: Record<string, unknown>;
   orderInputs?: Record<string, unknown>[];
+  /** Devis serveur (`POST /quote`) : le paiement facture exactement ce devis. */
+  quoteId?: string;
   source?: string;
 }
 
@@ -68,7 +70,9 @@ export const paymentService = {
 
     const data = await response.json().catch(() => ({} as any));
     if (!response.ok || data?.success === false) {
-      throw new Error(data?.message || 'Échec de l’initialisation du paiement.');
+      const err: any = new Error(data?.message || 'Échec de l’initialisation du paiement.');
+      err.reason = data?.reason;
+      throw err;
     }
 
     // Récupération de l'URL de paiement avec repli exhaustif (paymentUrl, payment_url, url directe, token)
