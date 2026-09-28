@@ -134,7 +134,11 @@ export default function OrderTrackingScreen() {
       refetch();
       showAlert(
         'Disponibilité confirmée',
-        'La course est maintenant visible par les livreurs. Préparez le colis.'
+        order!.payment_method === 'online'
+          ? 'La course est maintenant visible par les livreurs. Préparez le colis.'
+          : isPickupMode(order!.delivery_mode)
+          ? "Préparez l'article : l'acheteur vient le récupérer et vous paie sur place."
+          : "Livrez vous-même ou confiez la course à l'un de vos livreurs affiliés. L'acheteur paie à la réception."
       );
     } catch (err: any) {
       showAlert('Erreur', err.message || 'Confirmation impossible.');
@@ -642,7 +646,10 @@ export default function OrderTrackingScreen() {
           )}
 
         {/* ── Code OTP acheteur : remise ── */}
+        {/* Seulement pour un paiement en ligne : en espèces, l'acheteur paie à la
+            réception et ne donne aucun code. */}
         {!isSeller &&
+          order.payment_method === 'online' &&
           deliveryOtp &&
           order.status !== 'delivered' &&
           order.status !== 'cancelled' && (
@@ -650,8 +657,12 @@ export default function OrderTrackingScreen() {
               code={deliveryOtp}
               type="delivery"
               orderRef={order.id}
-              title="Votre code de remise"
-              subtitle="Donnez ce code au livreur UNIQUEMENT après avoir inspecté votre colis."
+              title={isPickup ? 'Votre code de retrait' : 'Votre code de remise'}
+              subtitle={
+                isPickup
+                  ? 'Donnez ce code au vendeur UNIQUEMENT après avoir vérifié votre article.'
+                  : 'Donnez ce code au livreur UNIQUEMENT après avoir inspecté votre colis.'
+              }
               style={styles.codeCard}
             />
           )}

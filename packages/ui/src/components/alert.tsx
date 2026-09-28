@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { View, Modal, StyleSheet, Alert, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Modal, StyleSheet, Animated, Easing } from 'react-native';
+import { CheckCircle2, AlertTriangle, XCircle, Info, HelpCircle } from 'lucide-react-native';
 import { colors, radii, spacing } from '../tokens';
 import { AppText } from './AppText';
 import { AppPressable } from './AppPressable';
@@ -8,18 +9,18 @@ import { sanitizeUserErrorMessage } from '@daloa/utils';
 /**
  * Remplaçant de `Alert.alert`, utilisable partout.
  *
- * Le problème : sur `react-native-web`, `Alert.alert` est une fonction vide.
- * Les 92 messages de l'application — erreur de paiement, confirmation de
- * suppression, échec d'envoi — étaient donc **muets** dès qu'une app tournait
- * dans un navigateur. L'utilisateur clique, rien ne se passe, il recommence.
+ * Historique : sur `react-native-web`, `Alert.alert` est une fonction vide ; une
+ * modale maison couvrait donc le web, et le natif gardait la boîte système
+ * d'Android. Celle-ci jurait avec l'application (rectangle gris, boutons en
+ * majuscules, aucune couleur) sur des moments importants : paiement,
+ * encaissement, livraison validée, suppression.
  *
- * Le parti pris ici : sur natif on délègue à `Alert.alert` tel quel, donc aucun
- * changement de comportement ni de rendu sur iOS et Android ; sur le web on
- * affiche une vraie modale. Le web passe de « rien » à « quelque chose », le
- * natif ne bouge pas d'un pixel.
+ * Désormais la même fenêtre s'affiche partout, aux couleurs DaloaMarket :
+ * icône selon la nature du message (succès, erreur, confirmation, info),
+ * bouton principal orange, bouton rouge pour une action destructive. La
+ * signature reste celle d'`Alert.alert` : aucun des appels existants ne change.
  *
- * Pour que la version web fonctionne, `<AlertHost />` doit être monté une fois
- * à la racine de l'application — sans lui, un appel web reste silencieux.
+ * `<AlertHost />` doit être monté une fois à la racine de l'application.
  */
 
 export type AlertButtonStyle = 'default' | 'cancel' | 'destructive';
@@ -59,38 +60,49 @@ const BOUTON_OK: AlertButton[] = [{ text: 'OK', style: 'default' }];
  * Affiche un message bloquant. Signature identique à `Alert.alert`.
  */
 export function showAlert(title: string, message?: string, buttons?: AlertButton[]): void {
-  const displayMessage = message ? sanitizeUserErrorMessage(message) : message;
-
-  if (Platform.OS !== 'web') {
-    // `Alert.alert` n'accepte pas `undefined` comme tableau de boutons sur
-    // toutes les versions : on ne le passe que s'il existe vraiment.
-    if (buttons && buttons.length > 0) {
-      Alert.alert(title, displayMessage, buttons as any);
-    } else {
-      Alert.alert(title, displayMessage);
-    }
-    return;
-  }
-
   emettre({
     id: prochainId++,
     title,
-    message: displayMessage,
+    message: message ? sanitizeUserErrorMessage(message) : message,
     buttons: buttons && buttons.length > 0 ? buttons : BOUTON_OK,
   });
 }
 
+type Ton = 'success' | 'error' | 'danger' | 'question' | 'info';
+
+/** Nature du message, déduite du titre et des boutons (les appels ne la précisent pas). */
+function tonDe(d: AlertDemande): Ton {
+  if (d.buttons.some((b) => b.style === 'destructive')) return 'danger';
+  const t = `${d.title}`.toLowerCase();
+  if (/erreur|échec|echec|impossible|refus|invalide|incorrect|introuvable|indisponible|expir|incomplet/.test(t)) {
+    return 'error';
+  }
+  if (d.buttons.length > 1) return 'question';
+  if (/réussi|valid|confirm|enregistr|envoy|succès|merci|bravo|clôtur|livré|encaiss|annulée|publi|🎉|🚀|✅/.test(t)) {
+    return 'success';
+  }
+  return 'info';
+}
+
+const TONS: Record<Ton, { Icone: typeof Info; couleur: string; fond: string }> = {
+  success: { Icone: CheckCircle2, couleur: colors.status.success, fond: colors.status.successLight },
+  error: { Icone: XCircle, couleur: colors.status.error, fond: colors.status.errorLight },
+  danger: { Icone: AlertTriangle, couleur: colors.status.error, fond: colors.status.errorLight },
+  question: { Icone: HelpCircle, couleur: colors.primary.DEFAULT, fond: colors.primary[50] },
+  info: { Icone: Info, couleur: colors.primary.DEFAULT, fond: colors.primary[50] },
+};
+
 /**
- * Hôte des messages web. À monter une fois, à la racine de l'application.
- * Ne rend rien en natif.
+ * Hôte des messages. À monter une fois, à la racine de l'application.
  */
 export const AlertHost: React.FC = () => {
-  const [demande, setDemande] = useState<AlertDemande | null>(null);
+  // File : un message émis pendant qu'un autre est affiché attend son tour.
+  const [file, setFile] = useState<AlertDemande[]>([]);
+  const apparition = useRef(new Animated.Value(0)).current;
+  const demande = file[0] ?? null;
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-
-    const recevoir: Abonne = (d) => setDemande(d);
+    const recevoir: Abonne = (d) => setFile((f) => [...f, d]);
     abonnes.add(recevoir);
 
     // Rattrapage de ce qui a été demandé avant le montage.
@@ -104,28 +116,59 @@ export const AlertHost: React.FC = () => {
     };
   }, []);
 
-  if (Platform.OS !== 'web' || !demande) return null;
+  useEffect(() => {
+    if (!demande) return;
+    apparition.setValue(0);
+    Animated.timing(apparition, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [demande?.id, apparition]);
+
+  if (!demande) return null;
 
   const repondre = (bouton: AlertButton) => {
-    setDemande(null);
-    // Après la fermeture, comme le fait la boîte système : le code appelant
-    // s'attend à ce que la modale ne soit plus là quand son callback s'exécute.
+    setFile((f) => f.slice(1));
+    // Après la fermeture, comme la boîte système : le code appelant s'attend à
+    // ce que la fenêtre ne soit plus là quand son callback s'exécute.
     bouton.onPress?.();
   };
 
   const annuler = demande.buttons.find((b) => b.style === 'cancel');
+  const ton = TONS[tonDe(demande)];
+  const Icone = ton.Icone;
+  // Annulation à gauche (ou en bas en colonne), action principale à droite.
+  const boutons = [...demande.buttons].sort(
+    (a, b) => Number(b.style === 'cancel') - Number(a.style === 'cancel')
+  );
+  const enColonne = boutons.length > 2 || boutons.some((b) => (b.text || '').length > 18);
 
   return (
     <Modal
       visible
       transparent
+      statusBarTranslucent
       animationType="fade"
-      // Sur le web, la touche Échap et le bouton retour passent par là.
+      // Bouton retour Android et touche Échap : équivaut à « annuler ».
       onRequestClose={() => repondre(annuler ?? demande.buttons[demande.buttons.length - 1])}
     >
       <View style={styles.voile}>
-        <View style={styles.boite}>
-          <AppText variant="bodyStrong" style={styles.titre}>
+        <Animated.View
+          style={[
+            styles.boite,
+            {
+              opacity: apparition,
+              transform: [{ scale: apparition.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }],
+            },
+          ]}
+        >
+          <View style={[styles.pastille, { backgroundColor: ton.fond }]}>
+            <Icone size={28} color={ton.couleur} strokeWidth={2.2} />
+          </View>
+
+          <AppText variant="title" style={styles.titre}>
             {demande.title}
           </AppText>
           {demande.message ? (
@@ -134,34 +177,30 @@ export const AlertHost: React.FC = () => {
             </AppText>
           ) : null}
 
-          <View style={[styles.actions, demande.buttons.length > 2 && styles.actionsColonne]}>
-            {demande.buttons.map((b, i) => (
-              <AppPressable
-                key={`${demande.id}-${i}`}
-                onPress={() => repondre(b)}
-                accessibilityLabel={b.text || 'OK'}
-                style={[
-                  styles.bouton,
-                  b.style === 'destructive' && styles.boutonDanger,
-                  b.style === 'cancel' && styles.boutonNeutre,
-                ]}
-              >
-                <AppText
-                  variant="label"
-                  color={
-                    b.style === 'destructive'
-                      ? colors.text.inverse
-                      : b.style === 'cancel'
-                        ? colors.text.body
-                        : colors.text.inverse
-                  }
+          <View style={[styles.actions, enColonne && styles.actionsColonne]}>
+            {boutons.map((b, i) => {
+              const neutre = b.style === 'cancel';
+              const danger = b.style === 'destructive';
+              return (
+                <AppPressable
+                  key={`${demande.id}-${i}`}
+                  onPress={() => repondre(b)}
+                  accessibilityLabel={b.text || 'OK'}
+                  style={[
+                    styles.bouton,
+                    !enColonne && styles.boutonLigne,
+                    danger && styles.boutonDanger,
+                    neutre && styles.boutonNeutre,
+                  ]}
                 >
-                  {b.text || 'OK'}
-                </AppText>
-              </AppPressable>
-            ))}
+                  <AppText variant="label" color={neutre ? colors.text.body : colors.text.inverse}>
+                    {b.text || 'OK'}
+                  </AppText>
+                </AppPressable>
+              );
+            })}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -170,18 +209,34 @@ export const AlertHost: React.FC = () => {
 const styles = StyleSheet.create({
   voile: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(17,24,39,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing[4],
+    padding: spacing[5],
   },
   boite: {
     width: '100%',
     maxWidth: 380,
     backgroundColor: colors.bg.surface,
-    borderRadius: radii['2xl'],
-    padding: spacing[5],
+    borderRadius: 24,
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[6],
+    paddingBottom: spacing[5],
+    alignItems: 'center',
     gap: spacing[2],
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  pastille: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[1],
   },
   titre: {
     textAlign: 'center',
@@ -190,21 +245,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   actions: {
+    alignSelf: 'stretch',
     flexDirection: 'row',
     gap: spacing[2],
     marginTop: spacing[3],
   },
   actionsColonne: {
-    flexDirection: 'column',
+    flexDirection: 'column-reverse',
   },
   bouton: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 46,
+    minHeight: 48,
+    paddingHorizontal: spacing[3],
     borderRadius: radii.xl,
     backgroundColor: colors.primary.DEFAULT,
     overflow: 'hidden',
+  },
+  boutonLigne: {
+    flex: 1,
   },
   boutonDanger: {
     backgroundColor: colors.status.error,

@@ -54,6 +54,9 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
     order.delivery_assignments?.[0]?.delivery_otp;
   const isPendingDelivery =
     !['delivered', 'completed', 'cancelled', 'disputed'].includes(order.status);
+  // Le code ne sert qu'aux commandes payées en ligne : en espèces, l'acheteur
+  // paie à la réception et ne donne jamais de code.
+  const isOnlinePaid = order.payment_method === 'online';
 
   return (
     <AppPressable onPress={() => router.push(`/order/${order.id}` as any)} style={styles.card} accessibilityLabel={`Commande ${order.id.slice(0, 8)}`}>
@@ -99,7 +102,7 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
           réside dans order.delivery_assignment.delivery_otp. On le résout proprement
           et on ne l'affiche que tant que la commande est en cours.
         */}
-        {role === 'buyer' && deliveryOtp && isPendingDelivery && (
+        {role === 'buyer' && isOnlinePaid && deliveryOtp && isPendingDelivery && (
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={(e) => {
