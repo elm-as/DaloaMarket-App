@@ -43,6 +43,20 @@ function listingContentFields(input: ListingCreateInput) {
 
 export const listingsService = {
   /**
+   * Signale une annonce (et son vendeur) à la modération : même table que le
+   * site (`reports`), visible dans l'onglet admin « Signalements ».
+   */
+  async reportListing(params: { listingId: string; sellerId?: string | null; reporterId: string; reason: string }): Promise<void> {
+    const { error } = await supabase.from('reports').insert({
+      listing_id: params.listingId,
+      reporter_id: params.reporterId,
+      reported_user_id: params.sellerId || null,
+      reason: params.reason.trim(),
+    } as any);
+    if (error) throw error;
+  },
+
+  /**
    * Récupère la liste des annonces avec pagination et filtres
    */
   async getListings(

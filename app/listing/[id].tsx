@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useListingDetail, useSimilarListings, useReviews, analyticsService } from '@daloa/api';
+import { useListingDetail, useSimilarListings, useReviews, analyticsService, listingsService } from '@daloa/api';
 import { findSimilar } from '../../src/lib/recommendationEngine';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
@@ -209,15 +209,35 @@ export default function ListingDetailScreen() {
     });
   };
 
+  // Le bouton se contentait d'une vibration : aucun signalement n'arrivait à la
+  // modération. Il écrit désormais dans `reports`, comme le site.
+  const sendReport = async (reason: string) => {
+    if (!listing || !user?.id) return;
+    try {
+      await listingsService.reportListing({
+        listingId: listing.id,
+        sellerId: listing.user_id || seller?.id || null,
+        reporterId: user.id,
+        reason,
+      });
+      Haptics.warning();
+      showAlert('Signalement envoyé', "Merci. L'équipe DaloaMarket va examiner cette annonce.");
+    } catch (err: any) {
+      showAlert('Signalement impossible', err?.message || 'Réessayez dans un instant.');
+    }
+  };
+
   const handleReport = () => {
-    showAlert(
-      'Signaler l\'annonce',
-      'Pensez-vous que cette annonce est problématique ou frauduleuse ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Signaler', style: 'destructive', onPress: () => Haptics.warning() },
-      ]
-    );
+    if (!isAuthenticated) {
+      router.push('/auth/login' as any);
+      return;
+    }
+    showAlert('Signaler l\'annonce', 'Quel est le problème avec cette annonce ?', [
+      { text: 'Arnaque ou fraude', onPress: () => sendReport('Arnaque ou fraude') },
+      { text: 'Article interdit', onPress: () => sendReport('Article interdit') },
+      { text: 'Contenu inapproprié', onPress: () => sendReport('Contenu inapproprié') },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
   };
 
   const handleToggleFavorite = () => {
