@@ -487,8 +487,9 @@ export default function CheckoutScreen() {
               operator={operator}
               onOperatorChange={setOperator}
               isCodAllowed={isCodAllowed}
-              quantity={quantity}
-              activePrice={activePrice}
+              // En panier, pas d'annonce unique : le prix affiché valait 0 FCFA.
+              quantity={isCartMode ? 1 : quantity}
+              activePrice={isCartMode ? cartProductTotal : activePrice}
               deliveryFee={serverQuote ? serverQuote.deliveryTotal : breakdown.deliveryFee}
               buyerServiceFee={serverQuote ? serverQuote.buyerFeeTotal : breakdown.buyerServiceFee}
               totalAmount={serverQuote ? serverQuote.totalAmount : breakdown.totalAmount}
