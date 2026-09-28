@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { decodeBase64ToArrayBuffer } from '../lib/base64';
 
 /**
  * Service de gestion du stockage sécurisé des documents KYC et preuves de livraison
@@ -49,18 +50,32 @@ export const deliveryStorageService = {
    * @param assignmentId Identifiant de l'assignation de livraison (optionnel pour partitionner)
    * @returns Le chemin d'accès ou l'identifiant du fichier stocké
    */
-  async uploadDeliveryProof(fileUri: string, assignmentId?: string): Promise<string> {
+  async uploadDeliveryProof(
+    input: string | { fileUri: string; base64?: string | null },
+    assignmentId?: string
+  ): Promise<string> {
+    const fileUri = typeof input === 'string' ? input : input.fileUri;
+    const base64 = typeof input === 'string' ? null : input.base64;
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(7);
     const filename = assignmentId
       ? `${assignmentId}/proof_${timestamp}_${randomSuffix}.jpg`
       : `proof_${timestamp}_${randomSuffix}.jpg`;
 
-    const response = await fetch(fileUri);
-    if (!response.ok) {
-      throw new Error(`Impossible de lire la photo de preuve locale : ${fileUri}`);
+    // Sur Android, `fetch(file://…).blob()` échoue (« Network request failed ») ou
+    // renvoie un corps vide : le livreur voyait « Connexion Internet instable »
+    // et ne pouvait pas valider. Même méthode que les autres envois : base64 →
+    // ArrayBuffer. Le blob reste le repli (web, anciens appels).
+    let blob: ArrayBuffer | Blob;
+    if (base64) {
+      blob = decodeBase64ToArrayBuffer(base64);
+    } else {
+      const response = await fetch(fileUri);
+      if (!response.ok) {
+        throw new Error(`Impossible de lire la photo de preuve locale : ${fileUri}`);
+      }
+      blob = await response.blob();
     }
-    const blob = await response.blob();
 
     const { data, error } = await supabase.storage
       .from('delivery-photos')

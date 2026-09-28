@@ -174,6 +174,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     color: 'transparent',
     backgroundColor: 'transparent',
+    // Certains Android ignorent `color: 'transparent'` : les chiffres saisis
+    // apparaissaient en double derrière les cases. Taille 1 = invisibles.
+    fontSize: 1,
+    textAlign: 'center',
     zIndex: 20,
     elevation: 20,
   },

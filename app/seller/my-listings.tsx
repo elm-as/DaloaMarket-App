@@ -64,29 +64,45 @@ export default function MyListingsScreen() {
   const handleRefresh = () => {
     setIsRefreshing(true);
     fetchMyListings();
+    fetchSales();
   };
 
   const activeCount = useMemo(
     () => listings.filter((l) => l.status === 'active').length,
     [listings]
   );
-  // Compteur de ventes lu dans `orders` : adossé à `listings.status`, il baissait
-  // dès qu'une annonce vendue était remise en vente après restock.
-  const [soldCount, setSoldCount] = useState(0);
-  useEffect(() => {
+  // Ventes livrées par annonce. L'onglet « Vendues » affichait un compteur de
+  // commandes livrées (ex. 2) mais ne listait que les annonces au statut
+  // « vendu » (ex. 0) : « Vendues (2) » au-dessus de « Aucune annonce vendue ».
+  // Il liste désormais toute annonce vendue au moins une fois, y compris une
+  // annonce remise en vente, avec son nombre de ventes.
+  const [salesByListing, setSalesByListing] = useState<Record<string, number>>({});
+  const fetchSales = useCallback(async () => {
     if (!user?.id) return;
-    supabase
+    const { data } = await supabase
       .from('orders')
-      .select('*', { count: 'exact', head: true })
+      .select('listing_id, quantity')
       .eq('seller_id', user.id)
-      .in('status', ['delivered', 'completed'])
-      .then(({ count }) => setSoldCount(count || 0));
+      .in('status', ['delivered', 'completed']);
+    const map: Record<string, number> = {};
+    for (const o of (data || []) as { listing_id: string | null; quantity: number | null }[]) {
+      if (!o.listing_id) continue;
+      map[o.listing_id] = (map[o.listing_id] || 0) + (o.quantity || 1);
+    }
+    setSalesByListing(map);
   }, [user?.id]);
+  useEffect(() => {
+    fetchSales();
+  }, [fetchSales]);
+
+  const soldListings = useMemo(
+    () => listings.filter((l) => l.status === 'sold' || (salesByListing[l.id] || 0) > 0),
+    [listings, salesByListing]
+  );
+  const soldCount = soldListings.length;
 
   const displayedListings = useMemo(() => {
-    let list = listings.filter((l) =>
-      activeTab === 'active' ? l.status === 'active' : l.status === 'sold'
-    );
+    let list = activeTab === 'active' ? listings.filter((l) => l.status === 'active') : soldListings;
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase().trim();
       list = list.filter(
@@ -96,7 +112,7 @@ export default function MyListingsScreen() {
       );
     }
     return list;
-  }, [listings, activeTab, searchFilter]);
+  }, [listings, soldListings, activeTab, searchFilter]);
 
   const handleExecuteAction = async () => {
     if (!targetListing || !confirmAction) return;
@@ -154,6 +170,7 @@ export default function MyListingsScreen() {
   const renderItem = ({ item }: { item: any }) => (
     <SellerListingCard
       item={item}
+      salesCount={salesByListing[item.id] || 0}
       onPress={() => router.push(`/listing/${item.id}` as any)}
       onEdit={() => router.push(`/listing/create?id=${item.id}` as any)}
       onToggleStatus={() => {
@@ -211,26 +228,28 @@ export default function MyListingsScreen() {
         />
       </View>
 
-      {/* Onglets En vente / Vendues */}
+      {/* Onglets En vente / Vendues : sélecteur en pilule. Le soulignement posé
+          sur des boutons animés se décalait et laissait une bande vide. */}
       <View style={styles.tabsRow}>
-        <AppPressable
-          haptic="selection"
-          onPress={() => setActiveTab('active')}
-          style={[styles.tab, activeTab === 'active' && { borderBottomColor: accent.DEFAULT, borderBottomWidth: 2 }]}
-        >
-          <AppText variant="bodyStrong" color={activeTab === 'active' ? accent.DEFAULT : colors.text.muted}>
-            En vente ({activeCount})
-          </AppText>
-        </AppPressable>
-        <AppPressable
-          haptic="selection"
-          onPress={() => setActiveTab('sold')}
-          style={[styles.tab, activeTab === 'sold' && { borderBottomColor: accent.DEFAULT, borderBottomWidth: 2 }]}
-        >
-          <AppText variant="bodyStrong" color={activeTab === 'sold' ? accent.DEFAULT : colors.text.muted}>
-            Vendues ({soldCount})
-          </AppText>
-        </AppPressable>
+        {([
+          { key: 'active', label: `En vente · ${activeCount}` },
+          { key: 'sold', label: `Vendues · ${soldCount}` },
+        ] as const).map((t) => {
+          const selected = activeTab === t.key;
+          return (
+            <AppPressable
+              key={t.key}
+              haptic="selection"
+              onPress={() => setActiveTab(t.key)}
+              style={[styles.tab, selected && { backgroundColor: accent.DEFAULT }]}
+              accessibilityState={{ selected }}
+            >
+              <AppText variant="label" color={selected ? colors.text.inverse : colors.text.muted}>
+                {t.label}
+              </AppText>
+            </AppPressable>
+          );
+        })}
       </View>
 
       {/* Liste */}
@@ -373,12 +392,22 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, color: colors.text.DEFAULT },
   tabsRow: {
     flexDirection: 'row',
-    backgroundColor: colors.bg.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    marginHorizontal: spacing[4],
     marginTop: spacing[3],
+    padding: 4,
+    gap: 4,
+    borderRadius: radii.full,
+    backgroundColor: colors.bg.surface,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: spacing[3] },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
+    borderRadius: radii.full,
+  },
   loadingList: { padding: spacing[4], gap: spacing[3] },
   listContent: { padding: spacing[4], gap: spacing[3] },
 });

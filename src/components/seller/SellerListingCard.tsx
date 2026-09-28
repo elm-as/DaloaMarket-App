@@ -1,12 +1,14 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { Edit3, RotateCcw, CheckCircle2, Trash2, Eye, Zap } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { formatFCFA } from '@daloa/utils';
+import { Pencil, RotateCcw, CheckCircle2, Trash2, Eye, Zap, ShoppingBag, MapPin } from 'lucide-react-native';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { formatFCFA, resolveListingPhoto } from '@daloa/utils';
 
 interface SellerListingCardProps {
   item: any;
+  /** Nombre de ventes livrées de l'annonce (onglet « Vendues »). */
+  salesCount?: number;
   onPress: () => void;
   onEdit: () => void;
   onToggleStatus: () => void;
@@ -16,11 +18,17 @@ interface SellerListingCardProps {
 }
 
 /**
- * Carte d'une annonce dans l'écran "Mes annonces" du vendeur.
- * Comprend les informations clés (statut, prix, vues) et la barre d'actions rapides.
+ * Carte d'une annonce dans « Mes annonces ».
+ *
+ * Refonte du 28/09 : les quatre actions tenaient sur une ligne avec icône et
+ * texte côte à côte, si bien que « Marquer vendu » passait sur deux lignes et
+ * que la barre paraissait bricolée. Désormais : icône au-dessus d'un libellé
+ * court, quatre colonnes égales. La vignette passe par `resolveListingPhoto`
+ * (une URI locale d'un envoi raté laissait une image vide).
  */
 export const SellerListingCard: React.FC<SellerListingCardProps> = ({
   item,
+  salesCount = 0,
   onPress,
   onEdit,
   onToggleStatus,
@@ -30,87 +38,89 @@ export const SellerListingCard: React.FC<SellerListingCardProps> = ({
   const accent = useAccent();
   const isSold = item.status === 'sold';
   const isBoosted = !!item.boosted_until && new Date(item.boosted_until) > new Date();
-  const photo = item.photos?.[0];
+  const photo = resolveListingPhoto(item.photos, '');
+
+  const statusLabel = isSold ? 'Vendu' : isBoosted ? 'Boostée' : 'En vente';
+  const statusColors = isSold
+    ? { bg: colors.bg.subtle, fg: colors.text.muted }
+    : isBoosted
+      ? { bg: accent[50], fg: accent[700] }
+      : { bg: colors.status.successLight, fg: colors.status.successDark };
+
+  const actions = [
+    { key: 'edit', label: 'Modifier', Icon: Pencil, color: colors.text.body, onPress: onEdit },
+    isSold
+      ? { key: 'restock', label: 'Remettre', Icon: RotateCcw, color: colors.status.infoDark, onPress: onToggleStatus }
+      : { key: 'sold', label: 'Vendu', Icon: CheckCircle2, color: colors.status.successDark, onPress: onToggleStatus },
+    ...(onBoost && !isSold
+      ? [{ key: 'boost', label: isBoosted ? 'Prolonger' : 'Booster', Icon: Zap, color: accent.DEFAULT, onPress: onBoost }]
+      : []),
+    { key: 'delete', label: 'Supprimer', Icon: Trash2, color: colors.status.errorDark, onPress: onDelete },
+  ];
 
   return (
     <View style={styles.card}>
-      <AppPressable onPress={onPress} style={styles.cardTop}>
-        {photo ? (
-          <Image source={{ uri: photo }} style={styles.thumbnail} contentFit="cover" />
-        ) : (
-          <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-            <AppText variant="caption" color={colors.text.subtle}>Sans photo</AppText>
-          </View>
-        )}
+      <AppPressable onPress={onPress} style={styles.cardTop} accessibilityLabel={`Voir l'annonce ${item.title}`}>
+        <View style={styles.thumbnail}>
+          {photo ? (
+            <Image source={{ uri: photo }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          ) : (
+            <ShoppingBag size={24} color={colors.text.subtle} />
+          )}
+        </View>
 
         <View style={styles.cardInfo}>
-          <View style={styles.titleRow}>
-            <AppText variant="bodyStrong" numberOfLines={1} style={styles.title}>
-              {item.title}
-            </AppText>
-            <View style={[styles.badge, { backgroundColor: isSold ? colors.status.warningLight : colors.status.successLight }]}>
-              <AppText variant="overline" color={isSold ? colors.status.warningDark : colors.status.successDark}>
-                {isSold ? 'Vendu' : isBoosted ? 'Boostée' : 'En vente'}
-              </AppText>
-            </View>
-          </View>
+          <AppText variant="bodyStrong" numberOfLines={2} style={styles.title}>
+            {item.title}
+          </AppText>
 
           <AppText variant="subtitle" color={accent.DEFAULT} style={styles.price}>
             {formatFCFA(item.price)}
           </AppText>
 
           <View style={styles.metaRow}>
-            <AppText variant="caption" color={colors.text.muted}>
-              {item.district || 'Daloa'}
-            </AppText>
-            <AppText variant="caption" color={colors.text.subtle}>·</AppText>
-            <View style={styles.viewsWrap}>
-              <Eye size={11} color={colors.text.subtle} />
-              <AppText variant="caption" color={colors.text.muted}>
-                {item.view_count || 0} vues
+            <View style={[styles.badge, { backgroundColor: statusColors.bg }]}>
+              <AppText variant="caption" color={statusColors.fg} style={styles.badgeText}>
+                {statusLabel}
               </AppText>
             </View>
+            {salesCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.status.successLight }]}>
+                <AppText variant="caption" color={colors.status.successDark} style={styles.badgeText}>
+                  {salesCount} vente{salesCount > 1 ? 's' : ''}
+                </AppText>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.metaRow}>
+            <MapPin size={11} color={colors.text.subtle} />
+            <AppText variant="caption" color={colors.text.muted} numberOfLines={1}>
+              {item.district || 'Daloa'}
+            </AppText>
+            <Eye size={11} color={colors.text.subtle} style={styles.eyeIcon} />
+            <AppText variant="caption" color={colors.text.muted}>
+              {item.view_count || 0}
+            </AppText>
           </View>
         </View>
       </AppPressable>
 
-      {/* Barre des 3 boutons d'actions vendeur */}
       <View style={styles.cardActions}>
-        <AppPressable haptic="light" onPress={onEdit} style={styles.actionBtn}>
-          <Edit3 size={14} color={colors.text.body} />
-          <AppText variant="caption" color={colors.text.body}>Modifier</AppText>
-        </AppPressable>
-
-        <View style={styles.btnDivider} />
-
-        {isSold ? (
-          <AppPressable haptic="selection" onPress={onToggleStatus} style={styles.actionBtn}>
-            <RotateCcw size={14} color={colors.status.infoDark} />
-            <AppText variant="caption" color={colors.status.infoDark}>Remettre en vente</AppText>
+        {actions.map(({ key, label, Icon, color, onPress: handle }) => (
+          <AppPressable
+            key={key}
+            haptic="selection"
+            onPress={handle}
+            style={styles.actionBtn}
+            accessibilityLabel={label}
+          >
+            <Icon size={17} color={color} />
+            <AppText variant="caption" color={color} numberOfLines={1} style={styles.actionLabel}>
+              {label}
+            </AppText>
           </AppPressable>
-        ) : (
-          <AppPressable haptic="selection" onPress={onToggleStatus} style={styles.actionBtn}>
-            <CheckCircle2 size={14} color={colors.status.warningDark} />
-            <AppText variant="caption" color={colors.status.warningDark}>Marquer vendu</AppText>
-          </AppPressable>
-        )}
-
-        {onBoost && !isSold && (
-          <>
-            <View style={styles.btnDivider} />
-            <AppPressable haptic="selection" onPress={onBoost} style={styles.actionBtn}>
-              <Zap size={14} color={accent.DEFAULT} />
-              <AppText variant="caption" color={accent.DEFAULT}>Booster</AppText>
-            </AppPressable>
-          </>
-        )}
-
-        <View style={styles.btnDivider} />
-
-        <AppPressable haptic="selection" onPress={onDelete} style={styles.actionBtn}>
-          <Trash2 size={14} color={colors.status.errorDark} />
-          <AppText variant="caption" color={colors.status.errorDark}>Supprimer</AppText>
-        </AppPressable>
+        ))}
       </View>
     </View>
   );
@@ -119,11 +129,15 @@ export const SellerListingCard: React.FC<SellerListingCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.bg.surface,
-    borderRadius: radii.xl,
+    borderRadius: radii['2xl'],
     borderWidth: 1,
     borderColor: colors.border.subtle,
     overflow: 'hidden',
-    marginBottom: spacing[3],
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   cardTop: {
     flexDirection: 'row',
@@ -131,66 +145,57 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
   thumbnail: {
-    width: 78,
-    height: 78,
-    borderRadius: radii.lg,
+    width: 88,
+    height: 88,
+    borderRadius: radii.xl,
     backgroundColor: colors.bg.subtle,
-  },
-  thumbnailPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   cardInfo: {
     flex: 1,
-    justifyContent: 'space-between',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing[2],
+    gap: 4,
   },
   title: {
-    flex: 1,
     fontSize: 14,
-  },
-  badge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: radii.full,
+    lineHeight: 19,
   },
   price: {
     fontVariant: ['tabular-nums'],
-    marginVertical: 2,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexWrap: 'wrap',
   },
-  viewsWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
+  eyeIcon: {
+    marginLeft: spacing[2],
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+  },
+  badgeText: {
+    fontFamily: typography.families.bold,
+    fontSize: 11,
   },
   cardActions: {
     flexDirection: 'row',
-    alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
-    backgroundColor: colors.bg.subtle,
   },
   actionBtn: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 3,
     paddingVertical: spacing[2] + 2,
   },
-  btnDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: colors.border.subtle,
+  actionLabel: {
+    fontSize: 11,
+    fontFamily: typography.families.semibold,
   },
 });

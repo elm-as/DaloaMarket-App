@@ -483,8 +483,11 @@ export const deliveryService = {
   /**
    * Téléverse une photo de preuve vers Supabase Storage sécurisé
    */
-  async uploadDeliveryProof(fileUri: string, assignmentId?: string): Promise<string> {
-    return deliveryStorageService.uploadDeliveryProof(fileUri, assignmentId);
+  async uploadDeliveryProof(
+    input: string | { fileUri: string; base64?: string | null },
+    assignmentId?: string
+  ): Promise<string> {
+    return deliveryStorageService.uploadDeliveryProof(input, assignmentId);
   },
 
   /**
