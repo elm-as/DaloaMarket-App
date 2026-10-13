@@ -126,7 +126,7 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
 
         {/* Gain net — le héros de la carte (accent de l'app) */}
         <View style={[styles.earningsBadge, { backgroundColor: accent.DEFAULT }]}>
-          <AppText variant="bodyStrong" color={colors.text.inverse} style={styles.earningsAmount}>
+          <AppText variant="bodyStrong" color={colors.text.inverse} style={styles.earningsAmount} numberOfLines={1}>
             {formatFCFA(netEarnings)}
           </AppText>
           <AppText variant="overline" color="rgba(255,255,255,0.85)">
@@ -278,10 +278,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[2],
     marginBottom: spacing[3],
   },
   headerLeft: {
     flex: 1,
+    minWidth: 0,
   },
   statusRow: {
     flexDirection: 'row',
@@ -293,17 +295,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: radii.full,
+    flexShrink: 0,
   },
   timeMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+    flexShrink: 1,
   },
   earningsBadge: {
     paddingHorizontal: spacing[3],
     paddingVertical: 6,
     borderRadius: radii.lg,
     alignItems: 'center',
+    flexShrink: 0,
   },
   earningsAmount: {
     fontVariant: ['tabular-nums'],

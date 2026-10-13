@@ -267,6 +267,7 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+    minWidth: 0,
   },
   withdrawCard: {
     padding: spacing[4],
@@ -286,6 +287,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radii.md,
     overflow: 'hidden',
+    flexShrink: 0,
   },
   autoPayoutBanner: {
     flexDirection: 'row',

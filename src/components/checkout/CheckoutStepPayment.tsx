@@ -85,16 +85,16 @@ export function CheckoutStepPayment({
         </AppText>
 
         <View style={styles.breakRow}>
-          <AppText variant="caption" color={colors.text.muted}>
+          <AppText variant="caption" color={colors.text.muted} style={styles.breakLabel}>
             Article ({quantity}x)
           </AppText>
-          <AppText variant="body" style={styles.boldNum}>
+          <AppText variant="body" style={[styles.boldNum, styles.breakAmount]} numberOfLines={1}>
             {formatFCFA(activePrice * quantity)}
           </AppText>
         </View>
 
         <View style={styles.breakRow}>
-          <AppText variant="caption" color={colors.text.muted}>
+          <AppText variant="caption" color={colors.text.muted} style={styles.breakLabel}>
             {deliveryMode === 'pickup'
               ? 'Retrait en boutique'
               : `Livraison DaloaDelivery (${distanceKm.toFixed(1)} km)`}
@@ -102,7 +102,8 @@ export function CheckoutStepPayment({
           <AppText
             variant="body"
             color={deliveryMode === 'pickup' ? colors.status.successDark : colors.text.DEFAULT}
-            style={styles.boldNum}
+            style={[styles.boldNum, styles.breakAmount]}
+            numberOfLines={1}
           >
             {deliveryMode === 'pickup' ? '0 FCFA' : formatFCFA(deliveryFee)}
           </AppText>
@@ -110,10 +111,10 @@ export function CheckoutStepPayment({
 
         {buyerServiceFee > 0 && (
           <View style={styles.breakRow}>
-            <AppText variant="caption" color={colors.text.muted}>
+            <AppText variant="caption" color={colors.text.muted} style={styles.breakLabel}>
               Frais de service plateforme (2%)
             </AppText>
-            <AppText variant="body" style={styles.boldNum}>
+            <AppText variant="body" style={[styles.boldNum, styles.breakAmount]} numberOfLines={1}>
               {formatFCFA(buyerServiceFee)}
             </AppText>
           </View>
@@ -206,6 +207,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing[2],
+  },
+  breakLabel: {
+    flex: 1,
+    minWidth: 0,
+  },
+  breakAmount: {
+    flexShrink: 0,
   },
   divider: {
     height: 1,

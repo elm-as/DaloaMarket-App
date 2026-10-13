@@ -122,7 +122,7 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
               <AppText variant="bodyStrong" numberOfLines={2} style={styles.title}>
                 {listing.title}
               </AppText>
-              <AppText variant="label" color={accent[600]} style={styles.price}>
+              <AppText variant="label" color={accent[600]} style={styles.price} numberOfLines={1}>
                 {formatFCFA(listing.price)}
               </AppText>
             </View>
@@ -264,6 +264,7 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: radii.lg,
     backgroundColor: colors.bg.subtle,
+    flexShrink: 0,
   },
   thumbnailPlaceholder: {
     borderWidth: 1,
@@ -271,6 +272,7 @@ const styles = StyleSheet.create({
   },
   listingInfo: {
     flex: 1,
+    minWidth: 0,
     gap: 4,
   },
   title: {

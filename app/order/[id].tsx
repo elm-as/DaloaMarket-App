@@ -474,7 +474,7 @@ export default function OrderTrackingScreen() {
                     {formatFCFA(it.unit_price)} × {it.quantity}
                   </AppText>
                 </View>
-                <AppText variant="bodyStrong" color={accent[600]}>
+                <AppText variant="bodyStrong" color={accent[600]} style={styles.itemAmount} numberOfLines={1}>
                   {formatFCFA(it.product_amount)}
                 </AppText>
               </View>
@@ -857,8 +857,8 @@ export default function OrderTrackingScreen() {
           <SummaryRow label="Livraison à" value={order.delivery_address || '—'} />
           <View style={styles.divider} />
           <View style={styles.totalRow}>
-            <AppText variant="bodyStrong">{amountLabel}</AppText>
-            <AppText variant="h2" color={accent[600]} style={styles.tnum}>
+            <AppText variant="bodyStrong" style={styles.totalLabel}>{amountLabel}</AppText>
+            <AppText variant="h2" color={accent[600]} style={[styles.tnum, styles.totalAmount]} numberOfLines={1}>
               {formatFCFA(order.total_amount)}
             </AppText>
           </View>
@@ -1021,10 +1021,16 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: radii.md,
     backgroundColor: colors.bg.subtle,
+    flexShrink: 0,
   },
   itemInfo: {
     flex: 1,
+    minWidth: 0,
     gap: 1,
+  },
+  itemAmount: {
+    flexShrink: 0,
+    fontVariant: ['tabular-nums'],
   },
   verifyBtn: {
     marginTop: spacing[2],
@@ -1155,12 +1161,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[1],
   },
   summaryLabel: {
-    flexShrink: 0,
+    flex: 1,
+    minWidth: 0,
   },
   summaryValue: {
-    flexShrink: 1,
+    flexShrink: 0,
     textAlign: 'right',
-    maxWidth: '60%',
+    maxWidth: '65%',
   },
   divider: {
     height: 1,
@@ -1171,6 +1178,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
+    gap: spacing[3],
+  },
+  totalLabel: {
+    flex: 1,
+    minWidth: 0,
+  },
+  totalAmount: {
+    flexShrink: 0,
   },
   tnum: {
     fontVariant: ['tabular-nums'],

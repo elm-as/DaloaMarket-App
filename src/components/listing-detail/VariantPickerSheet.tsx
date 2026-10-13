@@ -433,6 +433,7 @@ const styles = StyleSheet.create({
   },
   variantMeta: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
   },
   variantTitleRow: {
@@ -446,6 +447,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   variantSubRow: {
     flexDirection: 'row',
@@ -465,6 +467,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.subtle,
     height: 36,
     paddingHorizontal: 3,
+    flexShrink: 0,
   },
   stepBtn: {
     width: 30,
