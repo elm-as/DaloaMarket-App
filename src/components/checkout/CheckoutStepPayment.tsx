@@ -122,7 +122,7 @@ export function CheckoutStepPayment({
         <View style={styles.divider} />
 
         <View style={styles.totalRow}>
-          <View>
+          <View style={styles.totalLabel}>
             <AppText variant="bodyStrong">Total net à régler</AppText>
             <AppText variant="caption" color={colors.text.muted}>
               {paymentMode === 'cod'
@@ -132,7 +132,7 @@ export function CheckoutStepPayment({
                 : 'Paiement sécurisé en ligne (Mobile Money)'}
             </AppText>
           </View>
-          <AppText variant="h2" color={accent[600]} style={styles.totalAmountText}>
+          <AppText variant="h2" color={accent[600]} style={styles.totalAmountText} numberOfLines={1}>
             {formatFCFA(totalAmount)}
           </AppText>
         </View>
@@ -217,12 +217,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: spacing[1],
+    gap: spacing[3],
+  },
+  totalLabel: {
+    flex: 1,
+    minWidth: 0,
   },
   boldNum: {
     fontVariant: ['tabular-nums'],
     fontFamily: typography.families.bold,
   },
   totalAmountText: {
+    flexShrink: 0,
     fontVariant: ['tabular-nums'],
     fontFamily: typography.families.extrabold,
   },
