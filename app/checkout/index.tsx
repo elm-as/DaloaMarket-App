@@ -70,17 +70,33 @@ export default function CheckoutScreen() {
   );
   const isCodAllowed = allowCodForAll || isSellerPro;
   const isPickupAllowed = allowPickupForAll || isSellerPro;
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
-    (phaseConfig?.default_payment_method === 'cod' || isPhase0) && isCodAllowed ? 'cod' : 'online'
-  );
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>(() => {
+    if (onlineDisabled) {
+      return deliveryMode === 'pickup' && isPickupAllowed ? 'cash_at_shop' : 'cod';
+    }
+    return (phaseConfig?.default_payment_method === 'cod' || isPhase0) && isCodAllowed ? 'cod' : 'online';
+  });
 
-  // L'annonce arrive après le premier rendu : si le mode choisi n'est plus
-  // autorisé pour ce vendeur, on bascule sur un mode permis.
+  // Résolution déterministe et unidirectionnelle du mode de paiement
+  // Évite tout rebond/ping-pong entre 'cod' et 'online' quand les paiements en ligne sont coupés
   useEffect(() => {
-    if (!isPickupAllowed && deliveryMode === 'pickup') setDeliveryMode('delivery');
-    if (!isCodAllowed && paymentMode === 'cod') setPaymentMode('online');
-    if (!isPickupAllowed && paymentMode === 'cash_at_shop') setPaymentMode('online');
-  }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode]);
+    if (!isPickupAllowed && deliveryMode === 'pickup') {
+      setDeliveryMode('delivery');
+    }
+
+    if (onlineDisabled) {
+      if (paymentMode === 'online') {
+        setPaymentMode(deliveryMode === 'pickup' && isPickupAllowed ? 'cash_at_shop' : 'cod');
+      }
+    } else {
+      if (!isCodAllowed && paymentMode === 'cod') {
+        setPaymentMode('online');
+      }
+      if (!isPickupAllowed && paymentMode === 'cash_at_shop') {
+        setPaymentMode('online');
+      }
+    }
+  }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode, onlineDisabled]);
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
 
   // Position de la boutique relue en base à chaque ouverture du checkout.
@@ -328,13 +344,6 @@ export default function CheckoutScreen() {
   }, [step, isQuoteError, quoteError]);
 
   useEffect(() => {
-    if (!onlineDisabled) return;
-    if (paymentMode === 'online') {
-      setPaymentMode(deliveryMode === 'pickup' ? 'cash_at_shop' : 'cod');
-    }
-  }, [onlineDisabled, paymentMode, deliveryMode]);
-
-  useEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [step]);
 
@@ -487,6 +496,8 @@ export default function CheckoutScreen() {
               operator={operator}
               onOperatorChange={setOperator}
               isCodAllowed={isCodAllowed}
+              onlineDisabled={onlineDisabled}
+              onlineNotice={paymentConfig?.notice}
               // En panier, pas d'annonce unique : le prix affiché valait 0 FCFA.
               quantity={isCartMode ? 1 : quantity}
               activePrice={isCartMode ? cartProductTotal : activePrice}

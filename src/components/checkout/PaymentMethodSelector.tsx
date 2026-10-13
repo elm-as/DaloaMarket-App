@@ -27,6 +27,8 @@ interface PaymentMethodSelectorProps {
   operator: MobileMoneyOperator;
   onOperatorChange: (op: MobileMoneyOperator) => void;
   isCodAllowed?: boolean;
+  onlineDisabled?: boolean;
+  onlineNotice?: string;
 }
 
 export function PaymentMethodSelector({
@@ -36,6 +38,8 @@ export function PaymentMethodSelector({
   operator,
   onOperatorChange,
   isCodAllowed = true,
+  onlineDisabled = false,
+  onlineNotice,
 }: PaymentMethodSelectorProps) {
   const accent = useAccent();
 
@@ -99,27 +103,51 @@ export function PaymentMethodSelector({
 
         {/* 3. Option Mobile Money Sécurisé */}
         <AppPressable
-          haptic="selection"
-          onPress={() => onPaymentModeChange('online')}
-          style={[styles.modeCard, paymentMode === 'online' && { borderColor: accent.DEFAULT, backgroundColor: accent[50] }]}
+          haptic={onlineDisabled ? 'none' : 'selection'}
+          onPress={() => {
+            if (!onlineDisabled) onPaymentModeChange('online');
+          }}
+          disabled={onlineDisabled}
+          style={[
+            styles.modeCard,
+            paymentMode === 'online' && !onlineDisabled && { borderColor: accent.DEFAULT, backgroundColor: accent[50] },
+            onlineDisabled && { opacity: 0.6, borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.subtle },
+          ]}
         >
           <View style={styles.cardHeader}>
-            <View style={[styles.iconBox, { backgroundColor: accent[50] }]}>
-              <CreditCard size={16} color={accent.DEFAULT} />
+            <View style={[styles.iconBox, { backgroundColor: onlineDisabled ? colors.bg.subtle : accent[50] }]}>
+              <CreditCard size={16} color={onlineDisabled ? colors.text.muted : accent.DEFAULT} />
             </View>
             <View style={styles.flex1}>
-              <AppText variant="bodyStrong">Paiement Mobile Money Sécurisé</AppText>
-              <AppText variant="caption" color={colors.text.muted} style={styles.descText}>
-                Fonds protégés sous séquestre jusqu'à validation OTP
+              <View style={styles.badgeRow}>
+                <AppText variant="bodyStrong" color={onlineDisabled ? colors.text.muted : colors.text.DEFAULT}>
+                  Paiement Mobile Money Sécurisé
+                </AppText>
+                {onlineDisabled && (
+                  <View style={[styles.recBadge, { backgroundColor: '#FEE2E2' }]}>
+                    <AppText variant="overline" color="#B91C1C">INDISPONIBLE</AppText>
+                  </View>
+                )}
+              </View>
+              <AppText variant="caption" color={onlineDisabled ? colors.status.errorDark : colors.text.muted} style={styles.descText}>
+                {onlineDisabled
+                  ? (onlineNotice || 'Paiement en ligne temporairement suspendu pour maintenance')
+                  : "Fonds protégés sous séquestre jusqu'à validation OTP"}
               </AppText>
             </View>
-            <View style={[styles.radioCircle, paymentMode === 'online' && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT }]}>
-              {paymentMode === 'online' && <View style={styles.radioDot} />}
+            <View
+              style={[
+                styles.radioCircle,
+                paymentMode === 'online' && !onlineDisabled && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT },
+                onlineDisabled && { borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.subtle },
+              ]}
+            >
+              {paymentMode === 'online' && !onlineDisabled && <View style={styles.radioDot} />}
             </View>
           </View>
 
-          {/* Grille des opérateurs */}
-          {paymentMode === 'online' && (
+          {/* Grille des opérateurs (seulement si actif) */}
+          {paymentMode === 'online' && !onlineDisabled && (
             <View style={styles.operatorsGrid}>
               {OPERATORS.map((op) => {
                 const isSelected = operator === op.id;

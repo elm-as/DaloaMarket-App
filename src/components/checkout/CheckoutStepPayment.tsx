@@ -16,6 +16,8 @@ interface CheckoutStepPaymentProps {
   operator: MobileMoneyOperator;
   onOperatorChange: (op: MobileMoneyOperator) => void;
   isCodAllowed: boolean;
+  onlineDisabled?: boolean;
+  onlineNotice?: string;
   quantity: number;
   activePrice: number;
   deliveryFee: number;
@@ -37,6 +39,8 @@ export function CheckoutStepPayment({
   operator,
   onOperatorChange,
   isCodAllowed,
+  onlineDisabled = false,
+  onlineNotice,
   quantity,
   activePrice,
   deliveryFee,
@@ -56,6 +60,8 @@ export function CheckoutStepPayment({
       ? `Confirmer la commande (${formatFCFA(totalAmount)})`
       : paymentMode === 'cash_at_shop'
       ? `Valider le retrait (${formatFCFA(totalAmount)})`
+      : onlineDisabled
+      ? 'Paiement en ligne temporairement indisponible'
       : `Payer avec ${operator.toUpperCase()} · ${formatFCFA(totalAmount)}`;
 
   return (
@@ -68,6 +74,8 @@ export function CheckoutStepPayment({
         operator={operator}
         onOperatorChange={onOperatorChange}
         isCodAllowed={isCodAllowed}
+        onlineDisabled={onlineDisabled}
+        onlineNotice={onlineNotice}
       />
 
       {/* 2. Récapitulatif transparent de la commande */}
@@ -121,7 +129,7 @@ export function CheckoutStepPayment({
                 ? 'Règlement au livreur'
                 : paymentMode === 'cash_at_shop'
                 ? 'Règlement en boutique'
-                : 'Paiement sécurisé MoneyFusion'}
+                : 'Paiement sécurisé en ligne (Mobile Money)'}
             </AppText>
           </View>
           <AppText variant="h2" color={accent[600]} style={styles.totalAmountText}>
@@ -158,7 +166,7 @@ export function CheckoutStepPayment({
             if (priceStatus === 'error') onRetryPrice?.();
             else onSubmit();
           }}
-          disabled={isSubmitting || priceStatus === 'loading'}
+          disabled={isSubmitting || priceStatus === 'loading' || (paymentMode === 'online' && onlineDisabled)}
           fullWidth
         />
         <Button
