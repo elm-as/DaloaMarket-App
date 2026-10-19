@@ -32,6 +32,12 @@ export const PRICING_CONFIG = {
     driverCommissionRate: 0.10, // 10% retenu par la plateforme sur la livraison
   },
 
+  // Livraison Groupée Multi-Marchands (F06)
+  groupedDelivery: {
+    additionalStopFee: 300, // FCFA par boutique supplémentaire
+    driverBonusPerStop: 250, // FCFA reversé au livreur par stop additionnel collecté
+  },
+
   // Commissions sur les ventes d'articles
   marketplace: {
     /** Montant minimum d'une annonce, variantes comprises (FCFA). */
@@ -186,3 +192,72 @@ export function calculateOrderBreakdown(params: {
     driverNetPayout,
   };
 }
+
+export interface GroupedDeliveryBreakdown {
+  totalGroupedFee: number;
+  baseFee: number;
+  additionalFee: number;
+  sumIndividualFees: number;
+  savings: number;
+  stopCount: number;
+  driverTotalGain: number;
+}
+
+/**
+ * Calcule le devis de livraison groupée multi-marchands (F06).
+ * Dégressif : base = max(frais individuels), puis +300 FCFA par stop supplémentaire.
+ */
+export function calculateGroupedDeliveryQuote(
+  sellerDeliveryFees: number[],
+  customAdditionalRate?: number
+): GroupedDeliveryBreakdown {
+  if (!sellerDeliveryFees || sellerDeliveryFees.length === 0) {
+    return {
+      totalGroupedFee: 0,
+      baseFee: 0,
+      additionalFee: 0,
+      sumIndividualFees: 0,
+      savings: 0,
+      stopCount: 0,
+      driverTotalGain: 0,
+    };
+  }
+
+  const stopCount = sellerDeliveryFees.length;
+  const sumIndividualFees = sellerDeliveryFees.reduce((a, b) => a + b, 0);
+  const baseFee = Math.max(...sellerDeliveryFees);
+
+  if (stopCount === 1) {
+    const driverGain = Math.round(baseFee * (1 - PRICING_CONFIG.delivery.driverCommissionRate));
+    return {
+      totalGroupedFee: baseFee,
+      baseFee,
+      additionalFee: 0,
+      sumIndividualFees,
+      savings: 0,
+      stopCount: 1,
+      driverTotalGain: driverGain,
+    };
+  }
+
+  const rate = customAdditionalRate ?? PRICING_CONFIG.groupedDelivery.additionalStopFee;
+  const additionalStops = stopCount - 1;
+  const additionalFee = additionalStops * rate;
+  const totalGroupedFee = baseFee + additionalFee;
+  const savings = Math.max(0, sumIndividualFees - totalGroupedFee);
+
+  const baseDriverGain = Math.round(baseFee * (1 - PRICING_CONFIG.delivery.driverCommissionRate));
+  const driverBonus = additionalStops * PRICING_CONFIG.groupedDelivery.driverBonusPerStop;
+  const driverTotalGain = baseDriverGain + driverBonus;
+
+  return {
+    totalGroupedFee,
+    baseFee,
+    additionalFee,
+    sumIndividualFees,
+    savings,
+    stopCount,
+    driverTotalGain,
+  };
+}
+

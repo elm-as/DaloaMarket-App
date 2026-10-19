@@ -86,7 +86,7 @@ export const deliveryService = {
   async getAvailableRuns(driverCoords?: Coordinates | null): Promise<AvailableDeliveryRun[]> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name))')
+      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, payment_method, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
       .eq('status', 'awaiting_pickup')
       .is('delivery_person_id', null)
       .order('created_at', { ascending: false });
@@ -145,6 +145,14 @@ export const deliveryService = {
       const driverFee = commissionOn(deliveryPrice);
       const driverNetGain = deliveryPrice - driverFee;
 
+      const isExpress = Boolean(item.is_express || order.order_type === 'express');
+      const senderName = order.sender_name || item.sender_name || seller.shop_name || seller.full_name || 'Expéditeur';
+      const senderPhone = order.sender_phone || item.sender_phone || seller.phone || null;
+      const recipientName = order.recipient_name || item.recipient_name || buyer.full_name || 'Destinataire';
+      const recipientPhone = order.recipient_phone || item.recipient_phone || buyer.phone || null;
+      const packageDesc = order.package_description || item.package_description || null;
+      const packageType = order.package_type || item.package_type || null;
+
       return {
         assignmentId: item.id,
         orderId: item.order_id,
@@ -159,13 +167,30 @@ export const deliveryService = {
         driverFee,
         driverNetGain,
         isPrivate: item.is_private ?? false,
-        sellerName: seller.shop_name || seller.full_name || 'Vendeur',
-        sellerPhone: seller.phone || null,
-        buyerName: buyer.full_name || 'Client DaloaMarket',
-        buyerPhone: buyer.phone || null,
-        productTitle: listing.title,
+        sellerName: isExpress ? senderName : (seller.shop_name || seller.full_name || 'Vendeur'),
+        sellerPhone: isExpress ? senderPhone : (seller.phone || null),
+        buyerName: isExpress ? recipientName : (buyer.full_name || 'Client DaloaMarket'),
+        buyerPhone: isExpress ? recipientPhone : (buyer.phone || null),
+        productTitle: isExpress ? (packageDesc || '⚡ Course Express Daloa') : listing.title,
         productPhoto: listing.photos?.[0] || null,
         createdAt: item.created_at,
+        isExpress,
+        packageDescription: packageDesc,
+        packageType,
+        senderName: isExpress ? senderName : undefined,
+        senderPhone: isExpress ? senderPhone : undefined,
+        recipientName: isExpress ? recipientName : undefined,
+        recipientPhone: isExpress ? recipientPhone : undefined,
+        payerRole: item.payer_role || order.payer_role || 'sender',
+        isCod: Boolean(order.payment_method && ['cod', 'cash', 'cash_at_shop'].includes(order.payment_method)),
+        buyerCodReliabilityScore: (buyer as any).cod_reliability_score != null ? Number((buyer as any).cod_reliability_score) : null,
+        buyerCodDeliveredCount: (buyer as any).cod_delivered_count != null ? Number((buyer as any).cod_delivered_count) : null,
+        buyerCodRefusedCount: (buyer as any).cod_refused_count != null ? Number((buyer as any).cod_refused_count) : null,
+        isGrouped: Boolean(item.is_grouped || order.is_grouped),
+        deliveryGroupId: item.delivery_group_id || order.delivery_group_id || null,
+        groupTotalStops: Number(item.group_total_stops) || 1,
+        groupCompletedStops: Number(item.group_completed_stops) || 0,
+        groupedStops: Array.isArray(item.grouped_stops) ? item.grouped_stops : undefined,
       };
     });
   },
@@ -233,7 +258,7 @@ export const deliveryService = {
   async getActiveRun(driverId: string): Promise<ActiveDeliveryRunDetails | null> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name))')
+      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, payment_method, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
       .eq('delivery_person_id', driverId)
       .in('status', ['accepted', 'picked_up', 'in_transit'])
       .order('created_at', { ascending: false })
@@ -261,6 +286,16 @@ export const deliveryService = {
     const driverFee = commissionOn(deliveryPrice);
     const dropoff = parseDropoffAddress(order.delivery_address);
 
+    const rawData = data as any;
+    const rawOrder = order as any;
+    const isExpress = Boolean(rawData.is_express || rawOrder.order_type === 'express');
+    const senderName = rawOrder.sender_name || rawData.sender_name || seller.shop_name || seller.full_name || 'Expéditeur';
+    const senderPhone = rawOrder.sender_phone || rawData.sender_phone || (seller as { phone?: string | null }).phone || null;
+    const recipientName = rawOrder.recipient_name || rawData.recipient_name || buyer.full_name || 'Destinataire';
+    const recipientPhone = rawOrder.recipient_phone || rawData.recipient_phone || (buyer as { phone?: string | null }).phone || null;
+    const packageDesc = rawOrder.package_description || rawData.package_description || null;
+    const packageType = rawOrder.package_type || rawData.package_type || null;
+
     return {
       assignmentId: data.id,
       orderId: data.order_id,
@@ -284,13 +319,30 @@ export const deliveryService = {
       driverFee,
       driverNetGain: deliveryPrice - driverFee,
       isPrivate: data.is_private ?? false,
-      sellerName: seller.shop_name || seller.full_name || 'Vendeur',
-      sellerPhone: (seller as { phone?: string | null }).phone || null,
-      buyerName: buyer.full_name || 'Client',
-      buyerPhone: (buyer as { phone?: string | null }).phone || null,
-      productTitle: listing.title,
+      sellerName: isExpress ? senderName : (seller.shop_name || seller.full_name || 'Vendeur'),
+      sellerPhone: isExpress ? senderPhone : ((seller as { phone?: string | null }).phone || null),
+      buyerName: isExpress ? recipientName : (buyer.full_name || 'Client'),
+      buyerPhone: isExpress ? recipientPhone : ((buyer as { phone?: string | null }).phone || null),
+      productTitle: isExpress ? (packageDesc || '⚡ Course Express Daloa') : listing.title,
       productPhoto: listing.photos?.[0] || null,
       createdAt: data.created_at,
+      isExpress,
+      packageDescription: packageDesc,
+      packageType,
+      senderName: isExpress ? senderName : undefined,
+      senderPhone: isExpress ? senderPhone : undefined,
+      recipientName: isExpress ? recipientName : undefined,
+      recipientPhone: isExpress ? recipientPhone : undefined,
+      payerRole: rawData.payer_role || rawOrder.payer_role || 'sender',
+      isCod: Boolean(order.payment_method && ['cod', 'cash', 'cash_at_shop'].includes(order.payment_method)),
+      buyerCodReliabilityScore: (buyer as any).cod_reliability_score != null ? Number((buyer as any).cod_reliability_score) : null,
+      buyerCodDeliveredCount: (buyer as any).cod_delivered_count != null ? Number((buyer as any).cod_delivered_count) : null,
+      buyerCodRefusedCount: (buyer as any).cod_refused_count != null ? Number((buyer as any).cod_refused_count) : null,
+      isGrouped: Boolean(rawData.is_grouped || rawOrder.is_grouped),
+      deliveryGroupId: rawData.delivery_group_id || rawOrder.delivery_group_id || null,
+      groupTotalStops: Number(rawData.group_total_stops) || 1,
+      groupCompletedStops: Number(rawData.group_completed_stops) || 0,
+      groupedStops: Array.isArray(rawData.grouped_stops) ? rawData.grouped_stops : undefined,
     };
   },
 

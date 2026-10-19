@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Edit3, CheckCircle2, RotateCcw, Trash2, ExternalLink } from 'lucide-react-native';
-import { BottomSheet, ConfirmDialog, AppText, AppPressable, colors, radii, spacing, useAccent } from '@daloa/ui';
+import { Edit3, CheckCircle2, RotateCcw, Trash2, ExternalLink, Zap } from 'lucide-react-native';
+import { BottomSheet, ConfirmDialog, AppText, AppPressable, colors, radii, spacing, useAccent, showAlert } from '@daloa/ui';
 import { formatFCFA, Haptics } from '@daloa/utils';
-import { listingsService } from '@daloa/api';
+import { supabase, listingsService } from '@daloa/api';
+import { useAuth } from '../../context/AuthContext';
 import { RestockSheet, type RestockVariant } from '../seller/RestockSheet';
+import { BoostSheet } from '../seller/BoostSheet';
 
 export interface OwnerActionListing {
   id: string;
@@ -37,10 +39,14 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
 }) => {
   const router = useRouter();
   const accent = useAccent();
+  const { user } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showRestock, setShowRestock] = useState(false);
+  const [showBoost, setShowBoost] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [isBoosting, setIsBoosting] = useState(false);
 
   if (!listing) return null;
 
@@ -105,6 +111,36 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
   const handleViewAll = () => {
     onClose();
     router.push('/seller/my-listings' as any);
+  };
+
+  const handleOpenBoost = async () => {
+    if (!user?.id) return;
+    try {
+      const { data: me } = await supabase
+        .from('users_private')
+        .select('listing_credits')
+        .eq('id', user.id)
+        .maybeSingle();
+      setCredits(me?.listing_credits ?? 0);
+    } catch {
+      setCredits(0);
+    }
+    setShowBoost(true);
+  };
+
+  const handleExecuteBoost = async (days: 1 | 2 | 7) => {
+    try {
+      setIsBoosting(true);
+      await listingsService.boostWithCredits(listing.id, days);
+      Haptics.success();
+      setShowBoost(false);
+      onListingUpdated?.();
+      onClose();
+    } catch (err: any) {
+      showAlert('Boost impossible', err?.message || 'Réessayez dans un instant.');
+    } finally {
+      setIsBoosting(false);
+    }
   };
 
   return (
@@ -181,6 +217,24 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
             </AppPressable>
 
             <AppPressable
+              onPress={handleOpenBoost}
+              style={styles.actionRow}
+              rippleColor="rgba(0,0,0,0.06)"
+              accessibilityRole="button"
+              accessibilityLabel="Booster l'annonce"
+            >
+              <View style={[styles.iconBox, { backgroundColor: colors.primary[50] }]}>
+                <Zap size={18} color={colors.primary.DEFAULT} />
+              </View>
+              <View style={styles.actionTextWrap}>
+                <AppText variant="bodyStrong">Booster l'annonce</AppText>
+                <AppText variant="caption" color={colors.text.muted}>
+                  Dès 100 FCFA (24h, 2j ou 7j en priorité)
+                </AppText>
+              </View>
+            </AppPressable>
+
+            <AppPressable
               onPress={handleViewAll}
               style={styles.actionRow}
               rippleColor="rgba(0,0,0,0.06)"
@@ -221,7 +275,6 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
         </View>
       </BottomSheet>
 
-      {/* Confirmation de suppression stylisée */}
       <ConfirmDialog
         visible={showDeleteConfirm}
         title="Supprimer cette annonce ?"
@@ -242,69 +295,35 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
         onConfirm={handleRestock}
         onCancel={() => setShowRestock(false)}
       />
+
+      <BoostSheet
+        visible={showBoost}
+        listingTitle={listing.title}
+        credits={credits}
+        isLoading={isBoosting}
+        onConfirm={handleExecuteBoost}
+        onBuyCredits={() => {
+          setShowBoost(false);
+          onClose();
+          router.push('/pro/packs' as any);
+        }}
+        onCancel={() => setShowBoost(false)}
+      />
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    paddingBottom: spacing[4],
-  },
-  listingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-    paddingBottom: spacing[4],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-    marginBottom: spacing[2],
-  },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: radii.lg,
-    backgroundColor: colors.bg.subtle,
-    flexShrink: 0,
-  },
-  thumbnailPlaceholder: {
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  listingInfo: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  title: {
-    fontSize: 14,
-    lineHeight: 19,
-  },
-  price: {
-    fontVariant: ['tabular-nums'],
-  },
-  actionsList: {
-    gap: spacing[1],
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing[2],
-    borderRadius: radii.xl,
-  },
-  deleteRow: {
-    marginTop: spacing[1],
-  },
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
+  container: { paddingBottom: spacing[4] },
+  listingHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingBottom: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.border.subtle, marginBottom: spacing[2] },
+  thumbnail: { width: 60, height: 60, borderRadius: radii.lg, backgroundColor: colors.bg.subtle, flexShrink: 0 },
+  thumbnailPlaceholder: { borderWidth: 1, borderColor: colors.border.subtle },
+  listingInfo: { flex: 1, minWidth: 0, gap: 4 },
+  title: { fontSize: 14, lineHeight: 19 },
+  price: { fontVariant: ['tabular-nums'] },
+  actionsList: { gap: spacing[1] },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[3], paddingHorizontal: spacing[2], borderRadius: radii.xl },
+  deleteRow: { marginTop: spacing[1] },
+  iconBox: { width: 42, height: 42, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },
+  actionTextWrap: { flex: 1, gap: 2 },
 });

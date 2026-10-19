@@ -12,14 +12,18 @@ import {
   Store,
   LogOut,
   ChevronRight,
+  Gift,
 } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { formatFCFA } from '@daloa/utils';
 
 interface ProfileMenuSectionsProps {
   onOpenRevenue: () => void;
   onOpenPayoutSettings: () => void;
   onOpenFavorites: () => void;
   onOpenAccountSettings: () => void;
+  onOpenReferral: () => void;
+  daloaCashBalance?: number;
   onJoinDelivery: () => void;
   onOpenHelp: () => void;
   onOpenFaq: () => void;
@@ -77,6 +81,8 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
   onOpenPayoutSettings,
   onOpenFavorites,
   onOpenAccountSettings,
+  onOpenReferral,
+  daloaCashBalance,
   onJoinDelivery,
   onOpenHelp,
   onOpenFaq,
@@ -94,6 +100,17 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
         MON COMPTE & FINANCES
       </AppText>
       <View style={styles.cardGroup}>
+        <MenuItemRow
+          icon={<Gift size={17} color={colors.status.successDark} />}
+          tint={colors.status.successLight}
+          label="Parrainage & Daloa Cash"
+          sublabel={
+            daloaCashBalance && daloaCashBalance > 0
+              ? `${formatFCFA(daloaCashBalance)} disponibles · 500 F / ami`
+              : 'Gagnez 500 FCFA par ami invité'
+          }
+          onPress={onOpenReferral}
+        />
         <MenuItemRow
           icon={<Wallet size={17} color={colors.status.infoDark} />}
           tint={colors.status.infoLight}

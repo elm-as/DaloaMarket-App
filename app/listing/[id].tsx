@@ -11,7 +11,7 @@ import { userBehaviorService } from '../../src/services/userBehaviorService';
 import { ListingVariant } from '@daloa/types';
 import { colors, radii, spacing, Skeleton, ListingCard, AppText, AppPressable, useAccent, useResponsive, typography, showAlert } from '@daloa/ui';
 import { Tag, MapPin, Truck, Check, Home, ChevronLeft } from 'lucide-react-native';
-import { formatFCFA, Haptics, getListingPriceRange, getUnavailabilityReason } from '@daloa/utils';
+import { formatFCFA, Haptics, getListingPriceRange, getUnavailabilityReason, buildListingShareUrl } from '@daloa/utils';
 import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
 import { ListingSellerBox } from '../../src/components/listing-detail/ListingSellerBox';
 import { ListingStickyFooter } from '../../src/components/listing-detail/ListingStickyFooter';
@@ -203,9 +203,10 @@ export default function ListingDetailScreen() {
 
   const handleShare = async () => {
     Haptics.lightImpact();
+    const shareUrl = buildListingShareUrl(listing.id);
     await Share.share({
       title: listing.title,
-      message: `${listing.title} à ${formatFCFA(activePrice)} sur DaloaMarket !\nhttps://daloamarket.com/l/${listing.id.slice(0, 8)}`,
+      message: `${listing.title} à ${formatFCFA(activePrice)} sur DaloaMarket !\n${shareUrl}`,
     });
   };
 

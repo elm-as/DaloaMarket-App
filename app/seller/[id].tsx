@@ -13,7 +13,7 @@ import {
   ArrowLeft, Share2, MapPin, Store, Package, Star, ShieldCheck, AlertCircle,
 } from 'lucide-react-native';
 import { ListingCard } from '../../src/components/ListingCard';
-import { formatWhatsAppPhone, Haptics } from '@daloa/utils';
+import { formatWhatsAppPhone, formatShopWhatsAppShareMessage, buildWhatsAppLink, Haptics } from '@daloa/utils';
 
 const BANNER_FALLBACK = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&q=80';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -115,21 +115,26 @@ export default function SellerShopScreen() {
     Haptics.success();
     const shopName = seller?.shop_name || seller?.full_name || 'Boutique DaloaMarket';
     const slug = seller?.shop_slug || id?.slice(0, 8) || '';
-    const shareUrl = `https://daloamarket.com/shop/${slug}`;
+    const shareMessage = formatShopWhatsAppShareMessage({
+      shopName,
+      shopSlug: slug,
+      district: seller?.district,
+      rating: avgRating,
+      listingCount: listings.length,
+    });
     await Share.share({
-      message: `Découvrez la boutique *${shopName}* sur DaloaMarket !\n${shareUrl}\n${listings.length} articles disponibles à Daloa.`,
+      message: shareMessage,
       title: shopName,
     });
   };
 
   const handleWhatsApp = () => {
     Haptics.lightImpact();
-    const phone = formatWhatsAppPhone(seller?.phone);
-    if (!phone) return;
-    const text = encodeURIComponent(
+    const link = buildWhatsAppLink(
+      seller?.phone,
       `Bonjour ${seller?.shop_name || seller?.full_name}, je visite votre boutique sur DaloaMarket.`
     );
-    Linking.openURL(`https://wa.me/${phone}?text=${text}`);
+    if (link) Linking.openURL(link);
   };
 
   if (isLoading) {

@@ -3,7 +3,7 @@ import { View, StyleSheet, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Avatar, AppText, AppPressable, Button, colors, radii, spacing, ProBadge, useAccent, WhatsAppIcon } from '@daloa/ui';
 import { MessageCircle, Store, Star } from 'lucide-react-native';
-import { formatDate, formatWhatsAppPhone, Haptics } from '@daloa/utils';
+import { formatDate, formatListingWhatsAppOrderMessage, buildWhatsAppLink, Haptics } from '@daloa/utils';
 import { useAuth } from '../../context/AuthContext';
 
 interface ListingSellerBoxProps {
@@ -14,6 +14,7 @@ interface ListingSellerBoxProps {
     title: string;
     price?: number;
     photos?: string[];
+    district?: string | null;
   } | null;
 }
 
@@ -50,10 +51,20 @@ export const ListingSellerBox: React.FC<ListingSellerBoxProps> = ({ seller, isPr
   };
 
   const handleWhatsApp = () => {
-    const phone = formatWhatsAppPhone(seller?.phone);
-    if (!phone) return;
-    const text = encodeURIComponent(`Bonjour ${shopName}, je suis intéressé(e) par votre annonce sur DaloaMarket.`);
-    Linking.openURL(`https://wa.me/${phone}?text=${text}`);
+    Haptics.lightImpact();
+    if (!seller?.phone) return;
+    const message = listing
+      ? formatListingWhatsAppOrderMessage({
+          listingTitle: listing.title,
+          price: listing.price ?? 0,
+          listingId: listing.id,
+          district: listing.district || seller?.district,
+          sellerName: shopName,
+        })
+      : `Bonjour ${shopName}, je suis intéressé(e) par vos articles sur DaloaMarket.`;
+
+    const link = buildWhatsAppLink(seller.phone, message);
+    if (link) Linking.openURL(link);
   };
 
   return (

@@ -798,6 +798,60 @@ export type Database = {
           },
         ]
       }
+      cod_delivery_incidents: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          delivery_person_id: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          proof_photo_url: string | null
+          refusal_reason: string
+          reporter_id: string
+          seller_id: string | null
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          delivery_person_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          proof_photo_url?: string | null
+          refusal_reason: string
+          reporter_id: string
+          seller_id?: string | null
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          delivery_person_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          proof_photo_url?: string | null
+          refusal_reason?: string
+          reporter_id?: string
+          seller_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cod_delivery_incidents_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cod_delivery_incidents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cod_receivables: {
         Row: {
           amount: number
@@ -923,6 +977,101 @@ export type Database = {
         }
         Relationships: []
       }
+      daloa_cash_referrals: {
+        Row: {
+          created_at: string
+          first_order_id: string | null
+          id: string
+          referee_id: string
+          referee_reward_amount: number
+          referral_code: string
+          referrer_id: string
+          referrer_reward_amount: number
+          rewarded_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          first_order_id?: string | null
+          id?: string
+          referee_id: string
+          referee_reward_amount?: number
+          referral_code: string
+          referrer_id: string
+          referrer_reward_amount?: number
+          rewarded_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          first_order_id?: string | null
+          id?: string
+          referee_id?: string
+          referee_reward_amount?: number
+          referral_code?: string
+          referrer_id?: string
+          referrer_reward_amount?: number
+          rewarded_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daloa_cash_referrals_referee_id_fkey"
+            columns: ["referee_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daloa_cash_referrals_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daloa_cash_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          referral_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          referral_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          referral_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daloa_cash_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daloa_districts: {
         Row: {
           latitude: number
@@ -1007,6 +1156,11 @@ export type Database = {
           seller_id: string | null
           status: string
           updated_at: string
+          delivery_group_id?: string | null
+          is_grouped?: boolean | null
+          group_total_stops?: number | null
+          group_completed_stops?: number | null
+          grouped_stops?: Json | null
         }
         Insert: {
           accepted_at?: string | null
@@ -1960,6 +2114,7 @@ export type Database = {
           created_at: string
           delivery_address: string | null
           delivery_fee: number
+          daloa_cash_discount?: number
           delivery_lat: number | null
           delivery_lng: number | null
           delivery_mode: string
@@ -1978,6 +2133,10 @@ export type Database = {
           updated_at: string
           variant_id: string | null
           variant_label: string | null
+          delivery_group_id?: string | null
+          is_grouped?: boolean | null
+          grouped_stop_index?: number | null
+          grouped_delivery_discount?: number | null
         }
         Insert: {
           buyer_id: string
@@ -1985,6 +2144,7 @@ export type Database = {
           created_at?: string
           delivery_address?: string | null
           delivery_fee?: number
+          daloa_cash_discount?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_mode?: string
@@ -2003,6 +2163,10 @@ export type Database = {
           updated_at?: string
           variant_id?: string | null
           variant_label?: string | null
+          delivery_group_id?: string | null
+          is_grouped?: boolean | null
+          grouped_stop_index?: number | null
+          grouped_delivery_discount?: number | null
         }
         Update: {
           buyer_id?: string
@@ -2010,6 +2174,7 @@ export type Database = {
           created_at?: string
           delivery_address?: string | null
           delivery_fee?: number
+          daloa_cash_discount?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_mode?: string
@@ -2028,6 +2193,10 @@ export type Database = {
           updated_at?: string
           variant_id?: string | null
           variant_label?: string | null
+          delivery_group_id?: string | null
+          is_grouped?: boolean | null
+          grouped_stop_index?: number | null
+          grouped_delivery_discount?: number | null
         }
         Relationships: [
           {
@@ -2655,6 +2824,16 @@ export type Database = {
           suspect: boolean
           suspect_at: string | null
           suspect_reason: string | null
+          cod_orders_count?: number
+          cod_delivered_count?: number
+          cod_refused_count?: number
+          cod_reliability_score?: number
+          cod_warning_count?: number
+          cod_blocked_until?: string | null
+          last_cod_refusal_at?: string | null
+          daloa_cash_balance?: number
+          referral_code?: string | null
+          referred_by_user_id?: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -2699,6 +2878,16 @@ export type Database = {
           suspect?: boolean
           suspect_at?: string | null
           suspect_reason?: string | null
+          cod_orders_count?: number
+          cod_delivered_count?: number
+          cod_refused_count?: number
+          cod_reliability_score?: number
+          cod_warning_count?: number
+          cod_blocked_until?: string | null
+          last_cod_refusal_at?: string | null
+          daloa_cash_balance?: number
+          referral_code?: string | null
+          referred_by_user_id?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -2743,6 +2932,16 @@ export type Database = {
           suspect?: boolean
           suspect_at?: string | null
           suspect_reason?: string | null
+          cod_orders_count?: number
+          cod_delivered_count?: number
+          cod_refused_count?: number
+          cod_reliability_score?: number
+          cod_warning_count?: number
+          cod_blocked_until?: string | null
+          last_cod_refusal_at?: string | null
+          daloa_cash_balance?: number
+          referral_code?: string | null
+          referred_by_user_id?: string | null
         }
         Relationships: []
       }
@@ -3348,6 +3547,34 @@ export type Database = {
           p_gps_lng?: number
           p_otp: string
           p_photo_url?: string
+        }
+        Returns: Json
+      }
+      report_cod_delivery_refusal: {
+        Args: {
+          p_order_id: string
+          p_reason: string
+          p_notes?: string | null
+          p_proof_photo_url?: string | null
+        }
+        Returns: Json
+      }
+      reset_buyer_cod_penalties: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      apply_referral_code: {
+        Args: {
+          p_code: string
+        }
+        Returns: Json
+      }
+      apply_daloa_cash_to_order: {
+        Args: {
+          p_order_id: string
+          p_discount: number
         }
         Returns: Json
       }
