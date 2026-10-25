@@ -52,10 +52,10 @@ export function CheckoutStepReception({
             </View>
           ) : null}
           <View style={styles.priceRow}>
-            <AppText variant="body" color={colors.text.muted}>
+            <AppText variant="body" color={colors.text.muted} style={styles.unitPrice} numberOfLines={1}>
               {formatFCFA(activePrice)} × {quantity}
             </AppText>
-            <AppText variant="title" color={accent[600]} style={styles.totalPrice}>
+            <AppText variant="title" color={accent[600]} style={styles.totalPrice} numberOfLines={1}>
               {formatFCFA(activePrice * quantity)}
             </AppText>
           </View>
@@ -198,10 +198,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
+    gap: spacing[2],
     marginTop: 2,
+  },
+  unitPrice: {
+    flex: 1,
+    minWidth: 0,
   },
   totalPrice: {
     fontFamily: typography.families.bold,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 0,
   },
   sectionBox: {
     gap: spacing[2],

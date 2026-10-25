@@ -2,7 +2,7 @@
   "expo": {
     "name": "DaloaMarket",
     "slug": "daloamarket",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "daloamarket",
@@ -23,6 +23,8 @@
       ]
     },
     "android": {
+      "versionCode": 2,
+      "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -355,7 +357,18 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class com.facebook.jni.** { *; }\n-dontwarn com.facebook.react.**\n-dontwarn okhttp3.**\n-dontwarn okio.**"
+          }
+        }
+      ],
+      "./plugins/withResizeableActivity.js"
     ],
     "experiments": {
       "typedRoutes": true

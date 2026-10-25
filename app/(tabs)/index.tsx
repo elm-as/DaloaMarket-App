@@ -27,7 +27,8 @@ import {
 import { useAuth } from '../../src/context/AuthContext';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
-import { HomeHero } from '../../src/components/home/HomeHero';
+import { HomeBannerCarousel } from '../../src/components/home/HomeBannerCarousel';
+import { HomeFlashDeals } from '../../src/components/home/HomeFlashDeals';
 import { HomeDeliveryBanner } from '../../src/components/home/HomeDeliveryBanner';
 import { HomeForYouSection } from '../../src/components/home/HomeForYouSection';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
@@ -210,8 +211,9 @@ export default function HomeScreen() {
 
   const ListHeader = (
     <View>
-      <HomeHero />
+      <HomeBannerCarousel />
       <HomeDeliveryBanner />
+      <HomeFlashDeals />
 
       {/* Recommandations : personnalisé d'abord, tendance en complément */}
       <HomeForYouSection

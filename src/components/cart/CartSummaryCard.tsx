@@ -25,10 +25,10 @@ export const CartSummaryCard: React.FC<CartSummaryCardProps> = ({
 
   const Row = ({ label, value }: { label: string; value: string }) => (
     <View style={styles.detailRow}>
-      <AppText variant="body" color={colors.text.muted}>
+      <AppText variant="body" color={colors.text.muted} style={styles.label}>
         {label}
       </AppText>
-      <AppText variant="bodyStrong" style={styles.tnum}>
+      <AppText variant="bodyStrong" style={[styles.tnum, styles.amount]} numberOfLines={1}>
         {value}
       </AppText>
     </View>
@@ -48,8 +48,8 @@ export const CartSummaryCard: React.FC<CartSummaryCardProps> = ({
         <View style={styles.divider} />
 
         <View style={styles.totalRow}>
-          <AppText variant="bodyStrong">Total à payer</AppText>
-          <AppText variant="h2" color={accent[600]} style={styles.tnum}>
+          <AppText variant="bodyStrong" style={styles.label}>Total à payer</AppText>
+          <AppText variant="h2" color={accent[600]} style={[styles.tnum, styles.amount]} numberOfLines={1}>
             {formatFCFA(grandTotal)}
           </AppText>
         </View>
@@ -107,6 +107,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[3],
+  },
+  label: {
+    flex: 1,
+    minWidth: 0,
+  },
+  amount: {
+    flexShrink: 0,
   },
   tnum: {
     fontVariant: ['tabular-nums'],
@@ -120,6 +128,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[3],
   },
   escrowBanner: {
     flexDirection: 'row',

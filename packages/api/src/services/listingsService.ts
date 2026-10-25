@@ -1,9 +1,10 @@
 import { supabase } from '../supabase';
 import { attachContactPhones } from '../lib/contacts';
 import { rpcOutcome } from '../lib/rpc';
-import { decodeBase64ToArrayBuffer } from '../lib/base64';
-import { ListingFull, ListingFilters, ListingCreateInput, ListingVariant, Json } from '@daloa/types';
-import { generateUuidV4 } from '@daloa/utils';
+import { ListingFull, ListingFilters, ListingCreateInput, Json } from '@daloa/types';
+import { generateUuidV4, expandSmartSearch } from '@daloa/utils';
+import { listingMediaService } from './listingMediaService';
+import { listingActionsService } from './listingActionsService';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -93,13 +94,26 @@ export const listingsService = {
       query = query.not('boosted_until', 'is', null).gt('boosted_until', new Date().toISOString());
     }
     if (filters.searchQuery && filters.searchQuery.trim().length > 0) {
-      const term = filters.searchQuery.trim();
-      if (term.length <= 3) {
-        // Pour les termes courts (ex: TV, PC), on privilégie le titre pour éliminer le bruit en description
-        query = query.or(`title.ilike.%${term}%,district.ilike.%${term}%`);
-      } else {
-        query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%,district.ilike.%${term}%`);
+      const expansion = expandSmartSearch(filters.searchQuery);
+      const searchTerms = [
+        expansion.originalQuery,
+        expansion.correctedQuery,
+        ...expansion.expandedTerms,
+      ].filter((t, i, arr) => t.length >= 2 && arr.indexOf(t) === i);
+
+      // Limiter à 4 termes majeurs pour garder une requête PostgREST concise et performante
+      const primaryTerms = searchTerms.slice(0, 4);
+      const conditions: string[] = [];
+
+      for (const t of primaryTerms) {
+        conditions.push(`title.ilike.%${t}%`);
+        if (t.length > 3) {
+          conditions.push(`description.ilike.%${t}%`);
+        }
+        conditions.push(`district.ilike.%${t}%`);
       }
+
+      query = query.or(conditions.join(','));
     }
 
     // Tri
@@ -280,168 +294,40 @@ export const listingsService = {
   },
 
   /**
-   * Téléverse une photo d'annonce vers Supabase Storage (bucket `listings`).
-   *
-   * `fetch(uri).blob()` ne fonctionne pas de façon fiable en React Native : sur une
-   * URI locale (`file://`, `content://`) le corps remonte vide ou tronqué, et rien
-   * n'atterrit dans le bucket. `authService.uploadAvatar` avait déjà été migré vers
-   * un ArrayBuffer pour cette raison ; on fait de même ici. Le `base64` fourni par
-   * `expo-image-picker` (`base64: true`) est le chemin nominal sur mobile ; le repli
-   * `fetch().blob()` ne sert plus qu'au web, où il est correct.
+   * Téléverse une photo d'annonce vers Supabase Storage (délégué à listingMediaService)
    */
   async uploadImage(
     input: string | { uri: string; base64?: string | null; mimeType?: string | null },
     folder = 'general'
   ): Promise<string> {
-    const photo = typeof input === 'string' ? { uri: input } : input;
-    const uri = photo.uri;
-    const base64 = 'base64' in photo ? photo.base64 : null;
-
-    let contentType = ('mimeType' in photo && photo.mimeType) || '';
-    let body: ArrayBuffer | Blob;
-
-    if (base64) {
-      body = decodeBase64ToArrayBuffer(base64);
-      if (!contentType) {
-        contentType = uri.toLowerCase().endsWith('.png')
-          ? 'image/png'
-          : uri.toLowerCase().endsWith('.webp')
-          ? 'image/webp'
-          : 'image/jpeg';
-      }
-    } else {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      if (!blob.size) {
-        throw new Error(
-          "La photo n'a pas pu être lue sur l'appareil. Reprenez-la puis réessayez."
-        );
-      }
-      body = blob;
-      contentType = contentType || blob.type || 'image/jpeg';
-    }
-
-    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
-    const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-
-    const { data, error } = await supabase.storage.from('listings').upload(filename, body, {
-      contentType,
-      upsert: false,
-    });
-
-    if (error) {
-      console.error('Erreur upload image:', error);
-      throw error;
-    }
-
-    const { data: publicUrlData } = supabase.storage.from('listings').getPublicUrl(data.path);
-    return publicUrlData.publicUrl;
+    return listingMediaService.uploadImage(input, folder);
   },
 
   /**
-   * Booste une annonce en dépensant des crédits (1 jour = 1, 2 jours = 2,
-   * 7 jours = 5), via la RPC qui débite le solde et prolonge `boosted_until`.
-   *
-   * Remplace `boostListing`, jamais appelé, dont le repli écrivait
-   * `boosted_until` directement : colonne protégée, écriture annulée en silence.
+   * Booste une annonce en dépensant des crédits (délégué à listingActionsService)
    */
   async boostWithCredits(
     listingId: string,
     durationDays: 1 | 2 | 7
   ): Promise<{ boostedUntil: string; newBalance: number }> {
-    const { data, error } = await supabase.rpc('buy_boost_with_credits', {
-      p_listing_id: listingId,
-      p_duration_days: durationDays,
-    });
-    if (error) throw error;
-
-    const res = data as
-      | { success?: boolean; reason?: string; boosted_until?: string; new_balance?: number; cost?: number; balance?: number }
-      | null;
-    if (!res?.success) {
-      const messages: Record<string, string> = {
-        insufficient_credits: `Crédits insuffisants (${res?.balance ?? 0} disponible${(res?.balance ?? 0) > 1 ? 's' : ''}, ${res?.cost ?? '?'} nécessaires).`,
-        unauthorized: "Cette annonce n'est pas la vôtre.",
-        listing_not_found: 'Annonce introuvable.',
-        invalid_duration: 'Durée de boost invalide.',
-      };
-      throw new Error(messages[res?.reason || ''] || 'Boost impossible.');
-    }
-    return { boostedUntil: res.boosted_until || '', newBalance: res.new_balance ?? 0 };
+    return listingActionsService.boostWithCredits(listingId, durationDays);
   },
 
   /**
-   * Marque une annonce comme vendue.
-   *
-   * Passe par la RPC : `listings.status` est protégé contre les écritures directes
-   * des clients (`protect_listings_columns`), un `.update()` ne changeait rien tout
-   * en ne renvoyant aucune erreur.
+   * Marque une annonce comme vendue (délégué à listingActionsService)
    */
   async markListingAsSold(listingId: string): Promise<void> {
-    const { data, error } = await supabase.rpc('mark_listing_as_sold', {
-      p_listing_id: listingId,
-    });
-
-    if (error) throw error;
-    const sold = rpcOutcome(data);
-    if (sold && sold.success === false) {
-      throw new Error(sold.reason || 'Impossible de marquer cette annonce comme vendue.');
-    }
+    return listingActionsService.markListingAsSold(listingId);
   },
 
   /**
-   * Remet en vente une annonce précédemment vendue
-   */
-  /**
-   * Remet une annonce en vente.
-   *
-   * Le stock est obligatoire : le trigger `manage_listing_stock_on_order` met
-   * `stock` à 0 en même temps qu'il passe l'annonce en `sold`. Repasser le seul
-   * `status` à `active` laissait l'annonce visible dans le fil, ajoutable au panier,
-   * puis éjectée en « rupture de stock » à l'ouverture du panier.
-   *
-   * Passe par une RPC pour la même raison que `markListingAsSold` : `status` est
-   * protégé côté base. Le serveur recalcule le stock total depuis les variantes.
-   *
-   * `variantStocks` est indexé par `variant.id`, ou par la position de la variante
-   * quand l'id est absent — la feuille de restock construit sa clé de la même façon.
+   * Remet une annonce en vente (délégué à listingActionsService)
    */
   async markListingAsActive(
     listingId: string,
     stock: number,
     variantStocks?: Record<string, number>
   ): Promise<void> {
-    let variants: ListingVariant[] | null = null;
-
-    if (variantStocks && Object.keys(variantStocks).length > 0) {
-      const { data: current, error: readErr } = await supabase
-        .from('listings')
-        .select('variants')
-        .eq('id', listingId)
-        .single();
-
-      if (readErr) throw readErr;
-
-      variants = ((current?.variants as unknown as ListingVariant[]) || []).map((v, i) => ({
-        ...v,
-        stock: variantStocks[v.id ?? String(i)] ?? v.stock ?? 0,
-      }));
-    }
-
-    const { data, error } = await supabase.rpc('relist_listing', {
-      p_listing_id: listingId,
-      p_stock: Math.max(1, Math.floor(stock || 0)),
-      p_variants: (variants ?? null) as unknown as Json,
-    });
-
-    if (error) throw error;
-    const relisted = rpcOutcome(data);
-    if (relisted && relisted.success === false) {
-      throw new Error(
-        relisted.reason === 'stock_required'
-          ? 'Indiquez au moins une unité en stock.'
-          : relisted.reason || 'Remise en vente impossible.'
-      );
-    }
+    return listingActionsService.markListingAsActive(listingId, stock, variantStocks);
   },
 };

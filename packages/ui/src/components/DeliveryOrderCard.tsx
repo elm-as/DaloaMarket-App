@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, StyleSheet, Linking, StyleProp, ViewStyle } from 'react-native';
-import { Clock, Phone, Navigation, CheckCircle2 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../tokens';
+import { View, Linking, StyleProp, ViewStyle } from 'react-native';
+import { Clock, Phone, Navigation, CheckCircle2, Zap, Package, Store, ShieldCheck } from 'lucide-react-native';
+import { colors, spacing } from '../tokens';
 import { useAccent } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
 import { AppPressable } from './AppPressable';
 import { formatFCFA, formatRelativeTime, Haptics } from '@daloa/utils';
+import { deliveryOrderCardStyles as styles } from './deliveryOrderCardStyles';
+import { BuyerReliabilityBadge } from './BuyerReliabilityBadge';
 
 export interface DeliveryOrderCardData {
   id: string;
@@ -20,6 +22,19 @@ export interface DeliveryOrderCardData {
   seller_phone?: string | null;
   buyer_phone?: string | null;
   created_at: string;
+  is_express?: boolean;
+  package_description?: string | null;
+  package_type?: string | null;
+  sender_name?: string | null;
+  recipient_name?: string | null;
+  payer_role?: 'sender' | 'recipient' | string | null;
+  is_cod?: boolean;
+  buyer_cod_reliability_score?: number | null;
+  buyer_cod_delivered_count?: number | null;
+  buyer_cod_refused_count?: number | null;
+  is_grouped?: boolean;
+  group_total_stops?: number;
+  group_completed_stops?: number;
 }
 
 export interface DeliveryOrderCardProps {
@@ -44,7 +59,8 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
   const isAwaitingPickup = order.status === 'awaiting_pickup';
   const isAccepted = order.status === 'accepted';
   const isPickedUp = ['picked_up', 'in_transit'].includes(order.status);
-
+  const isExpress = Boolean(order.is_express);
+  const isGrouped = Boolean(order.is_grouped);
   const netEarnings = Math.round(order.delivery_price * 0.9);
 
   const getStatusLabel = () => {
@@ -103,12 +119,30 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
       onPress={onPress}
       haptic="none"
       pressedOpacity={0.95}
-      style={[styles.container, style]}
+      style={[styles.container, isExpress && styles.expressBorder, style]}
     >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <AppText variant="bodyStrong">Course #{order.id.slice(0, 6)}</AppText>
+          <View style={styles.titleRow}>
+            <AppText variant="bodyStrong">Course #{order.id.slice(0, 6)}</AppText>
+            {isExpress && (
+              <View style={[styles.expressBadge, { backgroundColor: accent[50] }]}>
+                <Zap size={11} color={accent.DEFAULT} />
+                <AppText variant="overline" color={accent[700]}>
+                  EXPRESS
+                </AppText>
+              </View>
+            )}
+            {isGrouped && (
+              <View style={[styles.expressBadge, { backgroundColor: colors.status.infoLight }]}>
+                <Store size={11} color={colors.status.infoDark} />
+                <AppText variant="overline" color={colors.status.infoDark}>
+                  TOURNÉE ({order.group_total_stops || 2})
+                </AppText>
+              </View>
+            )}
+          </View>
           <View style={styles.statusRow}>
             <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
               <AppText variant="overline" color={statusStyle.text}>
@@ -124,9 +158,9 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
           </View>
         </View>
 
-        {/* Gain net — le héros de la carte (accent de l'app) */}
+        {/* Gain net livreur */}
         <View style={[styles.earningsBadge, { backgroundColor: accent.DEFAULT }]}>
-          <AppText variant="bodyStrong" color={colors.text.inverse} style={styles.earningsAmount}>
+          <AppText variant="bodyStrong" color={colors.text.inverse} style={styles.earningsAmount} numberOfLines={1}>
             {formatFCFA(netEarnings)}
           </AppText>
           <AppText variant="overline" color="rgba(255,255,255,0.85)">
@@ -135,16 +169,26 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
         </View>
       </View>
 
+      {/* Format discret du colis si express (sécurité anti-vol) */}
+      {isExpress && (
+        <View style={styles.packageBanner}>
+          <ShieldCheck size={12} color={colors.status.successDark} />
+          <AppText variant="caption" color={colors.text.body} numberOfLines={1}>
+            Format : {order.package_description || 'Colis scellé standard'}
+          </AppText>
+        </View>
+      )}
+
       {/* Itinéraire */}
       <View style={styles.routeContainer}>
         <View style={styles.routeLine} />
 
-        {/* Point Ramassage (Vendeur) */}
+        {/* Point Ramassage */}
         <View style={styles.routeStep}>
           <View style={[styles.dot, { backgroundColor: colors.status.warning }]} />
           <View style={styles.stepContent}>
             <AppText variant="overline" color={colors.text.subtle}>
-              Récupération (vendeur)
+              {isExpress ? 'Expéditeur (ramassage)' : 'Récupération (vendeur)'}
             </AppText>
             <AppText variant="bodyStrong" numberOfLines={1} style={styles.stepLocation}>
               {order.pickup_location}
@@ -155,7 +199,7 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
                 onPress={() => handleCall(order.seller_phone)}
                 style={styles.callLink}
                 accessibilityRole="button"
-                accessibilityLabel={`Appeler le vendeur ${order.seller_phone}`}
+                accessibilityLabel={`Appeler ${order.seller_phone}`}
               >
                 <Phone size={12} color={colors.status.success} />
                 <AppText variant="caption" color={colors.status.successDark}>
@@ -166,23 +210,39 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
           </View>
         </View>
 
-        {/* Point Livraison (Acheteur) */}
+        {/* Point Dépôt */}
         <View style={[styles.routeStep, { marginTop: spacing[3] }]}>
           <View style={[styles.dot, { backgroundColor: accent.DEFAULT }]} />
           <View style={styles.stepContent}>
             <AppText variant="overline" color={colors.text.subtle}>
-              Livraison (acheteur)
+              {isExpress ? 'Destinataire (remise)' : 'Livraison (acheteur)'}
             </AppText>
             <AppText variant="bodyStrong" numberOfLines={1} style={styles.stepLocation}>
               {order.dropoff_location}
             </AppText>
+            {Boolean(order.is_cod) && (
+              <BuyerReliabilityBadge
+                compact
+                score={order.buyer_cod_reliability_score}
+                tier={
+                  ((order.buyer_cod_refused_count ?? 0) >= 2)
+                    ? 'at_risk'
+                    : ((order.buyer_cod_refused_count ?? 0) === 1)
+                    ? 'warning'
+                    : ((order.buyer_cod_delivered_count ?? 0) === 0)
+                    ? 'new_client'
+                    : 'verified'
+                }
+                style={{ marginTop: 3 }}
+              />
+            )}
             {order.buyer_phone && (
               <AppPressable
                 haptic="none"
                 onPress={() => handleCall(order.buyer_phone)}
                 style={styles.callLink}
                 accessibilityRole="button"
-                accessibilityLabel={`Appeler l'acheteur ${order.buyer_phone}`}
+                accessibilityLabel={`Appeler ${order.buyer_phone}`}
               >
                 <Phone size={12} color={accent.DEFAULT} />
                 <AppText variant="caption" color={accent[700]}>
@@ -234,11 +294,11 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
             rippleColor="rgba(255,255,255,0.24)"
             style={[styles.primaryAction, { backgroundColor: colors.status.success }]}
             accessibilityRole="button"
-            accessibilityLabel="Valider la remise au client avec le code OTP"
+            accessibilityLabel="Valider la remise avec le code OTP"
           >
             <CheckCircle2 size={15} color={colors.text.inverse} />
             <AppText variant="label" color={colors.text.inverse}>
-              Valider remise client (OTP)
+              Valider remise (OTP)
             </AppText>
           </AppPressable>
         )}
@@ -260,120 +320,3 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.bg.surface,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    padding: spacing[3],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    marginBottom: spacing[3],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing[3],
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-    marginTop: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing[2],
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
-  timeMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  earningsBadge: {
-    paddingHorizontal: spacing[3],
-    paddingVertical: 6,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-  },
-  earningsAmount: {
-    fontVariant: ['tabular-nums'],
-  },
-  routeContainer: {
-    position: 'relative',
-    paddingLeft: 4,
-    paddingVertical: 4,
-  },
-  routeLine: {
-    position: 'absolute',
-    left: 9,
-    top: 14,
-    bottom: 14,
-    width: 2,
-    backgroundColor: colors.border.DEFAULT,
-  },
-  routeStep: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing[2],
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 2,
-    borderWidth: 2,
-    borderColor: colors.bg.surface,
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepLocation: {
-    marginTop: 1,
-  },
-  callLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 3,
-  },
-  actionsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-    marginTop: spacing[3],
-    paddingTop: spacing[2],
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-  },
-  primaryAction: {
-    flex: 1,
-    height: 44,
-    borderRadius: radii.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    overflow: 'hidden',
-  },
-  navButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.md,
-    backgroundColor: colors.bg.subtle,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-});

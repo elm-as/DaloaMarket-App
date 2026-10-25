@@ -10,3 +10,6 @@ export * from './availability';
 export * from './media';
 export * from './errors';
 export * from './ids';
+export * from './search';
+export * from './share/shareHelper';
+export * from './reliability';

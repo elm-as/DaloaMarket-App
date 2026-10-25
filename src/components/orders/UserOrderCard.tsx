@@ -62,11 +62,11 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
     <AppPressable onPress={() => router.push(`/order/${order.id}` as any)} style={styles.card} accessibilityLabel={`Commande ${order.id.slice(0, 8)}`}>
       {/* Header */}
       <View style={styles.cardHeader}>
-        <AppText variant="caption" color={colors.text.muted}>
+        <AppText variant="caption" color={colors.text.muted} style={styles.headerRef} numberOfLines={1}>
           Réf: #{order.id.slice(0, 8).toUpperCase()}
         </AppText>
         <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-          <AppText variant="overline" color={badge.text}>
+          <AppText variant="overline" color={badge.text} numberOfLines={1}>
             {badge.label}
           </AppText>
         </View>
@@ -80,15 +80,15 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
             {listing?.title || 'Commande DaloaMarket'}
           </AppText>
           {otherItemsCount > 0 && (
-            <AppText variant="caption" color={colors.text.subtle}>
+            <AppText variant="caption" color={colors.text.subtle} numberOfLines={1}>
               +{otherItemsCount} autre(s) article(s)
             </AppText>
           )}
           <View style={styles.priceRow}>
-            <AppText variant="bodyStrong" color={accent[600]} style={styles.tnum}>
+            <AppText variant="bodyStrong" color={accent[600]} style={styles.tnum} numberOfLines={1}>
               {formatFCFA(order.total_amount || 0)}
             </AppText>
-            <AppText variant="caption" color={colors.text.subtle}>
+            <AppText variant="caption" color={colors.text.subtle} numberOfLines={1}>
               {formatDate(order.created_at)}
             </AppText>
           </View>
@@ -118,6 +118,7 @@ export const UserOrderCard: React.FC<UserOrderCardProps> = ({ order, role }) => 
             <AppText
               variant="caption"
               color={accent[700]}
+              numberOfLines={1}
               // `typography.families` n'expose pas de police monospace ; les chiffres
               // tabulaires suffisent à aligner le code proprement.
               style={isOtpRevealed ? { fontFamily: typography.families.bold, letterSpacing: 1.5 } : undefined}
@@ -157,11 +158,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[2],
+  },
+  headerRef: {
+    flex: 1,
+    minWidth: 0,
   },
   statusBadge: {
     paddingHorizontal: spacing[2],
     paddingVertical: 3,
     borderRadius: radii.full,
+    flexShrink: 0,
   },
   cardBody: {
     flexDirection: 'row',
@@ -172,24 +179,29 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: radii.lg,
     backgroundColor: colors.bg.subtle,
+    flexShrink: 0,
   },
   bodyDetails: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'space-between',
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
+    gap: spacing[2],
     marginTop: 4,
   },
   tnum: {
     fontVariant: ['tabular-nums'],
+    flexShrink: 0,
   },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[2],
     paddingTop: spacing[2],
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
@@ -201,11 +213,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[2],
     paddingVertical: 3,
     borderRadius: radii.md,
+    flexShrink: 1,
+    maxWidth: '65%',
   },
   detailsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
     marginLeft: 'auto',
+    flexShrink: 0,
   },
 });

@@ -3,10 +3,10 @@ import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent, KeyboardScreen } from '@daloa/ui';
+import { colors, radii, spacing, AppText, AppPressable, useAccent, KeyboardScreen, GroupedDeliveryBanner } from '@daloa/ui';
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import * as Location from 'expo-location';
-import { calculateOrderBreakdown, calculateDeliveryFee, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
+import { calculateOrderBreakdown, calculateDeliveryFee, calculateGroupedDeliveryQuote, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
 import { Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
 import { useListingDetail, analyticsService, useSystemSettings, supabase, quoteService } from '@daloa/api';
 import { useQuery } from '@tanstack/react-query';
@@ -68,20 +68,41 @@ export default function CheckoutScreen() {
   const isSellerPro = Boolean(
     !isCartMode && listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()
   );
-  const isCodAllowed = allowCodForAll || isSellerPro;
-  const isPickupAllowed = allowPickupForAll || isSellerPro;
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
-    (phaseConfig?.default_payment_method === 'cod' || isPhase0) && isCodAllowed ? 'cod' : 'online'
+  const isBuyerCodBlocked = Boolean(
+    profile?.cod_blocked_until && new Date(profile.cod_blocked_until).getTime() > Date.now()
   );
+  const isCodAllowed = (allowCodForAll || isSellerPro) && !isBuyerCodBlocked;
+  const isPickupAllowed = allowPickupForAll || isSellerPro;
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>(() => {
+    if (onlineDisabled) {
+      return deliveryMode === 'pickup' && isPickupAllowed ? 'cash_at_shop' : 'cod';
+    }
+    return (phaseConfig?.default_payment_method === 'cod' || isPhase0) && isCodAllowed ? 'cod' : 'online';
+  });
 
-  // L'annonce arrive après le premier rendu : si le mode choisi n'est plus
-  // autorisé pour ce vendeur, on bascule sur un mode permis.
+  // Résolution déterministe et unidirectionnelle du mode de paiement
+  // Évite tout rebond/ping-pong entre 'cod' et 'online' quand les paiements en ligne sont coupés
   useEffect(() => {
-    if (!isPickupAllowed && deliveryMode === 'pickup') setDeliveryMode('delivery');
-    if (!isCodAllowed && paymentMode === 'cod') setPaymentMode('online');
-    if (!isPickupAllowed && paymentMode === 'cash_at_shop') setPaymentMode('online');
-  }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode]);
+    if (!isPickupAllowed && deliveryMode === 'pickup') {
+      setDeliveryMode('delivery');
+    }
+
+    if (onlineDisabled) {
+      if (paymentMode === 'online') {
+        setPaymentMode(deliveryMode === 'pickup' && isPickupAllowed ? 'cash_at_shop' : 'cod');
+      }
+    } else {
+      if (!isCodAllowed && paymentMode === 'cod') {
+        setPaymentMode('online');
+      }
+      if (!isPickupAllowed && paymentMode === 'cash_at_shop') {
+        setPaymentMode('online');
+      }
+    }
+  }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode, onlineDisabled]);
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
+  const [useDaloaCash, setUseDaloaCash] = useState(false);
+  const daloaCashBalance = profile?.daloa_cash_balance ?? 0;
 
   // Position de la boutique relue en base à chaque ouverture du checkout.
   // L'annonce en cache pouvait dater de plusieurs heures (ou venir d'une liste
@@ -224,12 +245,26 @@ export default function CheckoutScreen() {
     };
   }, [isCartMode, cartSellerPlaces, deliveryCoords, deliveryDistrict]);
 
+  const rawCartFees = useMemo(() => {
+    return cartDeliveryFees ?? Array(Math.max(1, cartSellerCount)).fill(PRICING_CONFIG.delivery.baseFee);
+  }, [cartDeliveryFees, cartSellerCount]);
+
+  const groupedQuote = useMemo(() => {
+    if (!isCartMode || cartSellerCount <= 1 || deliveryMode === 'pickup') {
+      return null;
+    }
+    return calculateGroupedDeliveryQuote(rawCartFees);
+  }, [isCartMode, cartSellerCount, deliveryMode, rawCartFees]);
+
+  const groupedSavings = groupedQuote?.savings ?? 0;
+
   const estimatedCartDelivery =
     deliveryMode === 'pickup'
       ? 0
-      : cartDeliveryFees
-        ? cartDeliveryFees.reduce((sum, fee) => sum + fee, 0)
-        : PRICING_CONFIG.delivery.baseFee * Math.max(1, cartSellerCount);
+      : groupedQuote
+      ? groupedQuote.totalGroupedFee
+      : rawCartFees.reduce((sum, fee) => sum + fee, 0);
+
   // Arrondi article par article, comme le serveur.
   const cartBuyerServiceFee = cartItems.reduce(
     (s, ci) => s + Math.round((ci.variant?.price ?? ci.listing.price) * ci.quantity * PRICING_CONFIG.marketplace.buyerServiceFeeRate),
@@ -240,6 +275,7 @@ export default function CheckoutScreen() {
     ? {
         productPrice: cartProductTotal, quantity: cartQtyTotal, productSubtotal: cartProductTotal,
         deliveryFee: estimatedCartDelivery, buyerServiceFee: cartBuyerServiceFee,
+        groupedDeliveryDiscount: groupedSavings,
         totalAmount: cartProductTotal + estimatedCartDelivery + cartBuyerServiceFee,
         sellerCommission: 0, sellerNetPayout: cartProductTotal, driverFee: 0, driverNetPayout: estimatedCartDelivery,
       }
@@ -307,8 +343,17 @@ export default function CheckoutScreen() {
         : 'error'
       : 'loading';
 
+  const currentDeliveryFee = serverQuote ? serverQuote.deliveryTotal : breakdown.deliveryFee;
+  const daloaCashDiscount =
+    useDaloaCash && deliveryMode === 'delivery' && daloaCashBalance > 0
+      ? Math.min(daloaCashBalance, currentDeliveryFee)
+      : 0;
+  const currentTotalAmount = serverQuote ? serverQuote.totalAmount : breakdown.totalAmount;
+  const effectiveTotalAmount = Math.max(0, currentTotalAmount - daloaCashDiscount);
+
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({
     user, profile, listingId, variantId, variant, quantity, listing, activePrice, breakdown,
+    daloaCashDiscount,
     distanceKm,
     isCartMode, cartItems, clearCart, deliveryMode, deliveryDistrict, deliveryCoords,
     deliveryAddress, buyerPhone, paymentMode, operator, onlineDisabled,
@@ -326,13 +371,6 @@ export default function CheckoutScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, isQuoteError, quoteError]);
-
-  useEffect(() => {
-    if (!onlineDisabled) return;
-    if (paymentMode === 'online') {
-      setPaymentMode(deliveryMode === 'pickup' ? 'cash_at_shop' : 'cod');
-    }
-  }, [onlineDisabled, paymentMode, deliveryMode]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -480,19 +518,32 @@ export default function CheckoutScreen() {
           )}
 
           {step === 3 && (
-            <CheckoutStepPayment
-              deliveryMode={deliveryMode}
-              paymentMode={paymentMode}
-              onPaymentModeChange={setPaymentMode}
-              operator={operator}
-              onOperatorChange={setOperator}
-              isCodAllowed={isCodAllowed}
-              // En panier, pas d'annonce unique : le prix affiché valait 0 FCFA.
-              quantity={isCartMode ? 1 : quantity}
-              activePrice={isCartMode ? cartProductTotal : activePrice}
-              deliveryFee={serverQuote ? serverQuote.deliveryTotal : breakdown.deliveryFee}
+            <>
+              {isCartMode && cartSellerCount > 1 && deliveryMode === 'delivery' && (
+                <GroupedDeliveryBanner sellerCount={cartSellerCount} savings={groupedSavings} />
+              )}
+              <CheckoutStepPayment
+                deliveryMode={deliveryMode}
+                paymentMode={paymentMode}
+                onPaymentModeChange={setPaymentMode}
+                operator={operator}
+                onOperatorChange={setOperator}
+                isCodAllowed={isCodAllowed}
+                isCodBlocked={isBuyerCodBlocked}
+                codBlockedNotice="Le paiement à la livraison est temporairement indisponible suite à des commandes non réceptionnées. Veuillez régler par Mobile Money sécurisé."
+                onlineDisabled={onlineDisabled}
+                onlineNotice={paymentConfig?.notice}
+                // En panier, pas d'annonce unique : le prix affiché valait 0 FCFA.
+                quantity={isCartMode ? 1 : quantity}
+                activePrice={isCartMode ? cartProductTotal : activePrice}
+                daloaCashBalance={daloaCashBalance}
+                useDaloaCash={useDaloaCash}
+                onToggleDaloaCash={setUseDaloaCash}
+                daloaCashDiscount={daloaCashDiscount}
+                groupedDeliveryDiscount={groupedSavings}
+                deliveryFee={currentDeliveryFee}
               buyerServiceFee={serverQuote ? serverQuote.buyerFeeTotal : breakdown.buyerServiceFee}
-              totalAmount={serverQuote ? serverQuote.totalAmount : breakdown.totalAmount}
+              totalAmount={effectiveTotalAmount}
               distanceKm={serverQuote ? serverQuote.distanceKm : distanceKm}
               isSubmitting={isSubmitting}
               priceStatus={priceStatus}
@@ -503,7 +554,8 @@ export default function CheckoutScreen() {
               onBack={() => setStep(2)}
               onSubmit={submitOrder}
             />
-          )}
+          </>
+        )}
 
           <View style={{ height: insets.bottom + spacing[6] }} />
         </ScrollView>

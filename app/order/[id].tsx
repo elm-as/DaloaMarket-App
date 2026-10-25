@@ -10,9 +10,10 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useOrderDetail, ordersService } from '@daloa/api';
+import { useQuery } from '@tanstack/react-query';
+import { useOrderDetail, ordersService, antiLapinService, groupedDeliveryService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
-import { colors, radii, spacing, Button, Avatar, RatingStars, DeliveryCodeCard, BottomSheet, AppText, AppPressable, useAccent, typography, showAlert } from '@daloa/ui';
+import { colors, radii, spacing, Button, Avatar, RatingStars, DeliveryCodeCard, BottomSheet, AppText, AppPressable, useAccent, typography, showAlert, BuyerReliabilityBadge, GroupedStopsTimeline } from '@daloa/ui';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -29,9 +30,13 @@ import {
   Store,
   Route,
   ChevronDown,
+  UserCheck,
 } from 'lucide-react-native';
-import { formatDate, formatFCFA, Haptics, isPickupMode } from '@daloa/utils';
+import { formatDate, formatFCFA, Haptics, isPickupMode, computeBuyerReliability } from '@daloa/utils';
+import { CodRefusalReason } from '@daloa/types';
 import { OrderStatusHero } from '../../src/components/orders/OrderStatusHero';
+import { DeliveryRadarCard } from '../../src/components/orders/DeliveryRadarCard';
+import { CodRefusalSellerModal } from '../../src/components/orders/CodRefusalSellerModal';
 
 /* ─── SummaryRow ──────────────────────────────────────────────────── */
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -62,6 +67,38 @@ export default function OrderTrackingScreen() {
   const [isSellerActing, setIsSellerActing] = useState(false);
   const [enteredPickupOtp, setEnteredPickupOtp] = useState('');
   const [showJourney, setShowJourney] = useState(false);
+  const [isCodRefusalOpen, setIsCodRefusalOpen] = useState(false);
+  const [isReportingRefusal, setIsReportingRefusal] = useState(false);
+  const buyerReliability = computeBuyerReliability(order?.buyer);
+
+  const { data: groupedRun } = useQuery({
+    queryKey: ['grouped-run', order?.delivery_group_id],
+    enabled: Boolean(order?.is_grouped && order?.delivery_group_id),
+    queryFn: () => groupedDeliveryService.getGroupedRunDetails(order!.delivery_group_id!),
+  });
+
+  const handleSellerCodRefusal = async (reason: CodRefusalReason, notes?: string) => {
+    if (!order) return;
+    try {
+      setIsReportingRefusal(true);
+      await antiLapinService.reportCodRefusal({
+        orderId: order.id,
+        reason,
+        notes,
+      });
+      Haptics.warning();
+      setIsCodRefusalOpen(false);
+      await refetch();
+      showAlert(
+        'Refus enregistré (Anti-Lapin)',
+        'La commande a été clôturée et votre stock a été libéré.'
+      );
+    } catch (err: any) {
+      showAlert('Erreur', err.message || 'Impossible d’enregistrer le refus.');
+    } finally {
+      setIsReportingRefusal(false);
+    }
+  };
 
   const handleCancelOrder = () => {
     if (!order) return;
@@ -474,7 +511,7 @@ export default function OrderTrackingScreen() {
                     {formatFCFA(it.unit_price)} × {it.quantity}
                   </AppText>
                 </View>
-                <AppText variant="bodyStrong" color={accent[600]}>
+                <AppText variant="bodyStrong" color={accent[600]} style={styles.itemAmount} numberOfLines={1}>
                   {formatFCFA(it.product_amount)}
                 </AppText>
               </View>
@@ -567,6 +604,14 @@ export default function OrderTrackingScreen() {
                 onPress={handleCancelUnavailable}
                 fullWidth
               />
+              <Button
+                title="Client injoignable ou refus (Anti-Lapin)"
+                variant="ghost"
+                size="sm"
+                disabled={isSellerActing}
+                onPress={() => setIsCodRefusalOpen(true)}
+                fullWidth
+              />
             </View>
           )}
 
@@ -630,8 +675,8 @@ export default function OrderTrackingScreen() {
             </View>
           )}
 
-        {/* ── Code OTP vendeur : ramassage ── */}
-        {isSeller &&
+        {/* ── Code OTP vendeur / expéditeur : ramassage ── */}
+        {(isSeller || (order as any).order_type === 'express') &&
           pickupOtp &&
           (assignment?.pickup_confirmed_by_seller ||
             ['awaiting_pickup', 'accepted', 'picked_up'].includes(assignment?.status ?? '')) && (
@@ -639,17 +684,14 @@ export default function OrderTrackingScreen() {
               code={pickupOtp}
               type="pickup"
               orderRef={order.id}
-              title="Code de ramassage (Vendeur)"
-              subtitle="Le livreur scanne ce QR code pour confirmer qu'il prend en charge votre colis."
+              title={(order as any).order_type === 'express' ? "Code de ramassage (Expéditeur)" : "Code de ramassage (Vendeur)"}
+              subtitle={(order as any).order_type === 'express' ? "Donnez ce code au livreur pour confirmer l'enlèvement du colis." : "Le livreur scanne ce QR code pour confirmer qu'il prend en charge votre colis."}
               style={styles.codeCard}
             />
           )}
 
         {/* ── Code OTP acheteur : remise ── */}
-        {/* Seulement pour un paiement en ligne : en espèces, l'acheteur paie à la
-            réception et ne donne aucun code. */}
-        {!isSeller &&
-          order.payment_method === 'online' &&
+        {((!isSeller && order.payment_method === 'online') || (order as any).order_type === 'express') &&
           deliveryOtp &&
           order.status !== 'delivered' &&
           order.status !== 'cancelled' && (
@@ -657,9 +699,11 @@ export default function OrderTrackingScreen() {
               code={deliveryOtp}
               type="delivery"
               orderRef={order.id}
-              title={isPickup ? 'Votre code de retrait' : 'Votre code de remise'}
+              title={(order as any).order_type === 'express' ? "Code de remise (Destinataire)" : (isPickup ? 'Votre code de retrait' : 'Votre code de remise')}
               subtitle={
-                isPickup
+                (order as any).order_type === 'express'
+                  ? 'Le destinataire donne ce code au coursier lors de la livraison.'
+                  : isPickup
                   ? 'Donnez ce code au vendeur UNIQUEMENT après avoir vérifié votre article.'
                   : 'Donnez ce code au livreur UNIQUEMENT après avoir inspecté votre colis.'
               }
@@ -769,78 +813,182 @@ export default function OrderTrackingScreen() {
         </View>
         )}
 
-        {/* ── Livreur ── */}
-        {/* Commande annulée : le livreur n'a plus de rôle, sa fiche encombrait l'écran. */}
-        {driver && order.status !== 'cancelled' && (
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <Bike size={15} color={colors.status.successDark} />
-              <AppText variant="bodyStrong">Livreur DaloaDelivery</AppText>
-            </View>
-            <View style={styles.personRow}>
-              <Avatar uri={driver.photo_url} name={driver.name} size={50} isOnline />
-              <View style={styles.personInfo}>
-                <AppText variant="bodyStrong">{driver.name}</AppText>
-                <AppText variant="caption" color={colors.text.muted}>
-                  {driver.vehicle_type?.toUpperCase() || 'MOTO'}
-                </AppText>
-                <RatingStars
-                  rating={driver.rating ?? 0}
-                  totalReviews={driver.total_reviews}
-                  size={11}
-                />
-              </View>
-              <AppPressable
-                onPress={() => {
-                  if (!driver.phone) return;
-                  Haptics.lightImpact();
-                  Linking.openURL(`tel:${driver.phone}`);
-                }}
-                style={[styles.callBtn, { backgroundColor: colors.status.success }]}
-                accessibilityLabel="Appeler le livreur"
-              >
-                <PhoneCall size={16} color={colors.text.inverse} />
-              </AppPressable>
-            </View>
-          </View>
+        {/* ── Tournée Groupée Multi-Marchands (F06) ── */}
+        {groupedRun && groupedRun.stops.length > 0 && order.status !== 'cancelled' && (
+          <GroupedStopsTimeline
+            stops={groupedRun.stops}
+            dropoffAddress={order.delivery_address || 'Adresse de livraison'}
+            dropoffDistrict={groupedRun.dropoffDistrict}
+            totalStops={groupedRun.totalStops}
+            completedStops={groupedRun.completedStops}
+          />
         )}
 
-        {/* ── Vendeur ── */}
-        <View style={styles.card}>
-          <View style={styles.cardTitleRow}>
-            <ShieldCheck size={15} color={accent.DEFAULT} />
-            <AppText variant="bodyStrong">Vendeur partenaire</AppText>
-          </View>
-          <View style={styles.personRow}>
-            <Avatar
-              uri={seller?.shop_logo_url || seller?.avatar_url}
-              name={seller?.shop_name || seller?.full_name}
-              size={50}
+        {/* ── Livreur ── */}
+        {/* Commande annulée : le livreur n'a plus de rôle, sa fiche encombrait l'écran. */}
+        {/* ── Livreur : Suivi GPS Hybride V2 (Option C) ou Fiche Livreur standard ── */}
+        {driver && order.status !== 'cancelled' && (
+          assignment && ['picked_up', 'in_transit'].includes(assignment.status || '') ? (
+            <DeliveryRadarCard
+              assignmentId={assignment.id}
+              driver={{
+                id: driver.id,
+                name: driver.name,
+                phone: driver.phone,
+                photo_url: driver.photo_url,
+                vehicle_type: driver.vehicle_type,
+                rating: driver.rating,
+              }}
+              buyerCoords={
+                order.delivery_lat && order.delivery_lng
+                  ? { lat: order.delivery_lat, lng: order.delivery_lng }
+                  : null
+              }
+              deliveryAddress={order.delivery_address || 'Daloa'}
+              initialDriverCoords={
+                (assignment as any).current_driver_lat && (assignment as any).current_driver_lng
+                  ? {
+                      lat: Number((assignment as any).current_driver_lat),
+                      lng: Number((assignment as any).current_driver_lng),
+                    }
+                  : null
+              }
+              initialUpdatedAt={(assignment as any).driver_location_updated_at}
             />
-            <View style={styles.personInfo}>
-              <AppText variant="bodyStrong">
-                {seller?.shop_name || seller?.full_name || 'Boutique Daloa'}
-              </AppText>
-              <View style={styles.districtRow}>
-                <MapPin size={11} color={colors.text.subtle} />
-                <AppText variant="caption" color={colors.text.muted}>
-                  {seller?.district || 'Daloa'}
-                </AppText>
+          ) : (
+            <View style={styles.card}>
+              <View style={styles.cardTitleRow}>
+                <Bike size={15} color={colors.status.successDark} />
+                <AppText variant="bodyStrong">Livreur DaloaDelivery</AppText>
+              </View>
+              <View style={styles.personRow}>
+                <Avatar uri={driver.photo_url} name={driver.name} size={50} isOnline />
+                <View style={styles.personInfo}>
+                  <AppText variant="bodyStrong">{driver.name}</AppText>
+                  <AppText variant="caption" color={colors.text.muted}>
+                    {driver.vehicle_type?.toUpperCase() || 'MOTO'}
+                  </AppText>
+                  <RatingStars
+                    rating={driver.rating ?? 0}
+                    totalReviews={driver.total_reviews}
+                    size={11}
+                  />
+                </View>
+                <AppPressable
+                  onPress={() => {
+                    if (!driver.phone) return;
+                    Haptics.lightImpact();
+                    Linking.openURL(`tel:${driver.phone}`);
+                  }}
+                  style={[styles.callBtn, { backgroundColor: colors.status.success }]}
+                  accessibilityLabel="Appeler le livreur"
+                >
+                  <PhoneCall size={16} color={colors.text.inverse} />
+                </AppPressable>
               </View>
             </View>
-            <AppPressable
-              onPress={() => {
-                if (!seller?.phone) return;
-                Haptics.lightImpact();
-                Linking.openURL(`tel:${seller.phone}`);
-              }}
-              style={styles.callBtnOutline}
-              accessibilityLabel="Appeler le vendeur"
-            >
-              <PhoneCall size={16} color={colors.grey[700]} />
-            </AppPressable>
+          )
+        )}
+
+        {/* ── Client & Indice Anti-Lapin (Vue vendeur) ou Vendeur (Vue acheteur) ── */}
+        {(order as any).order_type !== 'express' ? (
+          isSeller ? (
+            order.buyer ? (
+              <View style={styles.card}>
+                <View style={styles.cardTitleRow}>
+                  <UserCheck size={15} color={accent.DEFAULT} />
+                  <AppText variant="bodyStrong">Acheteur & Indice Anti-Lapin</AppText>
+                </View>
+                <View style={styles.personRow}>
+                  <Avatar
+                    uri={order.buyer.avatar_url}
+                    name={order.buyer.full_name}
+                    size={50}
+                  />
+                  <View style={styles.personInfo}>
+                    <AppText variant="bodyStrong">
+                      {order.buyer.full_name || 'Client DaloaMarket'}
+                    </AppText>
+                    <View style={styles.districtRow}>
+                      <MapPin size={11} color={colors.text.subtle} />
+                      <AppText variant="caption" color={colors.text.muted}>
+                        {order.delivery_address || 'Daloa'}
+                      </AppText>
+                    </View>
+                  </View>
+                  {order.buyer.phone && (
+                    <AppPressable
+                      onPress={() => {
+                        Haptics.lightImpact();
+                        Linking.openURL(`tel:${order.buyer!.phone}`);
+                      }}
+                      style={styles.callBtnOutline}
+                      accessibilityLabel="Appeler l'acheteur"
+                    >
+                      <PhoneCall size={16} color={colors.grey[700]} />
+                    </AppPressable>
+                  )}
+                </View>
+
+                <View style={{ marginTop: spacing[2] }}>
+                  <BuyerReliabilityBadge
+                    score={buyerReliability.score}
+                    tier={buyerReliability.tier}
+                    deliveredCount={buyerReliability.deliveredCount}
+                    refusedCount={buyerReliability.refusedCount}
+                    showAdvice={Boolean(isCod)}
+                    advice={buyerReliability.advice}
+                  />
+                </View>
+              </View>
+            ) : null
+          ) : (
+            <View style={styles.card}>
+              <View style={styles.cardTitleRow}>
+                <ShieldCheck size={15} color={accent.DEFAULT} />
+                <AppText variant="bodyStrong">Vendeur partenaire</AppText>
+              </View>
+              <View style={styles.personRow}>
+                <Avatar
+                  uri={seller?.shop_logo_url || seller?.avatar_url}
+                  name={seller?.shop_name || seller?.full_name}
+                  size={50}
+                />
+                <View style={styles.personInfo}>
+                  <AppText variant="bodyStrong">
+                    {seller?.shop_name || seller?.full_name || 'Boutique Daloa'}
+                  </AppText>
+                  <View style={styles.districtRow}>
+                    <MapPin size={11} color={colors.text.subtle} />
+                    <AppText variant="caption" color={colors.text.muted}>
+                      {seller?.district || 'Daloa'}
+                    </AppText>
+                  </View>
+                </View>
+                <AppPressable
+                  onPress={() => {
+                    if (!seller?.phone) return;
+                    Haptics.lightImpact();
+                    Linking.openURL(`tel:${seller.phone}`);
+                  }}
+                  style={styles.callBtnOutline}
+                  accessibilityLabel="Appeler le vendeur"
+                >
+                  <PhoneCall size={16} color={colors.grey[700]} />
+                </AppPressable>
+              </View>
+            </View>
+          )
+        ) : (
+          <View style={styles.card}>
+            <View style={styles.cardTitleRow}>
+              <Package size={15} color={accent.DEFAULT} />
+              <AppText variant="bodyStrong">Contacts Course Express</AppText>
+            </View>
+            <SummaryRow label="Expéditeur" value={(order as any).sender_name || 'Expéditeur'} />
+            <SummaryRow label="Destinataire" value={(order as any).recipient_name || 'Destinataire'} />
           </View>
-        </View>
+        )}
 
         {/* ── Détail commande ── */}
         <View style={styles.card}>
@@ -848,17 +996,29 @@ export default function OrderTrackingScreen() {
             <Package size={15} color={accent.DEFAULT} />
             <AppText variant="bodyStrong">Récapitulatif</AppText>
           </View>
-          <SummaryRow label="Article" value={listing?.title || 'Article DaloaMarket'} />
-          <SummaryRow label="Quantité" value={`×${order.quantity || 1}`} />
-          {/* `orders` n'a pas de colonne `delivery_district` : ordersService
-              concatene deja le quartier dans `delivery_address`, sous la forme
-              « Adresse (Quartier) ». Y rajouter un suffixe affichait « … (Daloa) »
-              en double. Les types locaux perimes masquaient l'erreur. */}
-          <SummaryRow label="Livraison à" value={order.delivery_address || '—'} />
+          {(order as any).order_type === 'express' ? (
+            <>
+              <SummaryRow label="Colis express" value={(order as any).package_description || 'Colis hors catalogue'} />
+              <SummaryRow label="Ramassage" value={assignment?.pickup_location || 'Daloa'} />
+              <SummaryRow label="Dépôt" value={order.delivery_address || '—'} />
+              <SummaryRow
+                label="Règlement"
+                value={(order as any).payer_role === 'recipient' ? 'Par le destinataire (à l’arrivée)' : 'Par l’expéditeur (au ramassage)'}
+              />
+            </>
+          ) : (
+            <>
+              <SummaryRow label="Article" value={listing?.title || 'Article DaloaMarket'} />
+              <SummaryRow label="Quantité" value={`×${order.quantity || 1}`} />
+              <SummaryRow label="Livraison à" value={order.delivery_address || '—'} />
+            </>
+          )}
           <View style={styles.divider} />
           <View style={styles.totalRow}>
-            <AppText variant="bodyStrong">{amountLabel}</AppText>
-            <AppText variant="h2" color={accent[600]} style={styles.tnum}>
+            <AppText variant="bodyStrong" style={styles.totalLabel}>
+              {(order as any).order_type === 'express' ? 'Tarif course' : amountLabel}
+            </AppText>
+            <AppText variant="h2" color={accent[600]} style={[styles.tnum, styles.totalAmount]} numberOfLines={1}>
               {formatFCFA(order.total_amount)}
             </AppText>
           </View>
@@ -927,6 +1087,13 @@ export default function OrderTrackingScreen() {
           />
         </View>
       </BottomSheet>
+
+      <CodRefusalSellerModal
+        visible={isCodRefusalOpen}
+        onClose={() => setIsCodRefusalOpen(false)}
+        onSubmit={handleSellerCodRefusal}
+        loading={isReportingRefusal}
+      />
     </View>
   );
 }
@@ -1021,10 +1188,16 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: radii.md,
     backgroundColor: colors.bg.subtle,
+    flexShrink: 0,
   },
   itemInfo: {
     flex: 1,
+    minWidth: 0,
     gap: 1,
+  },
+  itemAmount: {
+    flexShrink: 0,
+    fontVariant: ['tabular-nums'],
   },
   verifyBtn: {
     marginTop: spacing[2],
@@ -1155,12 +1328,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[1],
   },
   summaryLabel: {
-    flexShrink: 0,
+    flex: 1,
+    minWidth: 0,
   },
   summaryValue: {
-    flexShrink: 1,
+    flexShrink: 0,
     textAlign: 'right',
-    maxWidth: '60%',
+    maxWidth: '65%',
   },
   divider: {
     height: 1,
@@ -1171,6 +1345,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
+    gap: spacing[3],
+  },
+  totalLabel: {
+    flex: 1,
+    minWidth: 0,
+  },
+  totalAmount: {
+    flexShrink: 0,
   },
   tnum: {
     fontVariant: ['tabular-nums'],

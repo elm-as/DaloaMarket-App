@@ -7,12 +7,14 @@ import { SearchX } from 'lucide-react-native';
 import { useInfiniteListings, analyticsService } from '@daloa/api';
 import { MARKET_CATEGORIES } from '@daloa/config';
 import { useAuth } from '../../src/context/AuthContext';
-import { colors, radii, spacing, ListingCard, Skeleton, EmptyState, useResponsive, AppText, AppPressable } from '@daloa/ui';
+import { colors, radii, spacing, Skeleton, EmptyState, useResponsive, AppText, AppPressable } from '@daloa/ui';
 import { useCart } from '../../src/context/CartContext';
 import { useFavorites } from '../../src/context/FavoritesContext';
-import { Haptics } from '@daloa/utils';
+import { Haptics, expandSmartSearch } from '@daloa/utils';
 import { SearchFilterModal, SearchFilterValues } from '../../src/components/search/SearchFilterModal';
 import { SearchTopBar } from '../../src/components/search/SearchTopBar';
+import { SearchCorrectionBanner } from '../../src/components/search/SearchCorrectionBanner';
+import { SearchItemCell } from '../../src/components/search/SearchItemCell';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
 import { filterAndRankListings } from '../../src/components/search/search-relevance';
@@ -42,16 +44,11 @@ export default function SearchScreen() {
     return map;
   }, [items, activeVariantListing]);
 
-  // Log de recherche débouncé (évite un event par frappe) — graine pour le ML
   useEffect(() => {
     const q = searchQuery.trim();
     if (q.length < 2) return;
     const t = setTimeout(() => {
-      analyticsService.logEvent({
-        eventName: 'search',
-        userId: user?.id ?? null,
-        props: { query: q },
-      });
+      analyticsService.logEvent({ eventName: 'search', userId: user?.id ?? null, props: { query: q } });
     }, 1200);
     return () => clearTimeout(t);
   }, [searchQuery, user?.id]);
@@ -60,8 +57,7 @@ export default function SearchScreen() {
   const [filters, setFilters] = useState<SearchFilterValues>(EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState<'recent' | 'price_asc' | 'price_desc'>('recent');
 
-  // Applique la catégorie reçue en paramètre : deep links /mode, /cosmetiques,
-  // /electronique… qui redirigent tous vers cet écran avec { category: slug }.
+  // Applique la catégorie passée en paramètre (deep links)
   const params = useLocalSearchParams<{ category?: string | string[] }>();
   const rawCategoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
 
@@ -91,6 +87,12 @@ export default function SearchScreen() {
     searchQuery: debouncedQuery.trim() || undefined,
     sortBy: sortBy === 'recent' ? undefined : sortBy,
   }), [filters.category, filters.district, filters.condition, filters.minPrice, filters.maxPrice, debouncedQuery, sortBy]);
+
+  const smartExpansion = useMemo(() => {
+    const q = debouncedQuery.trim();
+    if (q.length < 2) return null;
+    return expandSmartSearch(q);
+  }, [debouncedQuery]);
 
   const {
     data: listingsData,
@@ -161,37 +163,19 @@ export default function SearchScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: any }) => {
-      const isOwner = Boolean(user?.id && item.user_id === user.id);
-      return (
-        <View style={styles.cell}>
-          <ListingCard
-            listing={{
-              id: item.id,
-              title: item.title,
-              price: item.price,
-              originalPrice: item.original_price,
-              photos: item.photos || [],
-              district: item.district,
-              createdAt: item.created_at,
-              stock: item.stock,
-              boostedUntil: item.boosted_until,
-              cartQty: getCartQty(item.id),
-              isFavorite: isFavorited(item.id),
-              variants: item.variants || [],
-              hasVariants: Boolean(item.variants && item.variants.length > 0),
-              isOwner,
-            }}
-            onPress={() => router.push(`/listing/${item.id}` as any)}
-            onAddToCart={() => handleAddToCart(item)}
-            onUpdateCartQty={handleUpdateCartQty}
-            onToggleFavorite={() => toggleFavorite(item.id)}
-            isOwner={isOwner}
-            onManage={() => setManagingListing(item)}
-          />
-        </View>
-      );
-    },
+    ({ item }: { item: any }) => (
+      <SearchItemCell
+        item={item}
+        isOwner={Boolean(user?.id && item.user_id === user.id)}
+        cartQty={getCartQty(item.id)}
+        isFavorite={isFavorited(item.id)}
+        onPress={() => router.push(`/listing/${item.id}` as any)}
+        onAddToCart={() => handleAddToCart(item)}
+        onUpdateCartQty={handleUpdateCartQty}
+        onToggleFavorite={() => toggleFavorite(item.id)}
+        onManage={() => setManagingListing(item)}
+      />
+    ),
     [user?.id, getCartQty, isFavorited, handleAddToCart, handleUpdateCartQty, toggleFavorite, router]
   );
 
@@ -228,7 +212,17 @@ export default function SearchScreen() {
         setFilters={setFilters}
       />
 
-      {/* 2. Résultats */}
+      {/* 2. Résultats & Bannière d'expansion intelligente */}
+      {smartExpansion && (
+        <SearchCorrectionBanner
+          originalQuery={smartExpansion.originalQuery}
+          correctedQuery={smartExpansion.correctedQuery}
+          wasCorrected={smartExpansion.isCorrected}
+          synonyms={smartExpansion.expandedTerms}
+          onSelectTerm={(term) => setSearchQuery(term)}
+        />
+      )}
+
       {isLoading ? (
         <View style={styles.grid}>
           {[1, 2, 3, 4].map((i) => (
@@ -323,10 +317,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[2],
     paddingTop: spacing[2],
     paddingBottom: spacing[8],
-  },
-  cell: {
-    flex: 1,
-    paddingHorizontal: 5,
   },
   grid: {
     flexDirection: 'row',

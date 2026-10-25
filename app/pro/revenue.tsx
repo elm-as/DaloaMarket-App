@@ -179,7 +179,7 @@ export default function RevenueScreen() {
             return (
               <View key={p.id} style={styles.payoutItem}>
                 <View style={styles.payoutLeft}>
-                  <AppText variant="bodyStrong">
+                  <AppText variant="bodyStrong" numberOfLines={1}>
                     {operator}{phone ? ` · ${phone}` : ''}
                   </AppText>
                   <AppText variant="caption" color={colors.text.subtle}>
@@ -267,6 +267,7 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+    minWidth: 0,
   },
   withdrawCard: {
     padding: spacing[4],
@@ -286,6 +287,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radii.md,
     overflow: 'hidden',
+    flexShrink: 0,
   },
   autoPayoutBanner: {
     flexDirection: 'row',
@@ -320,6 +322,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[2],
     padding: spacing[3],
     marginBottom: spacing[2],
     backgroundColor: colors.bg.surface,
@@ -328,9 +331,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
   },
   payoutLeft: {
+    flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   payoutRight: {
+    flexShrink: 0,
     alignItems: 'flex-end',
     gap: 4,
   },

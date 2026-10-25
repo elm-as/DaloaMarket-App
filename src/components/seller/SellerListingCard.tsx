@@ -74,7 +74,7 @@ export const SellerListingCard: React.FC<SellerListingCardProps> = ({
             {item.title}
           </AppText>
 
-          <AppText variant="subtitle" color={accent.DEFAULT} style={styles.price}>
+          <AppText variant="subtitle" color={accent.DEFAULT} style={styles.price} numberOfLines={1}>
             {formatFCFA(item.price)}
           </AppText>
 
@@ -152,9 +152,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    flexShrink: 0,
   },
   cardInfo: {
     flex: 1,
+    minWidth: 0,
     gap: 4,
   },
   title: {

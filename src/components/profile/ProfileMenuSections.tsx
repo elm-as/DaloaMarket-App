@@ -12,14 +12,19 @@ import {
   Store,
   LogOut,
   ChevronRight,
+  Gift,
+  Sparkles,
 } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { formatFCFA } from '@daloa/utils';
 
 interface ProfileMenuSectionsProps {
   onOpenRevenue: () => void;
   onOpenPayoutSettings: () => void;
   onOpenFavorites: () => void;
   onOpenAccountSettings: () => void;
+  onOpenReferral: () => void;
+  daloaCashBalance?: number;
   onJoinDelivery: () => void;
   onOpenHelp: () => void;
   onOpenFaq: () => void;
@@ -27,6 +32,8 @@ interface ProfileMenuSectionsProps {
   onOpenTerms: () => void;
   onOpenDisputes: () => void;
   onLogout: () => void;
+  isPro?: boolean;
+  onOpenProCarousel?: () => void;
 }
 
 interface MenuItemRowProps {
@@ -77,6 +84,8 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
   onOpenPayoutSettings,
   onOpenFavorites,
   onOpenAccountSettings,
+  onOpenReferral,
+  daloaCashBalance,
   onJoinDelivery,
   onOpenHelp,
   onOpenFaq,
@@ -84,6 +93,8 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
   onOpenTerms,
   onOpenDisputes,
   onLogout,
+  isPro,
+  onOpenProCarousel,
 }) => {
   const accent = useAccent();
 
@@ -94,6 +105,17 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
         MON COMPTE & FINANCES
       </AppText>
       <View style={styles.cardGroup}>
+        <MenuItemRow
+          icon={<Gift size={17} color={colors.status.successDark} />}
+          tint={colors.status.successLight}
+          label="Parrainage & Daloa Cash"
+          sublabel={
+            daloaCashBalance && daloaCashBalance > 0
+              ? `${formatFCFA(daloaCashBalance)} disponibles · 500 F / ami`
+              : 'Gagnez 500 FCFA par ami invité'
+          }
+          onPress={onOpenReferral}
+        />
         <MenuItemRow
           icon={<Wallet size={17} color={colors.status.infoDark} />}
           tint={colors.status.infoLight}
@@ -115,6 +137,15 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
           sublabel="Articles sauvegardés"
           onPress={onOpenFavorites}
         />
+        {isPro && onOpenProCarousel ? (
+          <MenuItemRow
+            icon={<Sparkles size={17} color={colors.primary.DEFAULT} />}
+            tint={colors.primary[50]}
+            label="Carrousel Accueil VIP"
+            sublabel="Diffuser une affiche en tête d'accueil"
+            onPress={onOpenProCarousel}
+          />
+        ) : null}
         <MenuItemRow
           icon={<Settings size={17} color={colors.grey[600]} />}
           tint={colors.bg.subtle}

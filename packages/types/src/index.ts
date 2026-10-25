@@ -7,3 +7,4 @@ export * from './auth';
 export * from './payment';
 export * from './chat';
 export * from './notification';
+export * from './banner';

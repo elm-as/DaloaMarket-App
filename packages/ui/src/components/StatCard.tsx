@@ -26,7 +26,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <Card style={[styles.card, style]}>
       <View style={styles.topRow}>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label} numberOfLines={2}>{label}</Text>
         {icon && <View style={styles.iconBox}>{icon}</View>}
       </View>
       <View style={styles.bottomRow}>
@@ -38,7 +38,7 @@ export const StatCard: React.FC<StatCardProps> = ({
             color={currencyColor}
           />
         ) : (
-          <Text style={styles.valueText}>{value}</Text>
+          <Text style={styles.valueText} numberOfLines={1}>{value}</Text>
         )}
         {trend && <Text style={styles.trendText}>{trend}</Text>}
       </View>
@@ -56,9 +56,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[2],
     marginBottom: spacing[2],
   },
   label: {
+    flex: 1,
+    minWidth: 0,
     color: colors.grey[500],
     fontSize: typography.sizes.xs,
     fontFamily: typography.families.medium,
@@ -70,6 +73,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   bottomRow: {
     marginTop: 2,
@@ -78,6 +82,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: typography.sizes.xl,
     fontFamily: typography.families.bold,
+    fontVariant: ['tabular-nums'],
   },
   trendText: {
     color: colors.status.success,

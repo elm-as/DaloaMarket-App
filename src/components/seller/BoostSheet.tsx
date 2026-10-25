@@ -61,6 +61,7 @@ export const BoostSheet: React.FC<BoostSheetProps> = ({
       <View style={styles.options}>
         {BOOST_CREDIT_OPTIONS.map((option) => {
           const isSelected = option.days === selectedDays;
+          const approxFcfa = option.credits === 1 ? '≈ 100 F' : option.credits === 2 ? '≈ 200 F' : '≈ 500 F';
           return (
             <AppPressable
               key={option.days}
@@ -71,8 +72,8 @@ export const BoostSheet: React.FC<BoostSheetProps> = ({
               <AppText variant="bodyStrong" color={isSelected ? colors.primary[700] : colors.text.DEFAULT}>
                 {option.label}
               </AppText>
-              <AppText variant="caption" color={colors.text.muted}>
-                {option.credits} crédit{option.credits > 1 ? 's' : ''}
+              <AppText variant="caption" color={colors.text.muted} style={styles.tabular}>
+                {option.credits} crédit{option.credits > 1 ? 's' : ''} ({approxFcfa})
               </AppText>
             </AppPressable>
           );
@@ -136,6 +137,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[50],
   },
   balance: { marginTop: spacing[3], textAlign: 'center' },
+  tabular: { fontVariant: ['tabular-nums'] },
   actions: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[4] },
   actionBtn: { flex: 1 },
 });

@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { attachContactPhones } from '../lib/contacts';
 import { OrderWithDetails, CheckoutPayload, OrderStatus } from '@daloa/types';
+import { groupedDeliveryService } from './groupedDeliveryService';
 
 /*
  * Plus aucun calcul de montant ici : distance, frais et commissions sont
@@ -166,9 +167,22 @@ export const ordersService = {
 
     if (error) throw error;
 
-    const res = data as { success?: boolean; reason?: string; first_order_id?: string } | null;
+    const res = data as { success?: boolean; reason?: string; first_order_id?: string; order_ids?: string[] } | null;
     if (!res?.success) {
       throw codError(res?.reason);
+    }
+
+    if (res.order_ids && res.order_ids.length > 1 && opts.deliveryMode === 'delivery') {
+      try {
+        await groupedDeliveryService.setupGroupedDeliveryRun(res.order_ids, buyerId, {
+          fullAddress: opts.fullAddress,
+          district: opts.deliveryDistrict ?? undefined,
+          lat: opts.deliveryLat ?? undefined,
+          lng: opts.deliveryLng ?? undefined,
+        });
+      } catch (err) {
+        console.warn('Erreur initialisation tournée groupée:', err);
+      }
     }
 
     return res.first_order_id || null;
@@ -252,7 +266,7 @@ export const ordersService = {
     let rawData: any = null;
     const { data, error } = await supabase
       .from('orders')
-      .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, avatar_url), delivery_assignments(*), order_items(*, listings:listing_id(id, title, photos, price))')
+      .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, avatar_url, cod_orders_count, cod_delivered_count, cod_refused_count, cod_reliability_score, cod_warning_count, cod_blocked_until), delivery_assignments(*), order_items(*, listings:listing_id(id, title, photos, price))')
       .eq('id', orderId)
       .single();
 
@@ -260,7 +274,7 @@ export const ordersService = {
       // Repli sans jointure imbriquée order_items si un problème de relation survient
       const { data: fallbackData, error: fallbackErr } = await supabase
         .from('orders')
-        .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, avatar_url), delivery_assignments(*)')
+        .select('*, listings:listing_id(id, title, photos, price, district, category), seller:seller_id(id, full_name, avatar_url, shop_name, shop_slug, district, rating, pro_until), buyer:buyer_id(id, full_name, avatar_url, cod_orders_count, cod_delivered_count, cod_refused_count, cod_reliability_score, cod_warning_count, cod_blocked_until), delivery_assignments(*)')
         .eq('id', orderId)
         .single();
 

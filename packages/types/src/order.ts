@@ -36,7 +36,16 @@ export type DeliveryAssignmentStatus =
   | 'disputed'
   | 'cancelled';
 
-export interface OrderWithDetails extends OrderRow {
+export interface OrderWithDetails extends Omit<OrderRow, 'listing_id'> {
+  listing_id?: string | null;
+  order_type?: 'marketplace' | 'express' | string;
+  package_description?: string | null;
+  package_type?: string | null;
+  sender_name?: string | null;
+  sender_phone?: string | null;
+  recipient_name?: string | null;
+  recipient_phone?: string | null;
+  payer_role?: 'sender' | 'recipient' | string | null;
   listing?: {
     id: string;
     title: string;
@@ -51,9 +60,19 @@ export interface OrderWithDetails extends OrderRow {
     full_name: string;
     phone: string | null;
     avatar_url: string | null;
+    cod_orders_count?: number | null;
+    cod_delivered_count?: number | null;
+    cod_refused_count?: number | null;
+    cod_reliability_score?: number | null;
+    cod_warning_count?: number | null;
+    cod_blocked_until?: string | null;
   } | null;
   delivery_assignment?: DeliveryAssignmentRow | null;
   delivery_person?: DeliveryPersonSummary | null;
+  delivery_group_id?: string | null;
+  is_grouped?: boolean;
+  grouped_stop_index?: number | null;
+  grouped_delivery_discount?: number | null;
 }
 
 export interface CheckoutPayload {
@@ -77,6 +96,11 @@ export interface CheckoutPayload {
   delivery_lng?: number | null;
   buyer_notes?: string;
   buyer_phone: string;
+  daloa_cash_discount?: number;
+  use_daloa_cash?: boolean;
+  delivery_group_id?: string;
+  is_grouped?: boolean;
+  grouped_delivery_discount?: number;
 }
 
 export interface OrderFeeBreakdown {
@@ -85,6 +109,8 @@ export interface OrderFeeBreakdown {
   productSubtotal: number;
   deliveryFee: number;
   buyerServiceFee: number;
+  daloaCashDiscount?: number;
+  groupedDeliveryDiscount?: number;
   totalAmount: number;
   sellerCommission: number;
   sellerNetPayout: number;

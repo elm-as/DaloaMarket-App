@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
-  flex: { flex: 1, gap: 2 },
+  flex: { flex: 1, minWidth: 0, gap: 2 },
   bubble: {
     width: 48,
     height: 48,

@@ -62,12 +62,12 @@ export const CartItemCard: React.FC<CartItemCardProps> = ({ item, onUpdateQty, o
           )}
 
           <View style={styles.bottomRow}>
-            <View>
-              <AppText variant="bodyStrong" color={accent[600]} style={styles.unitPrice}>
+            <View style={styles.priceCol}>
+              <AppText variant="bodyStrong" color={accent[600]} style={styles.unitPrice} numberOfLines={1}>
                 {formatFCFA(price)}
               </AppText>
               {item.quantity > 1 && (
-                <AppText variant="caption" color={colors.text.muted} style={styles.lineTotal}>
+                <AppText variant="caption" color={colors.text.muted} style={styles.lineTotal} numberOfLines={1}>
                   Total: {formatFCFA(lineTotal)}
                 </AppText>
               )}
@@ -165,7 +165,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing[2],
     marginTop: 2,
+  },
+  priceCol: {
+    flex: 1,
+    minWidth: 0,
   },
   unitPrice: {
     fontVariant: ['tabular-nums'],
@@ -179,6 +184,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radii.lg,
     padding: 2,
+    flexShrink: 0,
   },
   stepperBtn: {
     width: 28,

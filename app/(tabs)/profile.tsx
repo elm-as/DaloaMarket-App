@@ -230,6 +230,8 @@ export default function ProfileScreen() {
           onOpenPayoutSettings={() => router.push('/settings/payout' as any)}
           onOpenFavorites={() => router.push('/favorites' as any)}
           onOpenAccountSettings={() => router.push('/settings' as any)}
+          onOpenReferral={() => router.push('/profile/referral' as any)}
+          daloaCashBalance={profile?.daloa_cash_balance}
           onJoinDelivery={() => openDeliveryApp('devenir-livreur')}
           onOpenHelp={() => router.push('/legal/help' as any)}
           onOpenFaq={() => router.push('/legal/faq' as any)}
@@ -237,6 +239,8 @@ export default function ProfileScreen() {
           onOpenTerms={() => router.push('/legal/terms' as any)}
           onOpenDisputes={() => router.push('/legal/how-it-works' as any)}
           onLogout={handleLogout}
+          isPro={isPro}
+          onOpenProCarousel={() => router.push('/pro/carousel' as any)}
         />
 
         {/* Pass Pro en fin de page : une offre, pas une information sur le compte */}

@@ -123,7 +123,7 @@ export default function BecomeProScreen() {
             <AppText variant="bodyStrong" color={billingPlan === 'monthly' ? accent[700] : colors.text.DEFAULT}>
               Mensuel
             </AppText>
-            <AppText variant="bodyStrong" color={billingPlan === 'monthly' ? accent[600] : colors.text.DEFAULT}>
+            <AppText variant="bodyStrong" color={billingPlan === 'monthly' ? accent[600] : colors.text.DEFAULT} style={styles.planPrice} numberOfLines={1}>
               {formatFCFA(PRICING_CONFIG.proSubscription.monthlyPrice)}
             </AppText>
             <AppText variant="caption" color={colors.text.subtle}>
@@ -144,7 +144,7 @@ export default function BecomeProScreen() {
             <AppText variant="bodyStrong" color={billingPlan === 'annual' ? accent[700] : colors.text.DEFAULT}>
               Annuel
             </AppText>
-            <AppText variant="bodyStrong" color={billingPlan === 'annual' ? accent[600] : colors.text.DEFAULT}>
+            <AppText variant="bodyStrong" color={billingPlan === 'annual' ? accent[600] : colors.text.DEFAULT} style={styles.planPrice} numberOfLines={1}>
               {formatFCFA(PRICING_CONFIG.proSubscription.annualPrice)}
             </AppText>
             <AppText variant="caption" color={colors.text.subtle}>
@@ -238,6 +238,7 @@ const styles = StyleSheet.create({
   },
   planCard: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: colors.bg.surface,
     borderRadius: radii.xl,
     borderWidth: 1.5,
@@ -246,6 +247,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     overflow: 'hidden',
+  },
+  planPrice: {
+    fontVariant: ['tabular-nums'],
   },
   saveBadge: {
     backgroundColor: colors.status.success,
