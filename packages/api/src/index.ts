@@ -3,6 +3,7 @@ export * from './lib/base64';
 export * from './lib/contacts';
 export * from './services/authService';
 export * from './services/listingsService';
+export * from './services/listingFlashDealsService';
 export * from './services/listingMediaService';
 export * from './services/listingActionsService';
 export * from './services/ordersService';

@@ -1,14 +1,26 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, TextInput } from 'react-native';
-import { MapPin, ChevronDown } from 'lucide-react-native';
+import {
+  MapPin,
+  ChevronDown,
+  Package,
+  FileText,
+  UtensilsCrossed,
+  ShoppingBag,
+  Boxes,
+  ArrowUpRight,
+  ArrowDownLeft,
+  CheckCircle2,
+  Circle,
+} from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent } from '@daloa/ui';
 
 export const PACKAGE_TYPES = [
-  { id: 'parcel', label: 'Colis standard' },
-  { id: 'envelope', label: 'Pli / Document' },
-  { id: 'food', label: 'Repas / Nourriture' },
-  { id: 'merchandise', label: 'Marchandise' },
-  { id: 'other', label: 'Autre' },
+  { id: 'parcel', label: 'Colis standard', icon: Package },
+  { id: 'envelope', label: 'Pli / Document', icon: FileText },
+  { id: 'food', label: 'Repas / Nourriture', icon: UtensilsCrossed },
+  { id: 'merchandise', label: 'Marchandise', icon: ShoppingBag },
+  { id: 'other', label: 'Autre', icon: Boxes },
 ];
 
 export interface ExpressFormFieldsProps {
@@ -65,20 +77,39 @@ export const ExpressFormFields: React.FC<ExpressFormFieldsProps> = ({
         <AppText variant="bodyStrong" style={styles.sectionTitle}>
           1. Que souhaitez-vous envoyer ?
         </AppText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillsScroll}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pillsScroll}
+        >
           {PACKAGE_TYPES.map((pt) => {
             const selected = packageType === pt.id;
+            const IconComponent = pt.icon;
             return (
               <AppPressable
                 key={pt.id}
+                haptic="selection"
                 onPress={() => setPackageType(pt.id)}
                 style={[
                   styles.typePill,
-                  selected && { backgroundColor: accent.DEFAULT, borderColor: accent.DEFAULT },
+                  selected
+                    ? {
+                        backgroundColor: accent[500],
+                        borderColor: accent[600],
+                      }
+                    : {
+                        backgroundColor: colors.bg.surface,
+                        borderColor: colors.border.DEFAULT,
+                      },
                 ]}
               >
+                <IconComponent
+                  size={15}
+                  color={selected ? colors.text.inverse : colors.text.body}
+                />
                 <AppText
-                  variant="caption"
+                  variant="label"
+                  numberOfLines={1}
                   color={selected ? colors.text.inverse : colors.text.body}
                 >
                   {pt.label}
@@ -177,25 +208,52 @@ export const ExpressFormFields: React.FC<ExpressFormFieldsProps> = ({
         </AppText>
         <View style={styles.payerRow}>
           <AppPressable
+            haptic="selection"
             onPress={() => setPayerRole('sender')}
             style={[
               styles.payerOption,
-              payerRole === 'sender' && { borderColor: accent.DEFAULT, backgroundColor: accent[50] },
+              payerRole === 'sender'
+                ? { borderColor: accent.DEFAULT, backgroundColor: accent[50], borderWidth: 1.5 }
+                : { borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.surface, borderWidth: 1 },
             ]}
           >
-            <AppText variant="bodyStrong">Expéditeur</AppText>
+            <View style={styles.payerHeader}>
+              <View style={[styles.payerIconCircle, { backgroundColor: payerRole === 'sender' ? accent[100] : colors.bg.subtle }]}>
+                <ArrowUpRight size={14} color={payerRole === 'sender' ? accent[800] : colors.text.muted} />
+              </View>
+              {payerRole === 'sender' ? (
+                <CheckCircle2 size={16} color={accent.DEFAULT} />
+              ) : (
+                <Circle size={16} color={colors.text.subtle} />
+              )}
+            </View>
+            <AppText variant="bodyStrong" color={colors.text.DEFAULT}>Expéditeur</AppText>
             <AppText variant="caption" color={colors.text.muted}>
               Payé au ramassage
             </AppText>
           </AppPressable>
+
           <AppPressable
+            haptic="selection"
             onPress={() => setPayerRole('recipient')}
             style={[
               styles.payerOption,
-              payerRole === 'recipient' && { borderColor: accent.DEFAULT, backgroundColor: accent[50] },
+              payerRole === 'recipient'
+                ? { borderColor: accent.DEFAULT, backgroundColor: accent[50], borderWidth: 1.5 }
+                : { borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.surface, borderWidth: 1 },
             ]}
           >
-            <AppText variant="bodyStrong">Destinataire</AppText>
+            <View style={styles.payerHeader}>
+              <View style={[styles.payerIconCircle, { backgroundColor: payerRole === 'recipient' ? accent[100] : colors.bg.subtle }]}>
+                <ArrowDownLeft size={14} color={payerRole === 'recipient' ? accent[800] : colors.text.muted} />
+              </View>
+              {payerRole === 'recipient' ? (
+                <CheckCircle2 size={16} color={accent.DEFAULT} />
+              ) : (
+                <Circle size={16} color={colors.text.subtle} />
+              )}
+            </View>
+            <AppText variant="bodyStrong" color={colors.text.DEFAULT}>Destinataire</AppText>
             <AppText variant="caption" color={colors.text.muted}>
               Payé à la réception
             </AppText>
@@ -215,16 +273,18 @@ const styles = StyleSheet.create({
   },
   pillsScroll: {
     flexDirection: 'row',
-    marginBottom: spacing[2],
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingBottom: spacing[2],
   },
   typePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 40,
     paddingHorizontal: spacing[3],
-    paddingVertical: 6,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    marginRight: spacing[2],
-    backgroundColor: colors.bg.surface,
   },
   input: {
     borderWidth: 1,
@@ -269,8 +329,18 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: spacing[3],
     borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    backgroundColor: colors.bg.surface,
+  },
+  payerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  payerIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
