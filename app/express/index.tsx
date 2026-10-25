@@ -16,9 +16,9 @@ import { Haptics } from '@daloa/utils';
 import { ExpressDeliveryResult } from '@daloa/types';
 import { expressDeliveryService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
-import { ExpressQuoteCard } from '../../src/components/express/ExpressQuoteCard';
 import { ExpressSuccessView } from '../../src/components/express/ExpressSuccessView';
-import { ExpressFormFields } from '../../src/components/express/ExpressFormFields';
+import { ExpressFormFields, PACKAGE_TYPES } from '../../src/components/express/ExpressFormFields';
+import { ExpressWizardStepper } from '../../src/components/express/ExpressWizardStepper';
 import { DistrictPickerModal } from '../../src/components/express/DistrictPickerModal';
 
 export default function ExpressDeliveryScreen() {
@@ -26,7 +26,17 @@ export default function ExpressDeliveryScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
-  // État formulaire
+  // Étape courante du Wizard
+  const [currentStep, setCurrentStep] = useState<number>(1);
+
+  // Étape 1 : Colis & Confidentialité anti-vol
+  const [packageType, setPackageType] = useState('parcel');
+  const [packageDescription, setPackageDescription] = useState('');
+  const [isSealed, setIsSealed] = useState(true);
+  const [isFragile, setIsFragile] = useState(false);
+  const [isHandDelivery, setIsHandDelivery] = useState(true);
+
+  // Étape 2 : Trajet & Contacts
   const [pickupDistrict, setPickupDistrict] = useState(user?.district || 'Commerce');
   const [pickupAddress, setPickupAddress] = useState('');
   const [senderName, setSenderName] = useState(user?.full_name || '');
@@ -37,8 +47,7 @@ export default function ExpressDeliveryScreen() {
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
 
-  const [packageType, setPackageType] = useState('parcel');
-  const [packageDescription, setPackageDescription] = useState('');
+  // Étape 3 : Règlement
   const [payerRole, setPayerRole] = useState<'sender' | 'recipient'>('sender');
 
   // Sélecteur quartier modal
@@ -48,13 +57,50 @@ export default function ExpressDeliveryScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdRun, setCreatedRun] = useState<ExpressDeliveryResult | null>(null);
 
-  // Devis calculé en direct
+  // Devis kilométrique officiel
   const quote = useMemo(() => {
     return expressDeliveryService.estimateExpressDelivery({
       pickupDistrict,
       dropoffDistrict,
     });
   }, [pickupDistrict, dropoffDistrict]);
+
+  const packageTypeLabel = useMemo(() => {
+    return PACKAGE_TYPES.find((pt) => pt.id === packageType)?.label || 'Colis standard';
+  }, [packageType]);
+
+  const handleNextStep = () => {
+    if (currentStep === 1) {
+      setCurrentStep(2);
+      Haptics.selection();
+      return;
+    }
+
+    if (currentStep === 2) {
+      if (!senderPhone.trim()) {
+        showAlert('Téléphone manquant', "Veuillez renseigner le téléphone de l'expéditeur.");
+        return;
+      }
+
+      if (!recipientPhone.trim()) {
+        showAlert('Destinataire manquant', 'Veuillez renseigner le numéro du destinataire.');
+        return;
+      }
+
+      setCurrentStep(3);
+      Haptics.selection();
+      return;
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => prev - 1);
+      Haptics.lightImpact();
+    } else {
+      router.back();
+    }
+  };
 
   const handleSubmit = async () => {
     if (!user) {
@@ -63,24 +109,19 @@ export default function ExpressDeliveryScreen() {
       return;
     }
 
-    if (!senderPhone.trim()) {
-      showAlert('Téléphone manquant', "Veuillez renseigner le téléphone de l'expéditeur.");
-      return;
-    }
-
-    if (!recipientPhone.trim()) {
-      showAlert('Destinataire manquant', 'Veuillez renseigner le numéro du destinataire.');
-      return;
-    }
-
-    if (!packageDescription.trim()) {
-      showAlert('Description requise', 'Indiquez ce que contient votre colis.');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       Haptics.mediumImpact();
+
+      // Description discrète combinant les précautions sans valeur marchande
+      const discreteDescription = [
+        isSealed ? '[Scellé]' : null,
+        isFragile ? '[Fragile]' : null,
+        isHandDelivery ? '[En main propre]' : null,
+        packageDescription.trim() || null,
+      ]
+        .filter(Boolean)
+        .join(' ') || 'Colis scellé standard';
 
       const res = await expressDeliveryService.createExpressRun({
         pickupDistrict,
@@ -88,7 +129,7 @@ export default function ExpressDeliveryScreen() {
         dropoffDistrict,
         dropoffAddress: dropoffAddress.trim() || 'Centre',
         packageType,
-        packageDescription: packageDescription.trim(),
+        packageDescription: discreteDescription,
         senderName: senderName.trim() || user.full_name || 'Expéditeur',
         senderPhone: senderPhone.trim(),
         recipientName: recipientName.trim() || 'Destinataire',
@@ -121,10 +162,12 @@ export default function ExpressDeliveryScreen() {
           deliveryFee={createdRun.deliveryFee!}
           pickupOtp={createdRun.pickupOtp!}
           deliveryOtp={createdRun.deliveryOtp!}
-          recipientName={recipientName}
+          recipientName={recipientName || 'Destinataire'}
           recipientPhone={recipientPhone}
-          senderName={senderName}
+          senderName={senderName || user?.full_name || 'Expéditeur'}
           packageDescription={packageDescription}
+          packageTypeLabel={packageTypeLabel}
+          payerRole={payerRole}
           pickupDistrict={pickupDistrict}
           dropoffDistrict={dropoffDistrict}
         />
@@ -138,7 +181,7 @@ export default function ExpressDeliveryScreen() {
       <View style={styles.header}>
         <AppPressable
           haptic="light"
-          onPress={() => router.back()}
+          onPress={handlePrevStep}
           style={styles.backBtn}
           accessibilityLabel="Retour"
         >
@@ -147,20 +190,30 @@ export default function ExpressDeliveryScreen() {
         <View style={styles.headerTitleBox}>
           <AppText variant="title">Coursier Express</AppText>
           <AppText variant="caption" color={colors.text.muted}>
-            Envoi et livraison directe dans Daloa
+            Étape {currentStep} sur 3 · Livraison directe à Daloa
           </AppText>
         </View>
       </View>
 
+      {/* Stepper bar */}
+      <ExpressWizardStepper currentStep={currentStep} />
+
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ padding: spacing[3], paddingBottom: insets.bottom + spacing[6] }}
+        contentContainerStyle={{ padding: spacing[4], paddingBottom: insets.bottom + spacing[8] }}
       >
         <ExpressFormFields
+          currentStep={currentStep}
           packageType={packageType}
           setPackageType={setPackageType}
           packageDescription={packageDescription}
           setPackageDescription={setPackageDescription}
+          isSealed={isSealed}
+          setIsSealed={setIsSealed}
+          isFragile={isFragile}
+          setIsFragile={setIsFragile}
+          isHandDelivery={isHandDelivery}
+          setIsHandDelivery={setIsHandDelivery}
           pickupDistrict={pickupDistrict}
           onOpenPickupDistrictPicker={() => setDistrictPickerTarget('pickup')}
           pickupAddress={pickupAddress}
@@ -177,25 +230,31 @@ export default function ExpressDeliveryScreen() {
           setRecipientPhone={setRecipientPhone}
           payerRole={payerRole}
           setPayerRole={setPayerRole}
-        />
-
-        {/* Devis kilométrique instantané */}
-        <ExpressQuoteCard
           distanceKm={quote.distanceKm}
           deliveryFee={quote.deliveryFee}
           driverNetGain={quote.driverNetGain}
-          pickupDistrict={pickupDistrict}
-          dropoffDistrict={dropoffDistrict}
         />
 
-        {/* Bouton de commande */}
-        <Button
-          variant="market"
-          size="lg"
-          title="Commander mon coursier express"
-          onPress={handleSubmit}
-          loading={isSubmitting}
-        />
+        {/* Boutons de navigation du Wizard */}
+        <View style={styles.navRow}>
+          {currentStep > 1 && (
+            <Button
+              variant="outline"
+              size="lg"
+              title="Précédent"
+              onPress={handlePrevStep}
+              style={styles.prevBtn}
+            />
+          )}
+          <Button
+            variant="market"
+            size="lg"
+            title={currentStep === 3 ? 'Confirmer la course express' : 'Continuer'}
+            onPress={currentStep === 3 ? handleSubmit : handleNextStep}
+            loading={isSubmitting}
+            style={styles.nextBtn}
+          />
+        </View>
       </ScrollView>
 
       {/* Modal choix quartier */}
@@ -237,4 +296,17 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginTop: spacing[4],
+  },
+  prevBtn: {
+    flex: 1,
+  },
+  nextBtn: {
+    flex: 2,
+  },
 });
+

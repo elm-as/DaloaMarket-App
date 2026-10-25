@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Linking, StyleProp, ViewStyle } from 'react-native';
-import { Clock, Phone, Navigation, CheckCircle2, Zap, Package, Store } from 'lucide-react-native';
+import { Clock, Phone, Navigation, CheckCircle2, Zap, Package, Store, ShieldCheck } from 'lucide-react-native';
 import { colors, spacing } from '../tokens';
 import { useAccent } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
@@ -169,12 +169,12 @@ export const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({
         </View>
       </View>
 
-      {/* Description du colis si express */}
-      {isExpress && order.package_description && (
+      {/* Format discret du colis si express (sécurité anti-vol) */}
+      {isExpress && (
         <View style={styles.packageBanner}>
-          <Package size={12} color={colors.text.muted} />
+          <ShieldCheck size={12} color={colors.status.successDark} />
           <AppText variant="caption" color={colors.text.body} numberOfLines={1}>
-            {order.package_description}
+            Format : {order.package_description || 'Colis scellé standard'}
           </AppText>
         </View>
       )}

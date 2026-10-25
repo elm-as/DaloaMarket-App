@@ -119,19 +119,27 @@ export const expressDeliveryService = {
     deliveryOtp: string;
     orderId: string;
     senderName?: string;
-    packageDescription?: string;
+    packageTypeLabel?: string;
+    payerRole?: 'sender' | 'recipient';
+    deliveryFee?: number;
   }): string {
     const cleanPhone = (params.recipientPhone || '').replace(/\D/g, '');
     const internationalPhone =
       cleanPhone.length === 10 ? `225${cleanPhone}` : cleanPhone;
 
+    const paymentLine =
+      params.payerRole === 'recipient'
+        ? `💰 Frais de livraison : ${params.deliveryFee ? `${params.deliveryFee} FCFA` : 'à régler'} au livreur.`
+        : `💰 Frais de livraison : 0 FCFA (Déjà réglé par l'expéditeur).`;
+
     const message = [
       `Bonjour ${params.recipientName || ''},`,
       `${params.senderName || "L'expéditeur"} vous envoie un colis via DaloaDelivery Express 🛵📦.`,
-      params.packageDescription ? `Nature : ${params.packageDescription}` : null,
+      params.packageTypeLabel ? `Format : ${params.packageTypeLabel}` : null,
+      paymentLine,
       ``,
       `🔐 Votre code secret de remise est : ${params.deliveryOtp}`,
-      `Communiquez ce code au coursier uniquement quand vous recevez le colis.`,
+      `Communiquez ce code au coursier uniquement quand vous recevez le colis en main propre.`,
       ``,
       `Suivez l'arrivée de votre coursier en direct :`,
       `https://daloamarket.com/order/${params.orderId}`,

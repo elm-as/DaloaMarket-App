@@ -18,6 +18,8 @@ export interface ExpressSuccessViewProps {
   packageDescription: string;
   pickupDistrict: string;
   dropoffDistrict: string;
+  payerRole?: 'sender' | 'recipient';
+  packageTypeLabel?: string;
 }
 
 export const ExpressSuccessView: React.FC<ExpressSuccessViewProps> = ({
@@ -28,9 +30,10 @@ export const ExpressSuccessView: React.FC<ExpressSuccessViewProps> = ({
   recipientName,
   recipientPhone,
   senderName,
-  packageDescription,
   pickupDistrict,
   dropoffDistrict,
+  payerRole = 'sender',
+  packageTypeLabel,
 }) => {
   const accent = useAccent();
   const router = useRouter();
@@ -43,7 +46,9 @@ export const ExpressSuccessView: React.FC<ExpressSuccessViewProps> = ({
       deliveryOtp,
       orderId,
       senderName,
-      packageDescription,
+      packageTypeLabel,
+      payerRole,
+      deliveryFee,
     });
     Linking.openURL(url).catch(() => {});
   };
@@ -73,7 +78,7 @@ export const ExpressSuccessView: React.FC<ExpressSuccessViewProps> = ({
         <View style={styles.cardHeader}>
           <KeyRound size={16} color={colors.status.warningDark} />
           <AppText variant="overline" color={colors.status.warningDark}>
-            VOTRE CODE DE RAMASSAGE (À DONNER AU LIVREUR)
+            VOTRE CODE DE RAMASSAGE (À DONNER AU COURSIER)
           </AppText>
         </View>
         <AppText variant="display" color={colors.status.warningDark} style={styles.otpCode}>
@@ -84,23 +89,23 @@ export const ExpressSuccessView: React.FC<ExpressSuccessViewProps> = ({
         </AppText>
       </View>
 
-      {/* Partage Destinataire */}
-      <View style={[styles.card, { borderColor: accent[200], backgroundColor: accent[50] }]}>
+      {/* Partage Destinataire WhatsApp */}
+      <View style={[styles.card, { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' }]}>
         <View style={styles.cardHeader}>
-          <MessageSquare size={16} color={accent[700]} />
-          <AppText variant="overline" color={accent[700]}>
-            CODE DE REMISE DESTINATAIRE : {deliveryOtp}
+          <MessageSquare size={16} color="#16A34A" />
+          <AppText variant="overline" color="#166534">
+            TRANSMISSION AU DESTINATAIRE ({recipientName})
           </AppText>
         </View>
         <AppText variant="caption" color={colors.text.body} style={styles.descText}>
-          {recipientName} doit donner son code au livreur à la réception à {dropoffDistrict}.
+          Le destinataire doit recevoir son lien de suivi en direct et son code secret de remise ({deliveryOtp}).
         </AppText>
         <Button
-          variant="outline"
+          variant="market"
           size="md"
-          title="Envoyer le code au destinataire (WhatsApp)"
+          title="Envoyer le suivi au destinataire (WhatsApp)"
           onPress={handleShareWhatsApp}
-          leftIcon={<MessageSquare size={16} color={accent.DEFAULT} />}
+          leftIcon={<MessageSquare size={16} color={colors.text.inverse} />}
           style={styles.whatsAppBtn}
         />
       </View>
@@ -176,7 +181,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[3],
   },
   whatsAppBtn: {
-    backgroundColor: colors.bg.surface,
+    backgroundColor: '#25D366',
   },
   actionsBox: {
     marginTop: spacing[2],
