@@ -95,11 +95,13 @@ export const promoBannersService = {
         badge_color: payload.badgeColor || '#FF9800',
         link_type: payload.linkType,
         link_target: payload.linkTarget?.trim() || null,
-        price_paid: payload.pricePaid,
-        priority: payload.priority ?? 5,
+        price_paid: 0,
+        priority: 0,
+        views_count: 0,
+        clicks_count: 0,
         starts_at,
         ends_at,
-        is_active: true,
+        is_active: false,
       };
 
       const { data, error } = await supabase

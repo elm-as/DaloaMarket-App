@@ -151,7 +151,7 @@ export default function ProCarouselScreen() {
       if (!created) throw new Error('Échec');
 
       Haptics.success();
-      showAlert('Affiche diffusée !', `Votre campagne Carrousel est active pour ${pack.days} jours.`);
+      showAlert('Affiche transmise !', 'Votre affiche a été soumise avec succès. Elle sera validée et activée par l’administration.');
       setTitle('');
       setSubtitle('');
       setImageUrl('');
@@ -209,13 +209,20 @@ export default function ProCarouselScreen() {
         {banners.length > 0 && (
           <View style={styles.section}>
             <AppText variant="overline" color={colors.text.muted} style={styles.sectionOverline}>
-              MES AFFICHES EN LIGNE ({banners.length})
+              MES AFFICHES ({banners.length})
             </AppText>
             {banners.map((b) => (
               <View key={b.id} style={styles.bannerRow}>
                 <ExpoImage source={{ uri: b.image_url }} style={styles.bannerThumbnail} contentFit="cover" />
                 <View style={styles.bannerMeta}>
-                  <AppText variant="bodyStrong" numberOfLines={1}>{b.title}</AppText>
+                  <View style={styles.titleRow}>
+                    <AppText variant="bodyStrong" numberOfLines={1} style={styles.flexOne}>{b.title}</AppText>
+                    {!b.is_active && (
+                      <View style={styles.pendingBadge}>
+                        <AppText variant="overline" color={colors.status.warningDark}>EN ATTENTE</AppText>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.statsInline}>
                     <AppText variant="caption" color={colors.text.subtle} style={styles.tabular}>
                       <Eye size={12} color={colors.text.subtle} /> {b.views_count} vues
@@ -295,4 +302,7 @@ const styles = StyleSheet.create({
   statsInline: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: 2 },
   clicksText: { fontFamily: typography.families.bold },
   tabular: { fontVariant: ['tabular-nums'] },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  flexOne: { flex: 1 },
+  pendingBadge: { backgroundColor: colors.status.warningLight, paddingHorizontal: 6, paddingVertical: 1, borderRadius: radii.full },
 });
