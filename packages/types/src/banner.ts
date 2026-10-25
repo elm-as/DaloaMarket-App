@@ -18,6 +18,8 @@ export interface PromoBanner {
   is_active: boolean;
   priority: number;
   seller_id?: string | null;
+  sponsor_name?: string | null;
+  price_paid?: number;
   views_count: number;
   clicks_count: number;
   starts_at?: string | null;

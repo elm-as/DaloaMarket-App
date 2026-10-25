@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronRight,
   Gift,
+  Sparkles,
 } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { formatFCFA } from '@daloa/utils';
@@ -31,6 +32,8 @@ interface ProfileMenuSectionsProps {
   onOpenTerms: () => void;
   onOpenDisputes: () => void;
   onLogout: () => void;
+  isPro?: boolean;
+  onOpenProCarousel?: () => void;
 }
 
 interface MenuItemRowProps {
@@ -90,6 +93,8 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
   onOpenTerms,
   onOpenDisputes,
   onLogout,
+  isPro,
+  onOpenProCarousel,
 }) => {
   const accent = useAccent();
 
@@ -132,6 +137,15 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
           sublabel="Articles sauvegardés"
           onPress={onOpenFavorites}
         />
+        {isPro && onOpenProCarousel ? (
+          <MenuItemRow
+            icon={<Sparkles size={17} color={colors.primary.DEFAULT} />}
+            tint={colors.primary[50]}
+            label="Carrousel Accueil VIP"
+            sublabel="Diffuser une affiche en tête d'accueil"
+            onPress={onOpenProCarousel}
+          />
+        ) : null}
         <MenuItemRow
           icon={<Settings size={17} color={colors.grey[600]} />}
           tint={colors.bg.subtle}

@@ -62,6 +62,13 @@ export const PRICING_CONFIG = {
     { id: 'gold', name: 'Pack Or', credits: 30, price: 2000, popular: false },
   ],
 
+  // Sponsoring Carrousel Accueil (Boost Supérieur VIP réservé aux Vendeurs Pro)
+  carouselBannerPacks: [
+    { id: 'carousel_7d', days: 7, price: 3000, label: '7 jours de diffusion', popular: false },
+    { id: 'carousel_14d', days: 14, price: 5000, label: '14 jours de diffusion', popular: true },
+    { id: 'carousel_30d', days: 30, price: 10000, label: '30 jours de diffusion', popular: false },
+  ],
+
   // La phase n'est plus codée ici : elle vient de system_settings.phase_config
   // (commission via `sellerFeeOverride`, 0 en phase 0). L'ancien interrupteur
   // `isFreeModeActive`, figé à true, faisait afficher 0 % de commission par
