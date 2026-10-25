@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { PRICING_CONFIG, BOOST_CREDIT_OPTIONS } from '@daloa/config';
-import { paymentService } from '@daloa/api';
+import { paymentService, systemSettingsService } from '@daloa/api';
 import { colors, radii, spacing, Card, Button, Badge, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
-import { Layers, Zap, ArrowLeft } from 'lucide-react-native';
+import { Zap, ArrowLeft, AlertCircle } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
 import { openPaymentGateway } from '../../src/lib/openPaymentGateway';
@@ -15,19 +15,34 @@ export default function PacksScreen() {
   const router = useRouter();
   const accent = useAccent();
   const insets = useSafeAreaInsets();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile } = useAuth();
   const [selectedPack, setSelectedPack] = useState<string>('silver');
-
   const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
+  const [boostsEnabled, setBoostsEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    systemSettingsService.getSettings().then((settings) => {
+      if (isMounted && settings?.phaseConfig) {
+        setBoostsEnabled(settings.phaseConfig.enable_boost ?? true);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   /**
-   * Achat réel d'un pack via MoneyFusion. L'écran affichait auparavant
-   * « Vos crédits ont été ajoutés » sans aucun paiement ni crédit.
-   * Les crédits sont ajoutés par le serveur à la confirmation du paiement.
+   * Achat d'un pack via Mobile Money.
+   * Si les boosts sont désactivés par l'administration, l'achat est bloqué.
    */
   const handleBuyPack = async (pack: (typeof PRICING_CONFIG.packs)[number]) => {
     if (!user?.id) {
       router.push('/auth/login' as any);
+      return;
+    }
+    if (!boostsEnabled) {
+      showAlert('Options suspendues', 'Les achats de packs de boost sont temporairement désactivés par l’administration.');
       return;
     }
     Haptics.selection();
@@ -47,12 +62,10 @@ export default function PacksScreen() {
       await openPaymentGateway(result.paymentUrl);
       if (Platform.OS === 'web') return;
 
-      await new Promise((r) => setTimeout(r, 1500));
-      await refreshProfile();
-      showAlert(
-        'Paiement lancé',
-        `Dès la confirmation Mobile Money, vos ${pack.credits} crédits sont ajoutés automatiquement.`
-      );
+      router.replace({
+        pathname: '/payment/success',
+        params: { transactionId: result.transactionId, type: `credits_pack_${pack.credits}` },
+      } as any);
     } catch (err: any) {
       showAlert('Paiement impossible', err.message || 'Une erreur est survenue. Réessayez.');
     } finally {
@@ -92,6 +105,20 @@ export default function PacksScreen() {
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {!boostsEnabled && (
+          <View style={styles.disabledBanner}>
+            <AlertCircle size={20} color="#B45309" />
+            <View style={styles.disabledTexts}>
+              <AppText variant="bodyStrong" color="#92400E">
+                Options payantes suspendues
+              </AppText>
+              <AppText variant="caption" color="#B45309">
+                La publication et la mise en avant de vos annonces sont actuellement 100% gratuites sur DaloaMarket.
+              </AppText>
+            </View>
+          </View>
+        )}
+
         {/* Packs crédits */}
         <AppText variant="subtitle">Packs de crédits de boost</AppText>
         <View style={styles.packsGrid}>
@@ -108,7 +135,6 @@ export default function PacksScreen() {
               >
                 {pack.popular && (
                   <View style={styles.popularBadge}>
-                    {/* "count" = accent orange : ce tag met en avant un pack, ce n'est pas un badge Pro. */}
                     <Badge label="POPULAIRE" variant="count" />
                   </View>
                 )}
@@ -117,18 +143,18 @@ export default function PacksScreen() {
                   {pack.name}
                 </AppText>
                 <AppText variant="caption" color={colors.text.subtle}>
-                  {pack.credits} crédits de boost
+                  {pack.credits} crédits
                 </AppText>
                 <AppText variant="bodyStrong" color={accent[600]}>
                   {formatFCFA(pack.price)}
                 </AppText>
 
                 <Button
-                  title="Acheter"
+                  title={boostsEnabled ? 'Acheter' : 'Désactivé'}
                   variant={isSelected ? 'market' : 'outline'}
                   size="sm"
                   loading={buyingPackId === pack.id}
-                  disabled={buyingPackId !== null}
+                  disabled={buyingPackId !== null || !boostsEnabled}
                   onPress={() => handleBuyPack(pack)}
                   style={styles.packBtn}
                 />
@@ -210,6 +236,20 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing[4],
     gap: spacing[4],
+  },
+  disabledBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radii.xl,
+    padding: spacing[3],
+    gap: spacing[3],
+  },
+  disabledTexts: {
+    flex: 1,
+    gap: 2,
   },
   packsGrid: {
     flexDirection: 'row',
