@@ -64,8 +64,10 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         return;
       }
 
-      const fullAddress =
-        params.deliveryMode === 'delivery'
+      const isDigital = !params.isCartMode && params.listing?.category === 'digital';
+      const fullAddress = isDigital
+        ? 'Envoi numérique direct en privé (Messagerie / WhatsApp)'
+        : params.deliveryMode === 'delivery'
           ? params.deliveryAddress.trim()
           : 'Retrait direct en boutique';
 

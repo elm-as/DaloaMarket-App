@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { colors, radii, spacing, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { Truck, Store, ArrowRight, ShieldCheck } from 'lucide-react-native';
+import { Truck, Store, ArrowRight, ShieldCheck, FileText } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 
 interface CheckoutStepReceptionProps {
@@ -15,6 +15,8 @@ interface CheckoutStepReceptionProps {
   onNext: () => void;
   /** Retrait non proposé (vendeur non Pro hors lancement) : l'option est masquée, sans mention « Pro » côté acheteur. */
   isPickupAllowed?: boolean;
+  /** Produit numérique : transmission directe en privé (PDF, ebook, cours) */
+  isDigital?: boolean;
 }
 
 export function CheckoutStepReception({
@@ -27,6 +29,7 @@ export function CheckoutStepReception({
   onDeliveryModeChange,
   onNext,
   isPickupAllowed = true,
+  isDigital = false,
 }: CheckoutStepReceptionProps) {
   const accent = useAccent();
 
@@ -65,74 +68,100 @@ export function CheckoutStepReception({
       {/* 2. Choix du mode de réception */}
       <View style={styles.sectionBox}>
         <AppText variant="bodyStrong" style={styles.sectionTitle}>
-          Choisissez votre mode de réception
+          Mode de réception
         </AppText>
 
         <View style={styles.modesList}>
-          <AppPressable
-            haptic="selection"
-            onPress={() => handleSelectMode('delivery')}
-            style={[
-              styles.modeCard,
-              deliveryMode === 'delivery' && {
-                borderColor: accent.DEFAULT,
-                backgroundColor: accent[50],
-              },
-            ]}
-          >
-            <View style={[styles.modeIconBox, { backgroundColor: accent[100] }]}>
-              <Truck size={22} color={accent.DEFAULT} />
-            </View>
-            <View style={styles.flex1}>
-              <View style={styles.modeTitleRow}>
-                <AppText variant="bodyStrong" color={deliveryMode === 'delivery' ? accent[700] : colors.text.DEFAULT}>
-                  Livraison à domicile
-                </AppText>
-                <View style={styles.recomBadge}>
-                  <AppText variant="overline" color={accent[700]}>EXPÉDITION EXPRESS</AppText>
-                </View>
+          {isDigital ? (
+            <View style={[styles.modeCard, { borderColor: '#0284C7', backgroundColor: '#F0F9FF' }]}>
+              <View style={[styles.modeIconBox, { backgroundColor: '#E0F2FE' }]}>
+                <FileText size={22} color="#0284C7" />
               </View>
-              <AppText variant="caption" color={colors.text.muted} style={styles.modeDesc}>
-                Prise en charge par un coursier DaloaDelivery et remis à votre porte
-              </AppText>
+              <View style={styles.flex1}>
+                <View style={styles.modeTitleRow}>
+                  <AppText variant="bodyStrong" color="#0369A1">
+                    Envoi numérique en privé
+                  </AppText>
+                  <View style={styles.freeBadge}>
+                    <AppText variant="overline" color={colors.status.successDark}>GRATUIT</AppText>
+                  </View>
+                </View>
+                <AppText variant="caption" color={colors.text.muted} style={styles.modeDesc}>
+                  Document (PDF, e-book) transmis directement par le vendeur en privé dès confirmation
+                </AppText>
+              </View>
+              <View style={[styles.radioCircle, { borderColor: '#0284C7', backgroundColor: '#0284C7' }]}>
+                <View style={styles.radioDot} />
+              </View>
             </View>
-            <View style={[styles.radioCircle, deliveryMode === 'delivery' && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT }]}>
-              {deliveryMode === 'delivery' && <View style={styles.radioDot} />}
-            </View>
-          </AppPressable>
+          ) : (
+            <>
+              <AppPressable
+                haptic="selection"
+                onPress={() => handleSelectMode('delivery')}
+                style={[
+                  styles.modeCard,
+                  deliveryMode === 'delivery' && {
+                    borderColor: accent.DEFAULT,
+                    backgroundColor: accent[50],
+                  },
+                ]}
+              >
+                <View style={[styles.modeIconBox, { backgroundColor: accent[100] }]}>
+                  <Truck size={22} color={accent.DEFAULT} />
+                </View>
+                <View style={styles.flex1}>
+                  <View style={styles.modeTitleRow}>
+                    <AppText variant="bodyStrong" color={deliveryMode === 'delivery' ? accent[700] : colors.text.DEFAULT}>
+                      Livraison à domicile
+                    </AppText>
+                    <View style={styles.recomBadge}>
+                      <AppText variant="overline" color={accent[700]}>EXPÉDITION EXPRESS</AppText>
+                    </View>
+                  </View>
+                  <AppText variant="caption" color={colors.text.muted} style={styles.modeDesc}>
+                    Prise en charge par un coursier DaloaDelivery et remis à votre porte
+                  </AppText>
+                </View>
+                <View style={[styles.radioCircle, deliveryMode === 'delivery' && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT }]}>
+                  {deliveryMode === 'delivery' && <View style={styles.radioDot} />}
+                </View>
+              </AppPressable>
 
-          {isPickupAllowed && (
-          <AppPressable
-            haptic="selection"
-            onPress={() => handleSelectMode('pickup')}
-            style={[
-              styles.modeCard,
-              deliveryMode === 'pickup' && {
-                borderColor: accent.DEFAULT,
-                backgroundColor: accent[50],
-              },
-            ]}
-          >
-            <View style={[styles.modeIconBox, { backgroundColor: colors.status.successLight }]}>
-              <Store size={22} color={colors.status.successDark} />
-            </View>
-            <View style={styles.flex1}>
-              <View style={styles.modeTitleRow}>
-                <AppText variant="bodyStrong" color={deliveryMode === 'pickup' ? accent[700] : colors.text.DEFAULT}>
-                  Retrait en boutique
-                </AppText>
-                <View style={styles.freeBadge}>
-                  <AppText variant="overline" color={colors.status.successDark}>GRATUIT</AppText>
-                </View>
-              </View>
-              <AppText variant="caption" color={colors.text.muted} style={styles.modeDesc}>
-                Click & Collect directement au magasin du commerçant à Daloa (0 FCFA)
-              </AppText>
-            </View>
-            <View style={[styles.radioCircle, deliveryMode === 'pickup' && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT }]}>
-              {deliveryMode === 'pickup' && <View style={styles.radioDot} />}
-            </View>
-          </AppPressable>
+              {isPickupAllowed && (
+                <AppPressable
+                  haptic="selection"
+                  onPress={() => handleSelectMode('pickup')}
+                  style={[
+                    styles.modeCard,
+                    deliveryMode === 'pickup' && {
+                      borderColor: accent.DEFAULT,
+                      backgroundColor: accent[50],
+                    },
+                  ]}
+                >
+                  <View style={[styles.modeIconBox, { backgroundColor: colors.status.successLight }]}>
+                    <Store size={22} color={colors.status.successDark} />
+                  </View>
+                  <View style={styles.flex1}>
+                    <View style={styles.modeTitleRow}>
+                      <AppText variant="bodyStrong" color={deliveryMode === 'pickup' ? accent[700] : colors.text.DEFAULT}>
+                        Retrait en boutique
+                      </AppText>
+                      <View style={styles.freeBadge}>
+                        <AppText variant="overline" color={colors.status.successDark}>GRATUIT</AppText>
+                      </View>
+                    </View>
+                    <AppText variant="caption" color={colors.text.muted} style={styles.modeDesc}>
+                      Click & Collect directement au magasin du commerçant à Daloa (0 FCFA)
+                    </AppText>
+                  </View>
+                  <View style={[styles.radioCircle, deliveryMode === 'pickup' && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT }]}>
+                    {deliveryMode === 'pickup' && <View style={styles.radioDot} />}
+                  </View>
+                </AppPressable>
+              )}
+            </>
           )}
         </View>
       </View>
