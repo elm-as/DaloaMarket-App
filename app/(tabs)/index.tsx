@@ -511,6 +511,9 @@ const styles = StyleSheet.create({
     width: '48%',
     marginBottom: spacing[3],
   },
+  listContent: {
+    paddingBottom: spacing[16],
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
