@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { colors, radii, spacing, Input, Button, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { MapPin, ChevronDown, Store, ArrowLeft, ArrowRight, Phone, CheckCircle2, AlertTriangle, Navigation } from 'lucide-react-native';
+import { MapPin, ChevronDown, Store, ArrowLeft, ArrowRight, Phone, CheckCircle2, AlertTriangle, Navigation, FileText } from 'lucide-react-native';
 import { DeliveryLocationMap } from './DeliveryLocationMap';
 import { Haptics } from '@daloa/utils';
 
@@ -22,6 +22,7 @@ interface CheckoutStepLocationProps {
   isLocatingGps?: boolean;
   onBack: () => void;
   onNext: () => void;
+  isDigital?: boolean;
 }
 
 export function CheckoutStepLocation({
@@ -41,6 +42,7 @@ export function CheckoutStepLocation({
   isLocatingGps,
   onBack,
   onNext,
+  isDigital = false,
 }: CheckoutStepLocationProps) {
   const accent = useAccent();
 
@@ -131,6 +133,36 @@ export function CheckoutStepLocation({
             />
           </View>
         </>
+      ) : isDigital ? (
+        /* Section Envoi numérique en privé */
+        <View style={styles.sectionCard}>
+          <View style={styles.pickupHeader}>
+            <View style={[styles.pickupIconBox, { backgroundColor: '#E0F2FE' }]}>
+              <FileText size={22} color="#0284C7" />
+            </View>
+            <View style={styles.flex1}>
+              <AppText variant="bodyStrong">Envoi numérique direct</AppText>
+              <AppText variant="caption" color={colors.text.muted}>
+                Le vendeur vous transmettra le fichier directement en privé
+              </AppText>
+            </View>
+          </View>
+
+          <View style={styles.pickupDetails}>
+            <View style={styles.pickupDetailRow}>
+              <CheckCircle2 size={16} color="#0284C7" />
+              <AppText variant="caption" color={colors.text.body} style={styles.flex1}>
+                Transmission : <AppText variant="caption" style={styles.boldText}>Messagerie DaloaMarket & WhatsApp</AppText>
+              </AppText>
+            </View>
+            <View style={styles.pickupDetailRow}>
+              <Store size={16} color={colors.text.muted} />
+              <AppText variant="caption" color={colors.text.body} style={styles.flex1}>
+                Vendeur : <AppText variant="caption" style={styles.boldText}>{shopName || 'Boutique certifiée Daloa'}</AppText>
+              </AppText>
+            </View>
+          </View>
+        </View>
       ) : (
         /* Section Retrait en boutique */
         <View style={styles.sectionCard}>

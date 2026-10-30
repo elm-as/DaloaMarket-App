@@ -31,6 +31,11 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.daloamarket.app",
+      "versionCode": 11,
+      "navigationBar": {
+        "backgroundColor": "#FFFFFF",
+        "barStyle": "dark-content"
+      },
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
@@ -364,7 +369,8 @@
           "android": {
             "enableProguardInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class com.facebook.jni.** { *; }\n-dontwarn com.facebook.react.**\n-dontwarn okhttp3.**\n-dontwarn okio.**"
+            "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class com.facebook.jni.** { *; }\n-dontwarn com.facebook.react.**\n-dontwarn okhttp3.**\n-dontwarn okio.**",
+            "enableMinifyInReleaseBuilds": true
           }
         }
       ],
@@ -376,9 +382,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f9b89e39-9c3f-4a77-a6c2-54efa14a4e97"
+        "projectId": "343876f7-071a-474b-bc8c-ac2df326911c"
       }
     },
-    "owner": "elmas-devs-team"
+    "owner": "elmas.rt"
   }
 }

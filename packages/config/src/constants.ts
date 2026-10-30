@@ -214,6 +214,14 @@ export const MARKET_CATEGORIES: CategoryDefinition[] = [
     color: '#6366F1',
     subcategories: ['Manuels scolaires', 'Romans & Littérature', 'Fournitures de bureau', 'Cahiers & Stylos'],
   },
+  {
+    id: 'digital',
+    name: 'Produits numériques & Formations',
+    slug: 'numerique',
+    iconName: 'FileText',
+    color: '#0284C7',
+    subcategories: ['E-books & PDF', 'Formations & Cours', 'Documents & Modèles', 'Logiciels & Comptes', 'Services numériques'],
+  },
 ];
 
 /** États des articles */

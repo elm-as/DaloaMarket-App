@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Tabs, useRouter } from 'expo-router';
 import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Search, Plus, MessageSquare, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -79,6 +80,7 @@ function TabItemView({
 export default function TabLayout() {
   const router = useRouter();
   const accent = useAccent();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data: conversations } = useConversations(user?.id);
   useInboxRealtime(user?.id);
@@ -87,6 +89,11 @@ export default function TabLayout() {
     () => (conversations || []).reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0),
     [conversations]
   );
+
+  // Espace réservé pour la barre de navigation système (3 boutons Android, barre de gestes, Home Indicator iOS)
+  const bottomInset = insets.bottom;
+  const paddingBottom = Math.max(bottomInset, Platform.OS === 'ios' ? 24 : 8);
+  const tabBarHeight = 58 + paddingBottom;
 
   return (
     <Tabs
@@ -97,8 +104,8 @@ export default function TabLayout() {
           backgroundColor: colors.bg.surface,
           borderTopColor: colors.border.DEFAULT,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 86 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          height: tabBarHeight,
+          paddingBottom: paddingBottom,
           paddingTop: 6,
           paddingHorizontal: 6,
           shadowColor: '#000',

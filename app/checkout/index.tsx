@@ -65,6 +65,7 @@ export default function CheckoutScreen() {
   // Même règle que create_cod_order : hors phase 0, paiement à la livraison et
   // retrait réservés aux vendeurs Pro. En panier multi-vendeurs, on reste
   // prudent (la base vérifie chaque vendeur).
+  const isDigital = !isCartMode && listing?.category === 'digital';
   const isSellerPro = Boolean(
     !isCartMode && listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()
   );
@@ -72,10 +73,10 @@ export default function CheckoutScreen() {
     profile?.cod_blocked_until && new Date(profile.cod_blocked_until).getTime() > Date.now()
   );
   const isCodAllowed = (allowCodForAll || isSellerPro) && !isBuyerCodBlocked;
-  const isPickupAllowed = allowPickupForAll || isSellerPro;
+  const isPickupAllowed = allowPickupForAll || isSellerPro || isDigital;
   const [paymentMode, setPaymentMode] = useState<PaymentMode>(() => {
     if (onlineDisabled) {
-      return deliveryMode === 'pickup' && isPickupAllowed ? 'cash_at_shop' : 'cod';
+      return (deliveryMode === 'pickup' || isDigital) && isPickupAllowed ? 'cash_at_shop' : 'cod';
     }
     return (phaseConfig?.default_payment_method === 'cod' || isPhase0) && isCodAllowed ? 'cod' : 'online';
   });
@@ -83,6 +84,11 @@ export default function CheckoutScreen() {
   // Résolution déterministe et unidirectionnelle du mode de paiement
   // Évite tout rebond/ping-pong entre 'cod' et 'online' quand les paiements en ligne sont coupés
   useEffect(() => {
+    if (isDigital) {
+      if (deliveryMode !== 'pickup') setDeliveryMode('pickup');
+      return;
+    }
+
     if (!isPickupAllowed && deliveryMode === 'pickup') {
       setDeliveryMode('delivery');
     }
@@ -476,6 +482,7 @@ export default function CheckoutScreen() {
               }}
               onNext={() => { setErrorMsg(null); setStep(2); }}
               isPickupAllowed={isPickupAllowed}
+              isDigital={isDigital}
             />
           )}
 
@@ -496,8 +503,9 @@ export default function CheckoutScreen() {
               onLocateGps={() => handleRequestGps(false)}
               isLocatingGps={isLocatingGps}
               onBack={() => setStep(1)}
+              isDigital={isDigital}
               onNext={() => {
-                if (deliveryMode === 'delivery') {
+                if (deliveryMode === 'delivery' && !isDigital) {
                   if (!deliveryCoords?.latitude || !deliveryCoords?.longitude) {
                     setErrorMsg('La position GPS est obligatoire pour la livraison. Veuillez activer votre GPS.');
                     return;

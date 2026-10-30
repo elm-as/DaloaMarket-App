@@ -101,4 +101,58 @@ export const NOTIFICATION_TEMPLATES: Record<string, NotificationTemplate> = {
     defaultRoute: '/listing/create',
     tag: 'whatsapp-status-new-stock',
   },
+
+  // Sondages WhatsApp & Avis de la communauté
+  SURVEY_WHAT_TO_BUY: {
+    key: 'SURVEY_WHAT_TO_BUY',
+    target: 'all',
+    title: '📊 Sondage : Que veux-tu acheter sur DaloaMarket ?',
+    body: "Dis-nous en 1 clic ce qui t'intéresse sur notre chaîne WhatsApp. On sélectionne les meilleurs articles pour toi !",
+    defaultRoute: 'https://whatsapp.com/channel/0029Vb94o2vJENy5kkADR42U',
+    tag: 'survey-what-to-buy',
+  },
+  SURVEY_CANT_FIND: {
+    key: 'SURVEY_CANT_FIND',
+    target: 'all',
+    title: '💡 Tu ne trouves pas ton bonheur à Daloa ?',
+    body: 'Participe au sondage du jour sur la chaîne WhatsApp ! Dis-nous les produits et les prix que tu attends.',
+    defaultRoute: 'https://whatsapp.com/channel/0029Vb94o2vJENy5kkADR42U',
+    tag: 'survey-cant-find',
+  },
+  SURVEY_CUSTOM_REQUEST: {
+    key: 'SURVEY_CUSTOM_REQUEST',
+    target: 'all',
+    title: '🎯 Dis-nous ce que tu cherches, on te le trouve !',
+    body: 'Un téléphone, des baskets, des mèches ou un meuble ? Donne-nous tes envies dans le sondage WhatsApp !',
+    defaultRoute: 'https://whatsapp.com/channel/0029Vb94o2vJENy5kkADR42U',
+    tag: 'survey-custom-request',
+  },
+
+  // Diversité d'articles & Ventes rapides (Vendeurs)
+  DIVERSITY_SELLERS_DEMAND: {
+    key: 'DIVERSITY_SELLERS_DEMAND',
+    target: 'seller',
+    title: '👕 Vendeurs : les acheteurs demandent de la variété !',
+    body: 'Mode, friperie, beauté, accessoires : nos +130 membres cherchent des articles du quotidien. Publie en 1 minute !',
+    defaultRoute: '/listing/create',
+    tag: 'diversity-sellers-demand',
+  },
+  DIVERSITY_LOW_PRICES: {
+    key: 'DIVERSITY_LOW_PRICES',
+    target: 'seller',
+    title: '🏷️ Les articles à petits prix partent le plus vite !',
+    body: 'Des articles entre 1 000 F et 10 000 F séduisent immédiatement les acheteurs. Dépose ton offre maintenant !',
+    defaultRoute: '/listing/create',
+    tag: 'diversity-low-prices',
+  },
+
+  // Activation premier achat (Acheteurs)
+  FIRST_ORDER_SECURE: {
+    key: 'FIRST_ORDER_SECURE',
+    target: 'buyer',
+    title: '🔥 Prêt pour ta première commande sur DaloaMarket ?',
+    body: 'Commande en toute sérénité : paiement sécurisé Mobile Money avec remise par code OTP à la livraison.',
+    defaultRoute: '/(tabs)',
+    tag: 'first-order-secure',
+  },
 };

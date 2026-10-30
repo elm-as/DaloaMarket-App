@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TextInput } from 'react-native';
-import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles, Tag } from 'lucide-react-native';
+import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles, Tag, FileText } from 'lucide-react-native';
 import { MARKET_CATEGORIES, LISTING_CONDITIONS } from '@daloa/config';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { formatFCFA } from '@daloa/utils';
@@ -28,6 +28,7 @@ const ICON_MAP: Record<string, React.FC<any>> = {
   Sparkles,
   Dumbbell,
   BookOpen,
+  FileText,
   Tag,
 };
 
@@ -100,6 +101,13 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
             );
           })}
         </View>
+        {selectedCategory === 'digital' && (
+          <View style={styles.digitalNotice}>
+            <AppText variant="caption" color="#0369A1" style={{ fontFamily: typography.families.semibold }}>
+              💡 Produit numérique : aucun coursier ne sera affecté. Vous transmettrez le document directement à l'acheteur en privé après validation.
+            </AppText>
+          </View>
+        )}
       </View>
 
       {/* ── État ── */}
@@ -329,5 +337,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     paddingVertical: 8,
     marginTop: -4,
+  },
+  digitalNotice: {
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: radii.lg,
+    padding: spacing[3],
+    marginTop: spacing[2],
   },
 });

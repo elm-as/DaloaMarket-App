@@ -47,24 +47,38 @@ export function usePushNotifications() {
         if (!granted) return;
 
         if (Platform.OS === 'android') {
-          // Canal messages : importance HIGH → bannière + son en premier plan
+          // Canal messages : importance HIGH → bannière + son + vibration
           await Notifications.setNotificationChannelAsync('chat', {
             name: 'Messages',
             importance: Notifications.AndroidImportance.HIGH,
             sound: 'default',
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#FF8C00',
+            showBadge: true,
+            enableLights: true,
+            enableVibrate: true,
           });
           // Canal commandes
           await Notifications.setNotificationChannelAsync('orders', {
             name: 'Commandes',
             importance: Notifications.AndroidImportance.HIGH,
             sound: 'default',
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF8C00',
+            showBadge: true,
+            enableLights: true,
+            enableVibrate: true,
           });
-          // Canal général (fallback)
+          // Canal général (annonces, sondages, nouveautés)
           await Notifications.setNotificationChannelAsync('default', {
-            name: 'Général',
-            importance: Notifications.AndroidImportance.DEFAULT,
+            name: 'Actualités & Bons Plans',
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: 'default',
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF8C00',
+            showBadge: true,
+            enableLights: true,
+            enableVibrate: true,
           });
         }
 
@@ -103,16 +117,23 @@ export function usePushNotifications() {
         }
       }
 
-      // 2. Redirection conversation chat
+      // 2. Redirection conversation chat (transmission de toutes les métadonnées pour un affichage parfait)
       if (data.chatPartnerId) {
-        // En cas de segments multiples (ex: listingId/partnerId), extraire le partnerId (dernier segment)
         const parts = String(data.chatPartnerId).split('/').filter(Boolean);
         const partnerId = parts.length >= 2 ? parts[1] : parts[0];
         const listingId = data.listingId || (parts.length >= 2 ? parts[0] : undefined);
         if (partnerId) {
           router.push({
             pathname: '/chat/[id]',
-            params: listingId ? { id: partnerId, listingId: String(listingId) } : { id: partnerId },
+            params: {
+              id: partnerId,
+              ...(listingId ? { listingId: String(listingId) } : {}),
+              ...(data.partnerName ? { partnerName: String(data.partnerName) } : {}),
+              ...(data.partnerAvatar ? { partnerAvatar: String(data.partnerAvatar) } : {}),
+              ...(data.listingTitle ? { listingTitle: String(data.listingTitle) } : {}),
+              ...(data.listingPhoto ? { listingPhoto: String(data.listingPhoto) } : {}),
+              ...(data.listingPrice ? { listingPrice: String(data.listingPrice) } : {}),
+            },
           } as any);
           return;
         }
@@ -127,7 +148,15 @@ export function usePushNotifications() {
           if (partnerId) {
             router.push({
               pathname: '/chat/[id]',
-              params: listingId ? { id: partnerId, listingId } : { id: partnerId },
+              params: {
+                id: partnerId,
+                ...(listingId ? { listingId } : {}),
+                ...(data.partnerName ? { partnerName: String(data.partnerName) } : {}),
+                ...(data.partnerAvatar ? { partnerAvatar: String(data.partnerAvatar) } : {}),
+                ...(data.listingTitle ? { listingTitle: String(data.listingTitle) } : {}),
+                ...(data.listingPhoto ? { listingPhoto: String(data.listingPhoto) } : {}),
+                ...(data.listingPrice ? { listingPrice: String(data.listingPrice) } : {}),
+              },
             } as any);
             return;
           }
@@ -157,7 +186,10 @@ export function usePushNotifications() {
     // A. Cold start : l'application était fermée quand l'utilisateur a cliqué sur la notification
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) {
-        handleNotificationData(response.notification.request.content.data);
+        // Laisser le temps à l'arbre de navigation Expo Router de se stabiliser
+        setTimeout(() => {
+          handleNotificationData(response.notification.request.content.data);
+        }, 350);
       }
     });
 
