@@ -47,7 +47,6 @@ export const promoBannersService = {
         return [];
       }
 
-      // Filtrage des dates de diffusion actives
       const filtered = data.filter((b: any) => {
         if (b.starts_at && b.starts_at > nowIso) return false;
         if (b.ends_at && b.ends_at < nowIso) return false;
@@ -118,16 +117,12 @@ export const promoBannersService = {
   },
 
   /**
-   * Enregistre un clic sur une bannière promotionnelle
+   * Enregistre un clic sur une bannière promotionnelle via la RPC atomique `increment_banner_click`
    */
   async trackBannerClick(bannerId: string): Promise<void> {
+    if (!bannerId) return;
     try {
-      await supabase
-        .from('promo_banners')
-        .update({
-          clicks_count: (supabase as any).raw ? (supabase as any).raw('clicks_count + 1') : undefined,
-        } as any)
-        .eq('id', bannerId);
+      await (supabase.rpc as any)('increment_banner_click', { p_banner_id: bannerId });
     } catch {
       // Ignorer pour analytics
     }

@@ -1,7 +1,6 @@
 import { supabase } from '../supabase';
 import {
   GroupedPickupStop,
-  DeliveryGroupRun,
   OrderWithDetails,
 } from '@daloa/types';
 import {
@@ -52,8 +51,10 @@ export const groupedDeliveryService = {
         .order('grouped_stop_index', { ascending: true }),
       supabase
         .from('delivery_assignments')
-        .select('*')
+        .select('id, order_id, delivery_group_id, is_grouped, group_total_stops, group_completed_stops, grouped_stops, delivery_price, status')
         .eq('delivery_group_id', groupId)
+        .order('delivery_price', { ascending: false })
+        .limit(1)
         .maybeSingle(),
     ]);
 
@@ -63,7 +64,7 @@ export const groupedDeliveryService = {
     }
 
     const orders = (ordersRes.data || []) as unknown as OrderWithDetails[];
-    const assignment = assignmentRes.data;
+    const assignment = assignmentRes.data as any;
 
     let stops: GroupedPickupStop[] = [];
 
@@ -82,7 +83,6 @@ export const groupedDeliveryService = {
         notes: s.notes,
       }));
     } else {
-      // Reconstitution à partir des commandes si l'assignation n'a pas encore le jsonb
       stops = orders.map((o, idx) => ({
         stopIndex: o.grouped_stop_index || idx + 1,
         sellerId: o.seller_id,
@@ -146,11 +146,12 @@ export const groupedDeliveryService = {
   },
 
   /**
-   * Initialise une tournée groupée pour une liste de commandes multi-vendeurs
+   * Initialise de manière atomique une tournée groupée pour une liste de commandes multi-vendeurs
+   * via la RPC SECURITY DEFINER `setup_grouped_delivery_run`.
    */
   async setupGroupedDeliveryRun(
     orderIds: string[],
-    buyerId: string,
+    _buyerId: string,
     options: {
       fullAddress: string;
       district?: string;
@@ -160,71 +161,24 @@ export const groupedDeliveryService = {
   ): Promise<string | null> {
     if (!orderIds || orderIds.length <= 1) return null;
 
-    const { data: orders, error: ordersErr } = await supabase
-      .from('orders')
-      .select('id, seller_id, delivery_fee, seller:seller_id(id, shop_name, full_name, district, shop_latitude, shop_longitude, phone)')
-      .in('id', orderIds);
+    const { data, error } = await (supabase.rpc as any)('setup_grouped_delivery_run', {
+      p_order_ids: orderIds,
+      p_dropoff_address: options.fullAddress || 'Daloa',
+      p_dropoff_district: options.district || null,
+      p_dropoff_lat: options.lat ?? null,
+      p_dropoff_lng: options.lng ?? null,
+    });
 
-    if (ordersErr || !orders || orders.length <= 1) return null;
+    if (error) {
+      console.warn('Erreur initialisation tournée groupée:', error.message);
+      return null;
+    }
 
-    const fees = orders.map((o: any) => Number(o.delivery_fee) || 500);
-    const quote = calculateGroupedDeliveryQuote(fees);
-    const groupId = (crypto as any)?.randomUUID?.() || `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const payload = data as any;
+    if (!payload?.success || !payload?.group_id) {
+      return null;
+    }
 
-    const groupedStops: GroupedPickupStop[] = orders.map((o: any, idx: number) => ({
-      stopIndex: idx + 1,
-      sellerId: o.seller_id,
-      shopName: o.seller?.shop_name || o.seller?.full_name || 'Boutique',
-      address: o.seller?.district || 'Daloa',
-      district: o.seller?.district || null,
-      latitude: o.seller?.shop_latitude ? Number(o.seller.shop_latitude) : null,
-      longitude: o.seller?.shop_longitude ? Number(o.seller.shop_longitude) : null,
-      phone: o.seller?.phone || null,
-      status: 'pending',
-    }));
-
-    const discountPerOrder = Math.round(quote.savings / orders.length);
-
-    await Promise.all([
-      ...orders.map((o: any, idx: number) =>
-        supabase
-          .from('orders')
-          .update({
-            delivery_group_id: groupId,
-            is_grouped: true,
-            grouped_stop_index: idx + 1,
-            grouped_delivery_discount: discountPerOrder,
-          } as any)
-          .eq('id', o.id)
-      ),
-      ...orders.map((o: any) =>
-        supabase
-          .from('delivery_assignments')
-          .update({
-            delivery_group_id: groupId,
-            is_grouped: true,
-            group_total_stops: orders.length,
-            group_completed_stops: 0,
-            grouped_stops: groupedStops as any,
-          } as any)
-          .eq('order_id', o.id)
-      ),
-      (supabase.from('delivery_group_runs' as any) as any).insert({
-        id: groupId,
-        buyer_id: buyerId,
-        total_sellers: orders.length,
-        status: 'awaiting_pickup',
-        total_delivery_price: quote.totalGroupedFee,
-        driver_earning: quote.driverTotalGain,
-        platform_fee: Math.round(quote.totalGroupedFee * 0.1),
-        buyer_discount: quote.savings,
-        dropoff_address: options.fullAddress,
-        dropoff_district: options.district || null,
-        dropoff_lat: options.lat || null,
-        dropoff_lng: options.lng || null,
-      }),
-    ]);
-
-    return groupId;
+    return String(payload.group_id);
   },
 };

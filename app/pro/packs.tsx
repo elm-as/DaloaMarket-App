@@ -22,9 +22,9 @@ export default function PacksScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    systemSettingsService.getPhaseConfig().then((cfg) => {
-      if (isMounted && cfg) {
-        setBoostsEnabled(cfg.enable_boost ?? true);
+    systemSettingsService.getSettings().then((settings) => {
+      if (isMounted && settings?.phaseConfig) {
+        setBoostsEnabled(settings.phaseConfig.enable_boost ?? true);
       }
     });
     return () => {

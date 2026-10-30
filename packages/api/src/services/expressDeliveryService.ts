@@ -142,7 +142,7 @@ export const expressDeliveryService = {
       `Communiquez ce code au coursier uniquement quand vous recevez le colis en main propre.`,
       ``,
       `Suivez l'arrivée de votre coursier en direct :`,
-      `https://daloamarket.com/order/${params.orderId}`,
+      `https://daloamarket.com/suivi/${params.orderId}`,
     ]
       .filter((line) => line !== null)
       .join('\n');

@@ -81,23 +81,35 @@ export const deliveryService = {
   },
 
   /**
-   * Récupère les courses disponibles en attente d'attribution
+   * Récupère les courses disponibles en attente d'attribution.
+   * Note de sécurité : pickup_otp et delivery_otp ne sont jamais sélectionnés côté livreur.
    */
   async getAvailableRuns(driverCoords?: Coordinates | null): Promise<AvailableDeliveryRun[]> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, payment_method, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
+      .select('id, order_id, seller_id, delivery_person_id, status, is_private, is_express, is_grouped, delivery_group_id, group_total_stops, group_completed_stops, grouped_stops, pickup_confirmed_by_seller, pickup_confirmed_at, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, delivery_price, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, created_at, orders:order_id(id, order_type, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, payment_method, is_grouped, delivery_group_id, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
       .eq('status', 'awaiting_pickup')
       .is('delivery_person_id', null)
+      .order('delivery_price', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
+    // Dédoublonnage des tournées groupées (F06) : une seule carte par delivery_group_id
+    const seenGroups = new Set<string>();
+    const deduplicated = (data || []).filter((item: any) => {
+      const gid = item.delivery_group_id || item.orders?.delivery_group_id;
+      if (!gid) return true;
+      if (seenGroups.has(gid)) return false;
+      seenGroups.add(gid);
+      return true;
+    });
+
     // Téléphones via get_contact_phones : avant l'acceptation, seul celui d'un
     // vendeur en ligne est visible ; celui de l'acheteur l'est une fois la course prise.
-    await attachContactPhones((data || []).flatMap((item: any) => [item.orders?.seller, item.orders?.buyer]));
+    await attachContactPhones(deduplicated.flatMap((item: any) => [item.orders?.seller, item.orders?.buyer]));
 
-    return (data || []).map((item: any) => {
+    return deduplicated.map((item: any) => {
       const order = item.orders || {};
       const listing = order.listings || {};
       const seller = order.seller || {};
@@ -253,25 +265,27 @@ export const deliveryService = {
 
   /**
    * Récupère la course actuellement active pour un livreur.
-   * Note de sécurité : pickupOtp et deliveryOtp sont exclus de la réponse envoyée au livreur.
+   * Note de sécurité : pickup_otp et delivery_otp sont exclus de la requête SQL envoyée au livreur.
    */
   async getActiveRun(driverId: string): Promise<ActiveDeliveryRunDetails | null> {
-    const { data, error } = await supabase
-      .from('delivery_assignments')
-      .select('*, orders:order_id(id, delivery_address, delivery_lat, delivery_lng, total_amount, payment_method, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
+    const { data: rawResult, error } = await (supabase.from('delivery_assignments') as any)
+      .select('id, order_id, seller_id, delivery_person_id, status, is_private, is_express, is_grouped, delivery_group_id, group_total_stops, group_completed_stops, grouped_stops, pickup_confirmed_by_seller, pickup_confirmed_at, delivered_at, pickup_photo_url, delivery_photo_url, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, delivery_price, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, created_at, orders:order_id(id, order_type, delivery_address, delivery_lat, delivery_lng, total_amount, payment_method, is_grouped, delivery_group_id, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
       .eq('delivery_person_id', driverId)
       .in('status', ['accepted', 'picked_up', 'in_transit'])
+      .order('delivery_price', { ascending: false })
       .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
+    const data = rawResult as any;
     if (error || !data) return null;
 
     await attachContactPhones([(data as any).orders?.seller, (data as any).orders?.buyer]);
 
-    const order = data.orders || {};
-    const listing = order.listings || {};
-    const seller = order.seller || {};
-    const buyer = order.buyer || {};
+    const order: any = data.orders || {};
+    const listing: any = order.listings || {};
+    const seller: any = order.seller || {};
+    const buyer: any = order.buyer || {};
 
     const pickupCoords: Coordinates = {
       lat: seller.shop_latitude ?? 6.8773,
