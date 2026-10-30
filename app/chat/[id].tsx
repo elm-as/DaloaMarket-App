@@ -1,42 +1,65 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useChatMessages, chatService } from '@daloa/api';
-import {
-  colors,
-  radii,
-  spacing,
-  typography,
-  Avatar,
-  CurrencyText,
-  AppText,
-  AppPressable,
-  useAccent,
-  showAlert,
-} from '@daloa/ui';
-import { Send, ArrowLeft, Lock } from 'lucide-react-native';
+import { colors, radii, spacing, typography, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
+import { Send, Lock } from 'lucide-react-native';
 import { formatDate, censorMessageContent } from '@daloa/utils';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
+import { useChatPartnerDetails } from '../../src/hooks/useChatPartnerDetails';
+import { ChatRoomHeader } from '../../src/components/chat/ChatRoomHeader';
 
 export default function ChatRoomScreen() {
+  const searchParams = useLocalSearchParams<{
+    id: string;
+    partnerName?: string;
+    partnerAvatar?: string;
+    listingId?: string;
+    listingTitle?: string;
+    listingPhoto?: string;
+    listingPrice?: string;
+  }>();
+
+  const partnerId = searchParams.id;
+  const router = useRouter();
+  const accent = useAccent();
+  const insets = useSafeAreaInsets();
+  const { user, isAdmin } = useAuth();
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [inputText, setInputText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
+  // Recherche initiale des messages avec l'identifiant d'annonce si disponible
+  const initialListingId = searchParams.listingId && searchParams.listingId !== 'support' && searchParams.listingId !== 'null'
+    ? searchParams.listingId
+    : undefined;
+
+  const { data: messages, refetch } = useChatMessages(user?.id, partnerId, initialListingId);
+  const messageList = messages || [];
+
+  // Résolution robuste des métadonnées (nom, avatar, annonce) si manquantes lors d'une ouverture par push
   const {
-    id: partnerId,
     partnerName,
     partnerAvatar,
     listingId,
     listingTitle,
     listingPhoto,
     listingPrice,
-  } = useLocalSearchParams<{ id: string; partnerName?: string; partnerAvatar?: string; listingId?: string; listingTitle?: string; listingPhoto?: string; listingPrice?: string }>();
-
-  const router = useRouter();
-  const accent = useAccent();
-  const insets = useSafeAreaInsets();
-  const { user, isAdmin } = useAuth();
+  } = useChatPartnerDetails(
+    {
+      partnerId,
+      partnerName: searchParams.partnerName,
+      partnerAvatar: searchParams.partnerAvatar,
+      listingId: searchParams.listingId,
+      listingTitle: searchParams.listingTitle,
+      listingPhoto: searchParams.listingPhoto,
+      listingPrice: searchParams.listingPrice,
+    },
+    messageList
+  );
 
   const isSupport = (!listingId || listingId === 'support' || listingId === 'null') && (
     partnerName?.includes('DaloaMarket') ||
@@ -55,13 +78,6 @@ export default function ChatRoomScreen() {
       />
     );
   }
-
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [inputText, setInputText] = useState('');
-  const [isSending, setIsSending] = useState(false);
-
-  const { data: messages, refetch } = useChatMessages(user?.id, partnerId, listingId);
-  const messageList = messages || [];
 
   useEffect(() => {
     if (!user?.id) return;
@@ -103,70 +119,17 @@ export default function ChatRoomScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Compact gradient header */}
-      <LinearGradient
-        colors={[accent[400], accent[600], accent[700]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.chatHeader}
-      >
-        <AppPressable
-          onPress={() => router.back()}
-          rippleBorderless
-          style={styles.backBtn}
-          accessibilityLabel="Retour"
-        >
-          <ArrowLeft size={18} color={colors.text.inverse} />
-        </AppPressable>
-
-        <View style={styles.headerCenter}>
-          <Avatar uri={partnerAvatar} name={partnerName || '?'} size={36} />
-          <View style={styles.headerInfo}>
-            <AppText variant="bodyStrong" color={colors.text.inverse} numberOfLines={1}>
-              {partnerName || 'Discussion'}
-            </AppText>
-            {listingTitle && (
-              <AppText variant="caption" color={accent[100]} numberOfLines={1}>
-                Re : {listingTitle}
-              </AppText>
-            )}
-          </View>
-        </View>
-
-        {listingId && listingPrice && (
-          <AppPressable
-            onPress={() => router.push(`/listing/${listingId}` as any)}
-            style={styles.priceChip}
-            haptic="selection"
-            accessibilityLabel="Voir l'annonce"
-          >
-            <CurrencyText amount={parseFloat(listingPrice)} size="sm" weight="bold" color="rgba(255,255,255,0.95)" />
-          </AppPressable>
-        )}
-      </LinearGradient>
+      <ChatRoomHeader
+        partnerName={partnerName}
+        partnerAvatar={partnerAvatar}
+        listingId={listingId}
+        listingTitle={listingTitle}
+        listingPhoto={listingPhoto}
+        listingPrice={listingPrice}
+        accent={accent}
+      />
 
       <KeyboardAvoidingView style={styles.flex1} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        {/* Encart produit épinglé */}
-        {listingTitle && (
-          <AppPressable
-            haptic="none"
-            onPress={() => listingId && router.push(`/listing/${listingId}` as any)}
-            style={[styles.pinnedProduct, { backgroundColor: accent[50], borderBottomColor: accent[100] }]}
-            accessibilityLabel="Voir l'annonce liée"
-          >
-            {listingPhoto ? (
-              <Image source={{ uri: listingPhoto }} style={styles.productThumb} contentFit="cover" transition={150} />
-            ) : null}
-            <View style={styles.pinnedInfo}>
-              <AppText variant="caption" color={colors.text.DEFAULT} numberOfLines={1}>
-                {listingTitle}
-              </AppText>
-              {listingPrice && (
-                <CurrencyText amount={parseFloat(listingPrice)} size="sm" weight="bold" color={accent.DEFAULT} />
-              )}
-            </View>
-          </AppPressable>
-        )}
 
         {/* Messages */}
         <ScrollView
@@ -246,45 +209,6 @@ export default function ChatRoomScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
   flex1: { flex: 1 },
-  chatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing[3],
-    paddingTop: spacing[2],
-    paddingBottom: spacing[3],
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    gap: spacing[2],
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.lg,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  headerInfo: { flex: 1, gap: 1 },
-  priceChip: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: spacing[2],
-    paddingVertical: 5,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  pinnedProduct: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[2],
-    borderBottomWidth: 1,
-    gap: spacing[3],
-  },
-  productThumb: { width: 36, height: 36, borderRadius: radii.md },
-  pinnedInfo: { flex: 1, gap: 2 },
   messagesScroll: { padding: spacing[4], gap: spacing[2] },
   messageRow: { flexDirection: 'row', marginVertical: 2 },
   myRow: { justifyContent: 'flex-end' },

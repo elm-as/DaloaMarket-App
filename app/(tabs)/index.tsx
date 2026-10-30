@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing[2],
-    paddingBottom: spacing[8],
+    paddingBottom: spacing[16],
   },
   cell: {
     flex: 1,
@@ -510,9 +510,6 @@ const styles = StyleSheet.create({
   skeletonCell: {
     width: '48%',
     marginBottom: spacing[3],
-  },
-  listContent: {
-    paddingBottom: spacing[16],
   },
   sectionHeader: {
     flexDirection: 'row',
