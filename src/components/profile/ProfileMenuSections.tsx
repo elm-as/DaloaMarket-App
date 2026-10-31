@@ -12,6 +12,7 @@ import {
   Store,
   LogOut,
   ChevronRight,
+  Zap,
 } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 
@@ -27,6 +28,8 @@ interface ProfileMenuSectionsProps {
   onOpenTerms: () => void;
   onOpenDisputes: () => void;
   onLogout: () => void;
+  showBoosts?: boolean;
+  onOpenPacks?: () => void;
 }
 
 interface MenuItemRowProps {
@@ -84,6 +87,8 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
   onOpenTerms,
   onOpenDisputes,
   onLogout,
+  showBoosts,
+  onOpenPacks,
 }) => {
   const accent = useAccent();
 
@@ -94,6 +99,15 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
         MON COMPTE & FINANCES
       </AppText>
       <View style={styles.cardGroup}>
+        {showBoosts && onOpenPacks ? (
+          <MenuItemRow
+            icon={<Zap size={17} color={accent[600]} />}
+            tint={accent[50]}
+            label="Packs & Crédits de Boost"
+            sublabel="Booster vos annonces en tête d'accueil (dès 100 F)"
+            onPress={onOpenPacks}
+          />
+        ) : null}
         <MenuItemRow
           icon={<Wallet size={17} color={colors.status.infoDark} />}
           tint={colors.status.infoLight}
