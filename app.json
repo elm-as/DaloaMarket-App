@@ -30,7 +30,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.daloamarket.app",
-      "versionCode": 11,
+      "versionCode": 12,
       "navigationBar": {
         "backgroundColor": "#FFFFFF",
         "barStyle": "dark-content"
