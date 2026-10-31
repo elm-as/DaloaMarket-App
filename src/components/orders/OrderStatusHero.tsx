@@ -22,7 +22,6 @@ interface OrderStatusHeroProps {
 
 const SUPPORT_WHATSAPP = 'https://wa.me/2250704163361';
 
-/** Une couleur par situation, comme sur le site : orange, vert, rouge, bleu-vert, ardoise. */
 const GRADIENTS = {
   progress: ['#FB923C', '#FF7F00', '#D97706'],
   success: ['#10B981', '#0D9488'],
@@ -51,11 +50,12 @@ function getClosedCopy(order: any, isSeller: boolean) {
   const isPickup = isPickupMode(order.delivery_mode);
   const isCod = order.payment_method === 'cod';
   const isCashAtShop = order.payment_method === 'cash_at_shop';
-  const unavailable = order.cancel_reason === 'unavailable' || order.cancel_reason === 'seller_unavailable';
+  const cancelReason = String(order.cancel_reason || '');
+  const unavailable = cancelReason === 'unavailable' || cancelReason === 'seller_unavailable';
+  const isCodRefusal = cancelReason.startsWith('cod_refused_');
 
-  // Litige arbitré par l'équipe (resolve_delivery_dispute) : annulation `admin_refund_*`.
-  if (order.status === 'cancelled' && String(order.cancel_reason || '').startsWith('admin_refund')) {
-    const partial = order.cancel_reason === 'admin_refund_partial';
+  if (order.status === 'cancelled' && cancelReason.startsWith('admin_refund')) {
+    const partial = cancelReason === 'admin_refund_partial';
     return isSeller
       ? {
           kind: 'resolved' as const,
@@ -85,39 +85,69 @@ function getClosedCopy(order: any, isSeller: boolean) {
       money: isCod || isCashAtShop ? 'Aucun paiement en ligne' : 'Argent bloqué en séquestre jusqu’à la décision',
     };
   }
+
+  if (unavailable) {
+    return isSeller
+      ? {
+          kind: 'cancelled' as const,
+          title: 'Commande annulée (article indisponible)',
+          message: 'Vous avez annulé cette commande car l’article n’est plus disponible.',
+          money: isCod || isCashAtShop ? 'Aucun paiement' : 'Acheteur remboursé',
+        }
+      : {
+          kind: 'cancelled' as const,
+          title: 'Article indisponible chez le vendeur',
+          message: 'Le vendeur ne peut pas honorer la commande.',
+          money: isCod || isCashAtShop
+            ? 'Rien n’a été débité'
+            : `Remboursement de ${formatFCFA(order.total_amount)} en cours vers votre Mobile Money`,
+        };
+  }
+
+  if (isCodRefusal) {
+    return isSeller
+      ? {
+          kind: 'cancelled' as const,
+          title: 'Refus à la livraison enregistré',
+          message: 'L’article a été remis en stock et le refus a été comptabilisé sur le profil de l’acheteur.',
+          money: 'Aucun paiement',
+        }
+      : {
+          kind: 'cancelled' as const,
+          title: 'Livraison non honorée',
+          message: 'Le vendeur a signalé une impossibilité de remise à l’arrivée du colis.',
+          money: 'Aucun prélèvement',
+        };
+  }
+
   if (isCashAtShop || isCod) {
     return {
       kind: 'cancelled' as const,
-      title: isSeller ? 'Commande annulée par le client' : isCashAtShop ? 'Réservation annulée' : 'Commande annulée',
+      title: isSeller
+        ? isCashAtShop ? 'Réservation annulée par le client' : 'Commande annulée par le client'
+        : isCashAtShop ? 'Réservation annulée' : 'Commande annulée',
       message: isSeller ? 'L’article est remis en vente.' : 'Votre commande a bien été annulée.',
       money: isSeller ? 'Aucun paiement' : 'Rien n’a été débité',
     };
   }
+
   if (isSeller) {
     return {
       kind: 'cancelled' as const,
-      title: unavailable ? 'Commande annulée (article indisponible)' : 'Commande annulée par l’acheteur',
-      message: unavailable
-        ? 'Vous avez annulé cette commande car l’article n’est plus disponible.'
-        : 'L’acheteur a annulé sa commande avant l’expédition. L’article a été remis en stock.',
+      title: 'Commande annulée par l’acheteur',
+      message: 'L’acheteur a annulé sa commande avant l’expédition. L’article a été remis en stock.',
       money: 'Acheteur remboursé',
     };
   }
   return {
     kind: 'cancelled' as const,
-    title: unavailable ? 'Article indisponible chez le vendeur' : isPickup ? 'Réservation annulée' : 'Commande annulée',
-    message: unavailable ? 'Le vendeur ne peut pas honorer la commande.' : 'Votre commande a été annulée.',
+    title: isPickup ? 'Réservation annulée' : 'Commande annulée',
+    message: 'Votre commande a été annulée.',
     money: `Remboursement de ${formatFCFA(order.total_amount)} en cours vers votre Mobile Money`,
   };
 }
 
-/**
- * Encadré d'état en tête du suivi : il change de forme avec la commande (en
- * cours, livrée, annulée, en litige) au lieu de se limiter à la pastille du
- * bandeau, et dit où en est la commande et quoi faire.
- */
 export function OrderStatusHero({ order, steps, isSeller, userId, driverPhone }: OrderStatusHeroProps) {
-  const accent = useAccent();
   const isPickup = isPickupMode(order.delivery_mode);
   const isDelivered = order.status === 'delivered' || order.status === 'completed';
   const closed = getClosedCopy(order, isSeller);
@@ -149,7 +179,6 @@ export function OrderStatusHero({ order, steps, isSeller, userId, driverPhone }:
   if (isDelivered) {
     const a = order.delivery_assignment;
     const when = a?.delivered_at || a?.buyer_confirmed_at;
-    // Livraison validée par l'équipe à l'issue d'un litige.
     const title = a?.resolved_at
       ? 'Litige réglé · livraison validée'
       : isSeller ? 'Vente conclue' : isPickup ? 'Article retiré' : 'Commande livrée';
@@ -215,7 +244,6 @@ export function OrderStatusHero({ order, steps, isSeller, userId, driverPhone }:
   );
 }
 
-/** Coche qui apparaît avec un petit rebond. */
 function PopIn({ children }: { children: React.ReactNode }) {
   const scale = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
@@ -234,7 +262,6 @@ function Segments({ done, total }: { done: number; total: number }) {
   );
 }
 
-/** Notation du vendeur depuis le suivi. Un avis par acheteur et par annonce (UNIQUE en base). */
 function InlineSellerRating({ userId, sellerId, listingId }: { userId: string; sellerId: string; listingId: string }) {
   const accent = useAccent();
   const [existing, setExisting] = useState<number | null | undefined>(undefined);
@@ -302,11 +329,7 @@ function InlineSellerRating({ userId, sellerId, listingId }: { userId: string; s
             accessibilityLabel={`${n} étoile${n > 1 ? 's' : ''}`}
             style={styles.starBtn}
           >
-            <Star
-              size={30}
-              color={n <= rating ? colors.status.warning : colors.grey[300]}
-              fill={n <= rating ? colors.status.warning : 'transparent'}
-            />
+            <Star size={30} color={n <= rating ? colors.status.warning : colors.grey[300]} fill={n <= rating ? colors.status.warning : 'transparent'} />
           </AppPressable>
         ))}
       </View>
@@ -331,75 +354,18 @@ function InlineSellerRating({ userId, sellerId, listingId }: { userId: string; s
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radii['2xl'],
-    padding: spacing[4],
-    marginBottom: spacing[3],
-    overflow: 'hidden',
-  },
+  card: { borderRadius: radii['2xl'], padding: spacing[4], marginBottom: spacing[3], overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
   flex: { flex: 1, minWidth: 0, gap: 2 },
-  bubble: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
+  bubble: { width: 48, height: 48, borderRadius: radii.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
   segments: { flexDirection: 'row', gap: 4, marginTop: spacing[4] },
   segment: { flex: 1, height: 6, borderRadius: 3 },
-  moneyBox: {
-    marginTop: spacing[3],
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  whiteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    marginTop: spacing[3],
-    paddingHorizontal: spacing[3],
-    height: 38,
-    borderRadius: radii.md,
-    backgroundColor: WHITE,
-  },
-  helpBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-end',
-    marginTop: spacing[3],
-  },
-  callBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    marginTop: spacing[3],
-    paddingHorizontal: spacing[3],
-    height: 38,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    backgroundColor: colors.bg.surface,
-  },
+  moneyBox: { marginTop: spacing[3], paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radii.md, backgroundColor: 'rgba(255,255,255,0.15)' },
+  whiteBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: spacing[3], paddingHorizontal: spacing[3], height: 38, borderRadius: radii.md, backgroundColor: WHITE },
   ratingBox: { marginTop: spacing[4], padding: spacing[3], borderRadius: radii.lg, backgroundColor: WHITE },
   ratingInner: { gap: spacing[2] },
   stars: { flexDirection: 'row', gap: 4 },
   starBtn: { padding: 2 },
   thanksRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  input: {
-    minHeight: 64,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: radii.md,
-    backgroundColor: colors.bg.surface,
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    color: colors.text.DEFAULT,
-  },
+  input: { minHeight: 64, borderWidth: 1, borderColor: colors.border.DEFAULT, borderRadius: radii.md, backgroundColor: colors.bg.surface, paddingHorizontal: spacing[3], paddingVertical: spacing[2], color: colors.text.DEFAULT },
 });
