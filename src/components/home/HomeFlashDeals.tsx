@@ -1,38 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import {
-  Flame,
-  Rocket,
-  MapPin,
-  Clock,
-  ShieldCheck,
-  Bike,
-  Sparkles,
-  ChevronRight,
-  Plus,
-} from 'lucide-react-native';
+import { Zap, Rocket, MapPin, Clock, ShieldCheck, Bike } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { formatFCFA } from '@daloa/utils';
+import { formatFCFA, resolveListingPhoto } from '@daloa/utils';
 import { ListingFull } from '@daloa/types';
 import { listingFlashDealsService } from '@daloa/api';
+import { usePhase } from '../../context/PhaseContext';
+
+function computeSecondsToMidnight(): number {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(23, 59, 59, 999);
+  return Math.max(0, Math.floor((midnight.getTime() - now.getTime()) / 1000));
+}
+
+function formatCountdown(totalSeconds: number): string {
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${hours}h : ${minutes}m : ${seconds}s`;
+}
 
 export const HomeFlashDeals: React.FC = () => {
   const router = useRouter();
   const accent = useAccent();
+  const { enableBoost } = usePhase();
   const [deals, setDeals] = useState<ListingFull[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [secondsLeft, setSecondsLeft] = useState<number>(computeSecondsToMidnight);
 
   const fetchDeals = useCallback(async () => {
     try {
-      setIsLoading(true);
       const items = await listingFlashDealsService.getFlashDeals(8);
       setDeals(items);
     } catch {
       // Échec silencieux
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
@@ -40,67 +44,80 @@ export const HomeFlashDeals: React.FC = () => {
     fetchDeals();
   }, [fetchDeals]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsLeft(computeSecondsToMidnight());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (deals.length === 0) return null;
+
   const handleOpenListing = (id: string) => {
     router.push(`/listing/${id}` as any);
   };
 
   const handleOpenBoost = () => {
-    router.push('/pro/plans' as any);
+    router.push('/pro/packs' as any);
   };
 
   return (
     <View style={styles.container}>
-      {/* En-tête Ventes Flash & Promos */}
-      <View style={styles.header}>
+      {/* Bandeau supérieur Rouge/Orange façon Jumia Ventes Flash */}
+      <LinearGradient
+        colors={['#DC2626', '#EA580C']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.jumiaBannerHeader}
+      >
         <View style={styles.headerLeft}>
-          <View style={[styles.flameIconBox, { backgroundColor: '#FEE2E2' }]}>
-            <Flame size={17} color="#DC2626" />
+          <View style={styles.zapBadge}>
+            <Zap size={14} color="#DC2626" fill="#DC2626" />
           </View>
           <View>
-            <View style={styles.titleBadgeRow}>
-              <AppText variant="subtitle" style={styles.sectionTitle}>
-                Ventes Flash & Promos
-              </AppText>
-              <View style={[styles.liveBadge, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-                <Clock size={10} color="#DC2626" />
-                <AppText variant="caption" color="#DC2626" style={styles.liveText}>
-                  Aujourd'hui
-                </AppText>
-              </View>
-            </View>
-            <AppText variant="caption" color={colors.text.muted}>
-              Bons plans & annonces vedettes à Daloa
+            <AppText variant="subtitle" color="#FFFFFF" style={styles.headerTitle}>
+              VENTES FLASH & PROMOS
             </AppText>
+            <View style={styles.timerRow}>
+              <Clock size={11} color="#FEF08A" />
+              <AppText variant="caption" color="#FEF08A" style={styles.timerText}>
+                Termine dans : {formatCountdown(secondsLeft)}
+              </AppText>
+            </View>
           </View>
         </View>
 
-        {/* Bouton pour les vendeurs */}
-        <AppPressable
-          haptic="light"
-          onPress={handleOpenBoost}
-          style={[styles.boostButton, { backgroundColor: accent[50], borderColor: accent[200] }]}
-          accessibilityRole="button"
-          accessibilityLabel="Booster une annonce vendeur"
-        >
-          <Rocket size={12} color={accent[700]} />
-          <AppText variant="caption" color={accent[900]} style={styles.boostText}>
-            Booster
-          </AppText>
-        </AppPressable>
-      </View>
+        {enableBoost ? (
+          <AppPressable
+            haptic="light"
+            onPress={handleOpenBoost}
+            style={styles.boostPill}
+            accessibilityRole="button"
+            accessibilityLabel="Booster une annonce vendeur"
+          >
+            <Rocket size={11} color="#DC2626" />
+            <AppText variant="caption" color="#DC2626" style={styles.boostPillText}>
+              Booster
+            </AppText>
+          </AppPressable>
+        ) : null}
+      </LinearGradient>
 
-      {/* Carrousel d'annonces */}
+      {/* Carrousel horizontal de cartes Flash */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {deals.map((item) => {
-          const photo = item.photos && item.photos.length > 0 ? item.photos[0] : null;
+          const photo = resolveListingPhoto(item.photos, '');
           const hasDiscount = item.original_price != null && item.original_price > item.price;
           const discountPercent = hasDiscount
             ? Math.min(90, Math.max(5, Math.round(((item.original_price! - item.price) / item.original_price!) * 100)))
             : null;
+          const stock = Math.max(1, Number((item as any).stock ?? 1));
+          const stockRatio = stock === 1 ? 0.88 : stock <= 3 ? 0.72 : 0.45;
+          const stockLabel = stock === 1 ? 'Dernière pièce !' : `Plus que ${stock} dispo`;
 
           return (
             <AppPressable
@@ -110,7 +127,6 @@ export const HomeFlashDeals: React.FC = () => {
               style={styles.dealCard}
               accessibilityLabel={`Offre: ${item.title}`}
             >
-              {/* Vignette photo carrée avec badges superposés */}
               <View style={styles.photoContainer}>
                 {photo ? (
                   <ExpoImage
@@ -123,7 +139,6 @@ export const HomeFlashDeals: React.FC = () => {
                   <View style={styles.fallbackPhoto} />
                 )}
 
-                {/* Badge Réduction ou Vedette */}
                 {discountPercent ? (
                   <View style={styles.discountBadge}>
                     <AppText variant="caption" color="#FFFFFF" style={styles.discountText}>
@@ -131,7 +146,7 @@ export const HomeFlashDeals: React.FC = () => {
                     </AppText>
                   </View>
                 ) : (
-                  <View style={[styles.featuredBadge, { backgroundColor: accent[500] }]}>
+                  <View style={[styles.featuredBadge, { backgroundColor: accent[600] }]}>
                     <AppText variant="caption" color="#FFFFFF" style={styles.featuredText}>
                       VEDETTE
                     </AppText>
@@ -139,20 +154,13 @@ export const HomeFlashDeals: React.FC = () => {
                 )}
               </View>
 
-              {/* Infos article */}
               <View style={styles.cardInfo}>
-                <AppText
-                  variant="body"
-                  color={colors.text.DEFAULT}
-                  numberOfLines={1}
-                  style={styles.cardTitle}
-                >
+                <AppText variant="body" color={colors.text.DEFAULT} numberOfLines={1} style={styles.cardTitle}>
                   {item.title}
                 </AppText>
 
-                {/* Prix & Remise */}
                 <View style={styles.priceRow}>
-                  <AppText variant="label" color={accent[700]} style={styles.salePrice}>
+                  <AppText variant="label" color="#DC2626" style={styles.salePrice}>
                     {formatFCFA(item.price)}
                   </AppText>
                   {hasDiscount ? (
@@ -162,7 +170,14 @@ export const HomeFlashDeals: React.FC = () => {
                   ) : null}
                 </View>
 
-                {/* Quartier */}
+                {/* Jauge de stock façon Jumia */}
+                <View style={styles.stockBarTrack}>
+                  <View style={[styles.stockBarFill, { width: `${Math.round(stockRatio * 100)}%` }]} />
+                  <AppText variant="caption" color="#FFFFFF" style={styles.stockBarLabel} numberOfLines={1}>
+                    {stockLabel}
+                  </AppText>
+                </View>
+
                 <View style={styles.districtRow}>
                   <MapPin size={10} color={colors.text.muted} />
                   <AppText variant="caption" color={colors.text.muted} numberOfLines={1} style={styles.districtText}>
@@ -174,30 +189,31 @@ export const HomeFlashDeals: React.FC = () => {
           );
         })}
 
-        {/* Carte de fin : CTA vendeur */}
-        <AppPressable
-          haptic="medium"
-          onPress={handleOpenBoost}
-          style={[styles.sellerPromoCard, { borderColor: accent[200], backgroundColor: accent[50] }]}
-        >
-          <View style={[styles.sellerIconBox, { backgroundColor: accent[500] }]}>
-            <Rocket size={18} color={colors.text.inverse} />
-          </View>
-          <AppText variant="bodyStrong" color={colors.text.DEFAULT} style={styles.sellerCtaTitle}>
-            Vous vendez à Daloa ?
-          </AppText>
-          <AppText variant="caption" color={colors.text.muted} style={styles.sellerCtaSub}>
-            Placez vos articles en tête d'affiche et vendez 3x plus vite.
-          </AppText>
-          <View style={[styles.sellerBtn, { backgroundColor: accent[500] }]}>
-            <AppText variant="caption" color={colors.text.inverse} style={styles.sellerBtnText}>
-              Booster maintenant
+        {enableBoost ? (
+          <AppPressable
+            haptic="medium"
+            onPress={handleOpenBoost}
+            style={[styles.sellerPromoCard, { borderColor: accent[200], backgroundColor: accent[50] }]}
+          >
+            <View style={[styles.sellerIconBox, { backgroundColor: accent[500] }]}>
+              <Rocket size={18} color={colors.text.inverse} />
+            </View>
+            <AppText variant="bodyStrong" color={colors.text.DEFAULT} style={styles.sellerCtaTitle}>
+              Vendez 3x plus vite
             </AppText>
-          </View>
-        </AppPressable>
+            <AppText variant="caption" color={colors.text.muted} style={styles.sellerCtaSub}>
+              Placez votre article dans les Ventes Flash dès 100 FCFA.
+            </AppText>
+            <View style={[styles.sellerBtn, { backgroundColor: accent[600] }]}>
+              <AppText variant="caption" color={colors.text.inverse} style={styles.sellerBtnText}>
+                Booster un article
+              </AppText>
+            </View>
+          </AppPressable>
+        ) : null}
       </ScrollView>
 
-      {/* Rassurance & Sécurité compacte */}
+      {/* Bandeau de réassurance compact */}
       <View style={styles.trustRow}>
         <View style={styles.trustItem}>
           <ShieldCheck size={13} color={colors.status.successDark} />
@@ -209,7 +225,7 @@ export const HomeFlashDeals: React.FC = () => {
         <View style={styles.trustItem}>
           <Bike size={13} color={accent[700]} />
           <AppText variant="caption" color={colors.text.muted} style={styles.trustText}>
-            Livraison express locale
+            Livraison express à Daloa
           </AppText>
         </View>
       </View>
@@ -218,104 +234,73 @@ export const HomeFlashDeals: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: spacing[2],
-  },
-  header: {
+  container: { marginVertical: spacing[2] },
+  jumiaBannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing[3],
+    marginHorizontal: spacing[3],
     marginBottom: spacing[2],
+    paddingHorizontal: spacing[3],
+    paddingVertical: 10,
+    borderRadius: radii.xl,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  flameIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.lg,
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  zapBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.full,
+    backgroundColor: '#FEF08A',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titleBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  headerTitle: {
+    fontFamily: typography.families.black,
+    fontSize: 13.5,
+    letterSpacing: 0.4,
   },
-  sectionTitle: {
+  timerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  timerText: {
+    fontSize: 11,
     fontFamily: typography.families.extrabold,
-    fontSize: 16,
+    fontVariant: ['tabular-nums'],
   },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  liveText: {
-    fontSize: 9,
-    fontFamily: typography.families.bold,
-  },
-  boostButton: {
+  boostPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radii.full,
-    borderWidth: 1,
   },
-  boostText: {
-    fontSize: 11,
-    fontFamily: typography.families.bold,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing[3],
-    gap: 10,
-    paddingBottom: 4,
-  },
+  boostPillText: { fontSize: 11, fontFamily: typography.families.extrabold },
+  scrollContent: { paddingHorizontal: spacing[3], gap: 10, paddingBottom: 4 },
   dealCard: {
-    width: 146,
+    width: 150,
     backgroundColor: colors.bg.surface,
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1,
   },
-  photoContainer: {
-    width: '100%',
-    height: 120,
-    backgroundColor: colors.grey[200],
-    position: 'relative',
-  },
-  fallbackPhoto: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.grey[200],
-  },
+  photoContainer: { width: '100%', height: 118, backgroundColor: colors.grey[200], position: 'relative' },
+  fallbackPhoto: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.grey[200] },
   discountBadge: {
     position: 'absolute',
     top: 6,
-    left: 6,
-    backgroundColor: '#DC2626',
+    right: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radii.sm,
   },
   discountText: {
     fontSize: 10,
-    fontFamily: typography.families.extrabold,
+    color: '#DC2626',
+    fontFamily: typography.families.black,
     fontVariant: ['tabular-nums'],
   },
   featuredBadge: {
@@ -326,80 +311,51 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radii.sm,
   },
-  featuredText: {
+  featuredText: { fontSize: 9, fontFamily: typography.families.extrabold, letterSpacing: 0.5 },
+  cardInfo: { padding: 8, gap: 3 },
+  cardTitle: { fontSize: 12, lineHeight: 16, fontFamily: typography.families.semibold },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  salePrice: { fontVariant: ['tabular-nums'], fontSize: 13, fontFamily: typography.families.extrabold },
+  originalPrice: { textDecorationLine: 'line-through', fontVariant: ['tabular-nums'], fontSize: 10 },
+  stockBarTrack: {
+    height: 15,
+    borderRadius: radii.full,
+    backgroundColor: '#FED7AA',
+    overflow: 'hidden',
+     justifyContent: 'center',
+    marginTop: 2,
+  },
+  stockBarFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#EA580C',
+    borderRadius: radii.full,
+  },
+  stockBarLabel: {
     fontSize: 9,
+    textAlign: 'center',
     fontFamily: typography.families.extrabold,
-    letterSpacing: 0.5,
-  },
-  cardInfo: {
-    padding: 8,
-    gap: 2,
-  },
-  cardTitle: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: typography.families.semibold,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginVertical: 2,
-  },
-  salePrice: {
     fontVariant: ['tabular-nums'],
-    fontSize: 13,
   },
-  originalPrice: {
-    textDecorationLine: 'line-through',
-    fontVariant: ['tabular-nums'],
-    fontSize: 10,
-  },
-  districtRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  districtText: {
-    fontSize: 10,
-  },
+  districtRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
+  districtText: { fontSize: 10 },
   sellerPromoCard: {
-    width: 154,
+    width: 152,
     borderRadius: radii.xl,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     padding: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    textAlign: 'center',
     gap: 6,
   },
-  sellerIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sellerCtaTitle: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  sellerCtaSub: {
-    fontSize: 10,
-    textAlign: 'center',
-    lineHeight: 13,
-  },
-  sellerBtn: {
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radii.full,
-  },
-  sellerBtnText: {
-    fontSize: 10,
-    fontFamily: typography.families.bold,
-  },
+  sellerIconBox: { width: 36, height: 36, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },
+  sellerCtaTitle: { fontSize: 12, textAlign: 'center' },
+  sellerCtaSub: { fontSize: 10, textAlign: 'center', lineHeight: 13 },
+  sellerBtn: { marginTop: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radii.full },
+  sellerBtnText: { fontSize: 10, fontFamily: typography.families.bold },
   trustRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -408,12 +364,6 @@ const styles = StyleSheet.create({
     marginTop: spacing[2],
     paddingHorizontal: spacing[3],
   },
-  trustItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  trustText: {
-    fontSize: 11,
-  },
+  trustItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  trustText: { fontSize: 11 },
 });

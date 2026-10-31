@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Share, Linking, RefreshControl, ActivityIndicator, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Share, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
+import { usePhase } from '../../src/context/PhaseContext';
 import { openDeliveryApp } from '../../src/lib/openDeliveryApp';
 import { supabase, authService, useActiveOrdersCount } from '@daloa/api';
 import { colors, useAccent, ConfirmDialog, showAlert } from '@daloa/ui';
@@ -18,6 +19,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const accent = useAccent();
   const { user, profile, logout, isAuthenticated, isLoading, refreshProfile, isAdmin } = useAuth();
+  const { enableBoost } = usePhase();
   const { data: activeOrders } = useActiveOrdersCount(user?.id);
 
   const [stats, setStats] = useState({
@@ -48,10 +50,6 @@ export default function ProfileScreen() {
           .eq('user_id', user.id)
           .neq('status', 'deleted')
           .neq('status', 'sold'),
-        // Les ventes se comptent depuis `orders`, pas depuis `listings.status`.
-        // Adossé au statut de l'annonce, le compteur baissait dès que le vendeur
-        // remettait un article en vente après restock. Même source que
-        // `app/pro/stats.tsx` et que le web (`MyStatsPage`).
         supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
@@ -241,6 +239,8 @@ export default function ProfileScreen() {
           onLogout={handleLogout}
           isPro={isPro}
           onOpenProCarousel={() => router.push('/pro/carousel' as any)}
+          showBoosts={enableBoost}
+          onOpenPacks={() => router.push('/pro/packs' as any)}
         />
 
         {/* Pass Pro en fin de page : une offre, pas une information sur le compte */}

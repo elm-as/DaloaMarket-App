@@ -11,6 +11,7 @@ export interface PhaseContextValue {
   allowPickupForAll: boolean;
   allowAffiliatedDeliverers: boolean;
   sellerFeeOverride: number | null;
+  enableBoost: boolean;
   enableSellerBadge: boolean;
   /** Bascule sur un préréglage complet de phase (console admin). */
   switchPhase: (targetPhase: 0 | 1) => Promise<void>;
@@ -98,6 +99,7 @@ export function PhaseProvider({ children }: { children: React.ReactNode }) {
       allowAffiliatedDeliverers: phaseConfig.allow_affiliated_deliverers_for_all,
       // Même règle que la base : null = taux standard, quelle que soit la phase.
       sellerFeeOverride: phaseConfig.seller_fee_override ?? null,
+      enableBoost: phaseConfig.enable_boost,
       enableSellerBadge: phaseConfig.enable_seller_badge,
       switchPhase,
       savePhaseConfig,
