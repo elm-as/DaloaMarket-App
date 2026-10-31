@@ -17,7 +17,6 @@ export interface OwnerActionListing {
   price: number;
   status?: string;
   photos?: string[];
-  /** Nécessaire pour demander le restock par option lors d'une remise en vente. */
   variants?: RestockVariant[] | null;
 }
 
@@ -28,10 +27,6 @@ interface OwnerActionSheetProps {
   onListingUpdated?: () => void;
 }
 
-/**
- * Feuille d'actions rapides pour le propriétaire d'une annonce.
- * Permet de modifier, marquer vendu / réactiver, booster, supprimer ou voir dans ses annonces.
- */
 export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
   visible,
   onClose,
@@ -53,6 +48,8 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
   if (!listing) return null;
 
   const isSold = listing.status === 'sold';
+  const isDeleted = listing.status === 'deleted';
+  const isInactive = isSold || isDeleted;
   const photoUri = listing.photos?.[0];
 
   const handleEdit = () => {
@@ -61,7 +58,7 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
   };
 
   const handleToggleStatus = async () => {
-    if (isSold) {
+    if (isInactive) {
       setShowRestock(true);
       return;
     }
@@ -147,7 +144,6 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
     <>
       <BottomSheet visible={visible} onClose={onClose} title="Gérer votre annonce">
         <View style={styles.container}>
-          {/* En-tête annonce */}
           <View style={styles.listingHeader}>
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.thumbnail} contentFit="cover" />
@@ -164,7 +160,6 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
             </View>
           </View>
 
-          {/* Liste des actions */}
           <View style={styles.actionsList}>
             <AppPressable
               onPress={handleEdit}
@@ -190,15 +185,15 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
               style={styles.actionRow}
               rippleColor="rgba(0,0,0,0.06)"
               accessibilityRole="button"
-              accessibilityLabel={isSold ? 'Remettre en vente' : 'Marquer comme vendue'}
+              accessibilityLabel={isInactive ? 'Remettre en vente' : 'Marquer comme vendue'}
             >
               <View
                 style={[
                   styles.iconBox,
-                  { backgroundColor: isSold ? colors.status.infoLight : colors.status.successLight },
+                  { backgroundColor: isInactive ? colors.status.infoLight : colors.status.successLight },
                 ]}
               >
-                {isSold ? (
+                {isInactive ? (
                   <RotateCcw size={18} color={colors.status.infoDark} />
                 ) : (
                   <CheckCircle2 size={18} color={colors.status.successDark} />
@@ -206,17 +201,17 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
               </View>
               <View style={styles.actionTextWrap}>
                 <AppText variant="bodyStrong">
-                  {isSold ? 'Remettre en vente' : 'Marquer comme vendue'}
+                  {isInactive ? 'Remettre en vente' : 'Marquer comme vendue'}
                 </AppText>
                 <AppText variant="caption" color={colors.text.muted}>
-                  {isSold
+                  {isInactive
                     ? "Rend l'annonce de nouveau visible aux acheteurs"
                     : 'Retire cet article des résultats du catalogue'}
                 </AppText>
               </View>
             </AppPressable>
 
-            {enableBoost && !isSold ? (
+            {enableBoost && !isInactive ? (
               <AppPressable
                 onPress={handleOpenBoost}
                 style={styles.actionRow}
@@ -254,25 +249,27 @@ export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
               </View>
             </AppPressable>
 
-            <AppPressable
-              onPress={() => setShowDeleteConfirm(true)}
-              style={[styles.actionRow, styles.deleteRow]}
-              rippleColor="rgba(239, 68, 68, 0.08)"
-              accessibilityRole="button"
-              accessibilityLabel="Supprimer définitivement l'annonce"
-            >
-              <View style={[styles.iconBox, { backgroundColor: colors.status.errorLight }]}>
-                <Trash2 size={18} color={colors.status.errorDark} />
-              </View>
-              <View style={styles.actionTextWrap}>
-                <AppText variant="bodyStrong" color={colors.status.errorDark}>
-                  Supprimer l'annonce
-                </AppText>
-                <AppText variant="caption" color={colors.text.muted}>
-                  Action irréversible : l'article sera effacé
-                </AppText>
-              </View>
-            </AppPressable>
+            {!isDeleted && (
+              <AppPressable
+                onPress={() => setShowDeleteConfirm(true)}
+                style={[styles.actionRow, styles.deleteRow]}
+                rippleColor="rgba(239, 68, 68, 0.08)"
+                accessibilityRole="button"
+                accessibilityLabel="Supprimer définitivement l'annonce"
+              >
+                <View style={[styles.iconBox, { backgroundColor: colors.status.errorLight }]}>
+                  <Trash2 size={18} color={colors.status.errorDark} />
+                </View>
+                <View style={styles.actionTextWrap}>
+                  <AppText variant="bodyStrong" color={colors.status.errorDark}>
+                    Supprimer l'annonce
+                  </AppText>
+                  <AppText variant="caption" color={colors.text.muted}>
+                    Action irréversible : l'article sera effacé
+                  </AppText>
+                </View>
+              </AppPressable>
+            )}
           </View>
         </View>
       </BottomSheet>
