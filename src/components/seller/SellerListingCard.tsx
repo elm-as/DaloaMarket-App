@@ -13,19 +13,10 @@ interface SellerListingCardProps {
   onEdit: () => void;
   onToggleStatus: () => void;
   onDelete: () => void;
-  /** Absent pour une annonce vendue : on ne booste que ce qui est en vente. */
+  /** Absent pour une annonce vendue ou supprimée : on ne booste que ce qui est en vente. */
   onBoost?: () => void;
 }
 
-/**
- * Carte d'une annonce dans « Mes annonces ».
- *
- * Refonte du 28/09 : les quatre actions tenaient sur une ligne avec icône et
- * texte côte à côte, si bien que « Marquer vendu » passait sur deux lignes et
- * que la barre paraissait bricolée. Désormais : icône au-dessus d'un libellé
- * court, quatre colonnes égales. La vignette passe par `resolveListingPhoto`
- * (une URI locale d'un envoi raté laissait une image vide).
- */
 export const SellerListingCard: React.FC<SellerListingCardProps> = ({
   item,
   salesCount = 0,
@@ -37,25 +28,31 @@ export const SellerListingCard: React.FC<SellerListingCardProps> = ({
 }) => {
   const accent = useAccent();
   const isSold = item.status === 'sold';
-  const isBoosted = !!item.boosted_until && new Date(item.boosted_until) > new Date();
+  const isDeleted = item.status === 'deleted';
+  const isInactive = isSold || isDeleted;
+  const isBoosted = !isInactive && !!item.boosted_until && new Date(item.boosted_until) > new Date();
   const photo = resolveListingPhoto(item.photos, '');
 
-  const statusLabel = isSold ? 'Vendu' : isBoosted ? 'Boostée' : 'En vente';
-  const statusColors = isSold
-    ? { bg: colors.bg.subtle, fg: colors.text.muted }
-    : isBoosted
-      ? { bg: accent[50], fg: accent[700] }
-      : { bg: colors.status.successLight, fg: colors.status.successDark };
+  const statusLabel = isDeleted ? 'Supprimée' : isSold ? 'Vendu' : isBoosted ? 'Boostée' : 'En vente';
+  const statusColors = isDeleted
+    ? { bg: colors.status.errorLight, fg: colors.status.errorDark }
+    : isSold
+      ? { bg: colors.bg.subtle, fg: colors.text.muted }
+      : isBoosted
+        ? { bg: accent[50], fg: accent[700] }
+        : { bg: colors.status.successLight, fg: colors.status.successDark };
 
   const actions = [
     { key: 'edit', label: 'Modifier', Icon: Pencil, color: colors.text.body, onPress: onEdit },
-    isSold
+    isInactive
       ? { key: 'restock', label: 'Remettre', Icon: RotateCcw, color: colors.status.infoDark, onPress: onToggleStatus }
       : { key: 'sold', label: 'Vendu', Icon: CheckCircle2, color: colors.status.successDark, onPress: onToggleStatus },
-    ...(onBoost && !isSold
+    ...(onBoost && !isInactive
       ? [{ key: 'boost', label: isBoosted ? 'Prolonger' : 'Booster', Icon: Zap, color: accent.DEFAULT, onPress: onBoost }]
       : []),
-    { key: 'delete', label: 'Supprimer', Icon: Trash2, color: colors.status.errorDark, onPress: onDelete },
+    ...(!isDeleted
+      ? [{ key: 'delete', label: 'Supprimer', Icon: Trash2, color: colors.status.errorDark, onPress: onDelete }]
+      : []),
   ];
 
   return (

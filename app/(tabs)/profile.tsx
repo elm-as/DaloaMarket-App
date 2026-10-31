@@ -196,8 +196,8 @@ export default function ProfileScreen() {
           onEditAvatar={handlePickAvatar}
           isUploadingAvatar={isUploadingAvatar}
           stats={[
-            { label: 'En vente', value: stats.activeCount, onPress: () => router.push('/seller/my-listings' as any) },
-            { label: 'Vendues', value: stats.soldCount, onPress: () => router.push('/seller/my-listings' as any) },
+            { label: 'En vente', value: stats.activeCount, onPress: () => router.push('/seller/my-listings?tab=active' as any) },
+            { label: 'Vendues', value: stats.soldCount, onPress: () => router.push('/seller/my-listings?tab=sold' as any) },
             { label: 'Avis', value: stats.reviewCount },
           ]}
         />
