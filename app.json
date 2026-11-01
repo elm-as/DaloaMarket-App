@@ -23,7 +23,7 @@
       ]
     },
     "android": {
-      "versionCode": 2,
+
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
@@ -31,7 +31,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.daloamarket.app",
-      "versionCode": 11,
+      "versionCode": 14,
       "navigationBar": {
         "backgroundColor": "#FFFFFF",
         "barStyle": "dark-content"
