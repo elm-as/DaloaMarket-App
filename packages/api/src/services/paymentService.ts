@@ -147,6 +147,12 @@ export const paymentService = {
   /**
    * Vérifie le statut d'un paiement auprès de l'API DaloaPay
    */
+  async triggerPayoutProcessing(): Promise<void> {
+    try {
+      fetch(`${ENV_CONFIG.PAYMENT_API_URL}/process-payouts`).catch(() => {});
+    } catch {}
+  },
+
   async checkPaymentStatus(orderId: string): Promise<{ status: string; isPaid: boolean }> {
     try {
       const response = await fetch(`${ENV_CONFIG.PAYMENT_API_URL}/payment/check?orderId=${orderId}`);

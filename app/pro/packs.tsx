@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { PRICING_CONFIG, BOOST_CREDIT_OPTIONS } from '@daloa/config';
 import { paymentService, systemSettingsService } from '@daloa/api';
-import { colors, radii, spacing, Card, Button, Badge, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
+import { colors, radii, spacing, typography, Card, Button, Badge, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
 import { Zap, ArrowLeft, AlertCircle, CheckCircle, ShieldCheck, Flame, Sparkles } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
@@ -112,7 +112,7 @@ export default function PacksScreen() {
           <View style={styles.balanceBadge}>
             <Zap size={14} color="#F59E0B" fill="#F59E0B" />
             <AppText variant="caption" color={colors.text.inverse} style={styles.tabular}>
-              {profile?.boost_credits ?? 0}
+              {(profile as any)?.boost_credits ?? 0}
             </AppText>
           </View>
         </View>
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   },
   packsList: { gap: spacing[3] },
   packCard: {
-    backgroundColor: colors.surface.DEFAULT,
+    backgroundColor: colors.neutrals.surface,
     borderRadius: radii.xl,
     padding: spacing[3],
     borderWidth: 1.5,
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   tagBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radii.sm },
   tagDefault: { backgroundColor: colors.bg.subtle },
   tagPopular: { backgroundColor: '#FFEDD5' },
-  tagText: { fontSize: 10, fontWeight: '700' },
+  tagText: { fontSize: 10, fontFamily: typography.families.bold },
   priceCol: { alignItems: 'flex-end', marginLeft: spacing[2] },
   savingsPill: {
     flexDirection: 'row',
@@ -330,12 +330,12 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     alignSelf: 'flex-start',
   },
-  savingsText: { fontSize: 11, fontWeight: '700' },
-  perksCard: { backgroundColor: colors.surface.DEFAULT, borderRadius: radii.xl, padding: spacing[3], gap: spacing[2] },
+  savingsText: { fontSize: 11, fontFamily: typography.families.bold },
+  perksCard: { backgroundColor: colors.neutrals.surface, borderRadius: radii.xl, padding: spacing[3], gap: spacing[2] },
   perksTitle: { marginBottom: 2 },
   perkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   perkIcon: { marginTop: 2 },
-  bold: { fontWeight: '700' },
+  bold: { fontFamily: typography.families.bold },
   reassuranceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], marginVertical: spacing[1] },
   mainCtaBtn: { borderRadius: radii.xl, marginTop: spacing[1] },
   flex1: { flex: 1 },

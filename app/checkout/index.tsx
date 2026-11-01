@@ -271,11 +271,14 @@ export default function CheckoutScreen() {
       ? groupedQuote.totalGroupedFee
       : rawCartFees.reduce((sum, fee) => sum + fee, 0);
 
-  // Arrondi article par article, comme le serveur.
-  const cartBuyerServiceFee = cartItems.reduce(
-    (s, ci) => s + Math.round((ci.variant?.price ?? ci.listing.price) * ci.quantity * PRICING_CONFIG.marketplace.buyerServiceFeeRate),
-    0
-  );
+  // Arrondi article par article. Zéro frais de réservation/protection pour les règlements en espèces (cash_at_shop & cod).
+  const isCashPayment = paymentMode === 'cash_at_shop' || paymentMode === 'cod' || deliveryMode === 'pickup';
+  const cartBuyerServiceFee = isCashPayment
+    ? 0
+    : cartItems.reduce(
+        (s, ci) => s + Math.round((ci.variant?.price ?? ci.listing.price) * ci.quantity * PRICING_CONFIG.marketplace.buyerServiceFeeRate),
+        0
+      );
 
   const breakdown = isCartMode
     ? {
@@ -287,6 +290,7 @@ export default function CheckoutScreen() {
       }
     : calculateOrderBreakdown({
         productPrice: activePrice, quantity, distanceKm, deliveryMode,
+        paymentMethod: paymentMode,
         isProSeller: Boolean(listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()),
         // Même règle que la base : commission imposée par la phase si elle existe.
         sellerFeeOverride: phaseConfig?.seller_fee_override ?? null,
@@ -316,6 +320,7 @@ export default function CheckoutScreen() {
       'order-quote',
       JSON.stringify(quoteItems),
       deliveryMode,
+      paymentMode,
       deliveryCoords?.latitude?.toFixed(5),
       deliveryCoords?.longitude?.toFixed(5),
       deliveryDistrict,
@@ -330,6 +335,7 @@ export default function CheckoutScreen() {
       quoteService.getQuote({
         items: quoteItems,
         deliveryMode,
+        paymentMethod: paymentMode,
         deliveryLat: deliveryCoords?.latitude,
         deliveryLng: deliveryCoords?.longitude,
         deliveryDistrict,
@@ -350,11 +356,14 @@ export default function CheckoutScreen() {
       : 'loading';
 
   const currentDeliveryFee = serverQuote ? serverQuote.deliveryTotal : breakdown.deliveryFee;
+  const currentBuyerServiceFee = isCashPayment ? 0 : (serverQuote ? serverQuote.buyerFeeTotal : breakdown.buyerServiceFee);
   const daloaCashDiscount =
     useDaloaCash && deliveryMode === 'delivery' && daloaCashBalance > 0
       ? Math.min(daloaCashBalance, currentDeliveryFee)
       : 0;
-  const currentTotalAmount = serverQuote ? serverQuote.totalAmount : breakdown.totalAmount;
+  const currentTotalAmount = isCashPayment
+    ? (isCartMode ? cartProductTotal : activePrice * quantity) + currentDeliveryFee
+    : (serverQuote ? serverQuote.totalAmount : breakdown.totalAmount);
   const effectiveTotalAmount = Math.max(0, currentTotalAmount - daloaCashDiscount);
 
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({
@@ -550,7 +559,7 @@ export default function CheckoutScreen() {
                 daloaCashDiscount={daloaCashDiscount}
                 groupedDeliveryDiscount={groupedSavings}
                 deliveryFee={currentDeliveryFee}
-              buyerServiceFee={serverQuote ? serverQuote.buyerFeeTotal : breakdown.buyerServiceFee}
+              buyerServiceFee={currentBuyerServiceFee}
               totalAmount={effectiveTotalAmount}
               distanceKm={serverQuote ? serverQuote.distanceKm : distanceKm}
               isSubmitting={isSubmitting}
