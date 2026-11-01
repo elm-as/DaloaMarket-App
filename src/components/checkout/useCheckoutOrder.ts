@@ -55,6 +55,36 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
       setIsSubmitting(true);
       setErrorMsg(null);
 
+      // Compte test Google Store / Testeurs : simulation client sans écriture en base
+      const isTestUser = Boolean(
+        params.profile?.is_test_user ||
+        params.profile?.is_test_users ||
+        params.user?.is_test_user ||
+        params.user?.is_test_users ||
+        params.user?.email?.toLowerCase().includes('google-play-test') ||
+        params.user?.email?.toLowerCase().includes('test-store')
+      );
+
+      if (isTestUser) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        Haptics.success();
+        params.clearCart();
+        showAlert(
+          'Commande confirmée',
+          params.deliveryMode === 'pickup'
+            ? 'Votre réservation en boutique a bien été prise en compte.'
+            : 'Votre commande a bien été enregistrée pour livraison.',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/(tabs)/orders' as any),
+            },
+          ]
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       if (params.onlineDisabled && params.paymentMode === 'online') {
         setErrorMsg(
           params.paymentConfigNotice ||
