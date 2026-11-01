@@ -132,7 +132,8 @@ export function calculateOrderBreakdown(params: {
   quantity?: number;
   distanceKm: number;
   isProSeller?: boolean;
-  deliveryMode?: 'delivery' | 'pickup';
+  deliveryMode?: 'delivery' | 'pickup' | 'pickup_point';
+  paymentMethod?: 'online' | 'cod' | 'cash_at_shop' | string;
   deliveryFeeOverride?: number | null;
   /**
    * Override du taux de commission vendeur issu de la config de phase
@@ -149,9 +150,9 @@ export function calculateOrderBreakdown(params: {
       ? 0
       : calculateDeliveryFee(params.distanceKm, params.deliveryFeeOverride);
 
-  const buyerServiceFee = Math.round(
-    productSubtotal * PRICING_CONFIG.marketplace.buyerServiceFeeRate
-  );
+  const isPickup = params.deliveryMode === 'pickup' || params.deliveryMode === 'pickup_point';
+  const isCash = isPickup || params.paymentMethod === 'cash_at_shop' || params.paymentMethod === 'cod';
+  const buyerServiceFee = isCash ? 0 : Math.round(productSubtotal * PRICING_CONFIG.marketplace.buyerServiceFeeRate);
 
   const sellerFeeRate = params.isProSeller
     ? PRICING_CONFIG.marketplace.proSellerFeeRate

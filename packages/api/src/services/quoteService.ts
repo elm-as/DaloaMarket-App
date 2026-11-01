@@ -20,6 +20,7 @@ export interface QuoteLineInput {
 export interface QuoteRequest {
   items: QuoteLineInput[];
   deliveryMode: 'delivery' | 'pickup';
+  paymentMethod?: string;
   deliveryLat?: number | null;
   deliveryLng?: number | null;
   deliveryDistrict?: string | null;
@@ -73,6 +74,7 @@ export const quoteService = {
           variant_id: it.variant_id || undefined,
           quantity: it.quantity,
           delivery_mode: req.deliveryMode,
+          payment_method: req.paymentMethod || undefined,
           delivery_lat: req.deliveryMode === 'delivery' ? req.deliveryLat ?? undefined : undefined,
           delivery_lng: req.deliveryMode === 'delivery' ? req.deliveryLng ?? undefined : undefined,
           delivery_district: req.deliveryDistrict || undefined,
