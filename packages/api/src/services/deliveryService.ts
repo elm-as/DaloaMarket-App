@@ -243,10 +243,10 @@ export const deliveryService = {
 
     await attachContactPhones([(data as any).orders?.seller, (data as any).orders?.buyer]);
 
-    const order = data.orders || {};
-    const listing = order.listings || {};
-    const seller = order.seller || {};
-    const buyer = order.buyer || {};
+    const order: any = (data as any)?.orders || {};
+    const listing: any = order.listings || {};
+    const seller: any = order.seller || {};
+    const buyer: any = order.buyer || {};
 
     const pickupCoords: Coordinates = {
       lat: seller.shop_latitude ?? 6.8773,
