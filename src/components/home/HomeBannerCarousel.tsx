@@ -11,16 +11,15 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Zap, Gift, Sparkles, Flame } from 'lucide-react-native';
+import { ArrowRight } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
 import { Haptics } from '@daloa/utils';
 import { PromoBanner } from '@daloa/types';
 import { promoBannersService } from '@daloa/api';
-import { usePhase } from '../../context/PhaseContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(SCREEN_WIDTH - spacing[3] * 2, 420);
-const BANNER_HEIGHT = 176;
+const BANNER_HEIGHT = 158;
 const AUTO_PLAY_MS = 4500;
 
 const DEFAULT_BANNERS: PromoBanner[] = [
@@ -30,7 +29,7 @@ const DEFAULT_BANNERS: PromoBanner[] = [
     subtitle: 'Colis, plis & repas livrés en 30 min entre quartiers dès 500 F',
     image_url:
       'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=900&q=80',
-    badge_text: '⚡ EXPRESS · DÈS 500 F',
+    badge_text: 'EXPRESS · DÈS 500 F',
     badge_color: '#EA580C',
     sponsor_name: 'DaloaDelivery',
     link_type: 'express',
@@ -43,16 +42,16 @@ const DEFAULT_BANNERS: PromoBanner[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'default-referral',
-    title: 'Programme Daloa Cash',
-    subtitle: 'Invitez vos proches et gagnez 500 FCFA par ami inscrit',
+    id: 'default-boost',
+    title: 'Vendez 3x plus vite à Daloa',
+    subtitle: 'Placez vos articles en tête d’accueil ou passez Vendeur Pro vérifié',
     image_url:
-      'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=900&q=80',
-    badge_text: '🎁 BONUS +500 F',
-    badge_color: '#16A34A',
-    sponsor_name: 'DaloaMarket',
-    link_type: 'referral',
-    link_target: null,
+      'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=80',
+    badge_text: 'VISIBILITÉ N°1',
+    badge_color: '#D97706',
+    sponsor_name: 'DaloaMarket Pro',
+    link_type: 'none',
+    link_target: '/pro/packs',
     is_active: true,
     priority: 5,
     views_count: 0,
@@ -65,7 +64,6 @@ const DEFAULT_BANNERS: PromoBanner[] = [
 export const HomeBannerCarousel: React.FC = () => {
   const router = useRouter();
   const accent = useAccent();
-  const { enableBoost, enableSellerBadge } = usePhase();
   const [banners, setBanners] = useState<PromoBanner[]>(DEFAULT_BANNERS);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -74,8 +72,9 @@ export const HomeBannerCarousel: React.FC = () => {
   const fetchBanners = useCallback(async () => {
     try {
       const active = await promoBannersService.getActiveBanners();
-      if (active && active.length > 0) {
-        setBanners(active);
+      const filtered = (active || []).filter((b: PromoBanner) => b.link_type !== 'referral');
+      if (filtered.length > 0) {
+        setBanners(filtered);
       }
     } catch {
       // Conserver les bannières par défaut
@@ -117,9 +116,6 @@ export const HomeBannerCarousel: React.FC = () => {
       case 'express':
         router.push('/express' as any);
         return;
-      case 'referral':
-        router.push('/profile/referral' as any);
-        return;
       case 'listing':
         if (banner.link_target) router.push(`/listing/${banner.link_target}` as any);
         return;
@@ -130,64 +126,10 @@ export const HomeBannerCarousel: React.FC = () => {
         if (banner.link_target) Linking.openURL(banner.link_target).catch(() => {});
         return;
       default:
+        if (banner.link_target) router.push(banner.link_target as any);
         return;
     }
   };
-
-  const quickPills = [
-    {
-      key: 'flash',
-      label: 'Ventes Flash',
-      icon: <Flame size={13} color="#DC2626" />,
-      bg: '#FEF2F2',
-      border: '#FECACA',
-      text: '#991B1B',
-      onPress: () => router.push('/(tabs)/search' as any),
-    },
-    {
-      key: 'express',
-      label: 'Coursier 500F',
-      icon: <Zap size={13} color={accent[700]} />,
-      bg: accent[50],
-      border: accent[200],
-      text: accent[900],
-      onPress: () => router.push('/express' as any),
-    },
-    {
-      key: 'cash',
-      label: 'Daloa Cash',
-      icon: <Gift size={13} color="#15803D" />,
-      bg: '#F0FDF4',
-      border: '#BBF7D0',
-      text: '#14532D',
-      onPress: () => router.push('/profile/referral' as any),
-    },
-    ...(enableBoost
-      ? [
-          {
-            key: 'boost',
-            label: 'Booster',
-            icon: <Sparkles size={13} color="#B45309" />,
-            bg: '#FFFBEB',
-            border: '#FDE68A',
-            text: '#78350F',
-            onPress: () => router.push('/pro/packs' as any),
-          },
-        ]
-      : enableSellerBadge
-        ? [
-            {
-              key: 'pro',
-              label: 'Pass Pro',
-              icon: <Sparkles size={13} color="#B45309" />,
-              bg: '#FFFBEB',
-              border: '#FDE68A',
-              text: '#78350F',
-              onPress: () => router.push('/pro/become-pro' as any),
-            },
-          ]
-        : []),
-  ];
 
   return (
     <View style={styles.container}>
@@ -221,7 +163,6 @@ export const HomeBannerCarousel: React.FC = () => {
               transition={250}
             />
 
-            {/* Dégradé directionnel façon Jumia : préserve l'éclat du produit en haut/droite */}
             <LinearGradient
               colors={['rgba(15,23,42,0.10)', 'rgba(15,23,42,0.45)', 'rgba(15,23,42,0.92)']}
               locations={[0, 0.45, 1]}
@@ -229,7 +170,6 @@ export const HomeBannerCarousel: React.FC = () => {
             />
 
             <View style={styles.cardContent}>
-              {/* Ligne supérieure : Badge promo + Compteur / Sponsor */}
               <View style={styles.topRow}>
                 {b.badge_text ? (
                   <View style={[styles.badgeChip, { backgroundColor: b.badge_color || accent.DEFAULT }]}>
@@ -259,7 +199,6 @@ export const HomeBannerCarousel: React.FC = () => {
                 </View>
               </View>
 
-              {/* Bas d'affiche : Titre, Sous-titre + Bouton d'appel à l'action Jumia */}
               <View style={styles.bottomRow}>
                 <View style={styles.textGroup}>
                   <AppText variant="h2" color="#FFFFFF" numberOfLines={1} style={styles.title}>
@@ -274,7 +213,7 @@ export const HomeBannerCarousel: React.FC = () => {
 
                 <View style={[styles.ctaPill, { backgroundColor: accent.DEFAULT }]}>
                   <AppText variant="caption" color="#FFFFFF" style={styles.ctaText}>
-                    J'en profite
+                    Voir
                   </AppText>
                   <ArrowRight size={12} color="#FFFFFF" strokeWidth={2.8} />
                 </View>
@@ -284,7 +223,6 @@ export const HomeBannerCarousel: React.FC = () => {
         ))}
       </ScrollView>
 
-      {/* Indicateurs de pagination Jumia */}
       {banners.length > 1 && (
         <View style={styles.dotsRow}>
           {banners.map((b, i) => (
@@ -293,34 +231,13 @@ export const HomeBannerCarousel: React.FC = () => {
               style={[
                 styles.dot,
                 i === activeIndex
-                  ? { backgroundColor: accent.DEFAULT, width: 20 }
+                  ? { backgroundColor: accent.DEFAULT, width: 18 }
                   : { backgroundColor: colors.border.DEFAULT, width: 6 },
               ]}
             />
           ))}
         </View>
       )}
-
-      {/* Barre de raccourcis rapides façon Jumia */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.quickStrip}
-      >
-        {quickPills.map((pill) => (
-          <AppPressable
-            key={pill.key}
-            haptic="selection"
-            onPress={pill.onPress}
-            style={[styles.quickPill, { backgroundColor: pill.bg, borderColor: pill.border }]}
-          >
-            {pill.icon}
-            <AppText variant="caption" color={pill.text} style={styles.quickPillLabel}>
-              {pill.label}
-            </AppText>
-          </AppPressable>
-        ))}
-      </ScrollView>
     </View>
   );
 };
@@ -335,81 +252,30 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: '#0F172A',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 3,
   },
   cardContent: { flex: 1, justifyContent: 'space-between', padding: spacing[3] },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   topRightRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  badgeChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 3.5,
-    borderRadius: radii.full,
-  },
-  badgeText: { fontSize: 9.5, fontFamily: typography.families.extrabold, letterSpacing: 0.5 },
+  badgeChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.full },
+  badgeText: { fontSize: 9, fontFamily: typography.families.extrabold, letterSpacing: 0.4 },
   sponsorChip: {
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.22)',
     paddingHorizontal: 8,
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     borderRadius: radii.full,
     maxWidth: 130,
   },
   sponsorText: { fontSize: 10, fontFamily: typography.families.semibold },
-  counterChip: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
+  counterChip: { backgroundColor: 'rgba(0, 0, 0, 0.5)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: radii.full },
   counterText: { fontSize: 10, fontFamily: typography.families.bold, fontVariant: ['tabular-nums'] },
   bottomRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
   textGroup: { flex: 1, gap: 2 },
-  title: {
-    fontSize: 18,
-    lineHeight: 22,
-    fontFamily: typography.families.black,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  subtitle: {
-    fontSize: 11.5,
-    lineHeight: 15,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  ctaPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 11,
-    paddingVertical: 6.5,
-    borderRadius: radii.full,
-    flexShrink: 0,
-  },
+  title: { fontSize: 16, lineHeight: 20, fontFamily: typography.families.black },
+  subtitle: { fontSize: 11, lineHeight: 14 },
+  ctaPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.full, flexShrink: 0 },
   ctaText: { fontSize: 11, fontFamily: typography.families.extrabold },
-  dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 7 },
+  dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 6 },
   dot: { height: 5, borderRadius: radii.full },
-  quickStrip: {
-    paddingHorizontal: spacing[3],
-    paddingTop: 8,
-    paddingBottom: 2,
-    gap: 8,
-  },
-  quickPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5.5,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  quickPillLabel: { fontSize: 11, fontFamily: typography.families.bold },
 });

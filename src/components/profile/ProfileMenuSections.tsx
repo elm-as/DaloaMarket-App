@@ -12,20 +12,16 @@ import {
   Store,
   LogOut,
   ChevronRight,
-  Gift,
   Sparkles,
   Zap,
 } from 'lucide-react-native';
 import { colors, spacing, radii, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { formatFCFA } from '@daloa/utils';
 
 interface ProfileMenuSectionsProps {
   onOpenRevenue: () => void;
   onOpenPayoutSettings: () => void;
   onOpenFavorites: () => void;
   onOpenAccountSettings: () => void;
-  onOpenReferral: () => void;
-  daloaCashBalance?: number;
   onJoinDelivery: () => void;
   onOpenHelp: () => void;
   onOpenFaq: () => void;
@@ -87,8 +83,6 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
   onOpenPayoutSettings,
   onOpenFavorites,
   onOpenAccountSettings,
-  onOpenReferral,
-  daloaCashBalance,
   onJoinDelivery,
   onOpenHelp,
   onOpenFaq,
@@ -105,22 +99,10 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* ── Section 1 : Mon compte & Finances ── */}
       <AppText variant="overline" color={colors.text.muted} style={styles.sectionHeader}>
         MON COMPTE & FINANCES
       </AppText>
       <View style={styles.cardGroup}>
-        <MenuItemRow
-          icon={<Gift size={17} color={colors.status.successDark} />}
-          tint={colors.status.successLight}
-          label="Parrainage & Daloa Cash"
-          sublabel={
-            daloaCashBalance && daloaCashBalance > 0
-              ? `${formatFCFA(daloaCashBalance)} disponibles · 500 F / ami`
-              : 'Gagnez 500 FCFA par ami invité'
-          }
-          onPress={onOpenReferral}
-        />
         {showBoosts && onOpenPacks ? (
           <MenuItemRow
             icon={<Zap size={17} color={accent[600]} />}
@@ -128,6 +110,15 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
             label="Packs & Crédits de Boost"
             sublabel="Booster vos annonces en tête d'accueil (dès 100 F)"
             onPress={onOpenPacks}
+          />
+        ) : null}
+        {isPro && onOpenProCarousel ? (
+          <MenuItemRow
+            icon={<Sparkles size={17} color={colors.primary.DEFAULT} />}
+            tint={colors.primary[50]}
+            label="Affiche Carrousel Accueil VIP"
+            sublabel="Diffuser une bannière 16:9 en tête d'accueil"
+            onPress={onOpenProCarousel}
           />
         ) : null}
         <MenuItemRow
@@ -151,15 +142,6 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
           sublabel="Articles sauvegardés"
           onPress={onOpenFavorites}
         />
-        {isPro && onOpenProCarousel ? (
-          <MenuItemRow
-            icon={<Sparkles size={17} color={colors.primary.DEFAULT} />}
-            tint={colors.primary[50]}
-            label="Carrousel Accueil VIP"
-            sublabel="Diffuser une affiche en tête d'accueil"
-            onPress={onOpenProCarousel}
-          />
-        ) : null}
         <MenuItemRow
           icon={<Settings size={17} color={colors.grey[600]} />}
           tint={colors.bg.subtle}
@@ -170,7 +152,6 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
         />
       </View>
 
-      {/* ── Section 2 : Réseau Partenaires ── */}
       <AppText variant="overline" color={colors.text.muted} style={styles.sectionHeader}>
         RÉSEAU PARTENAIRES
       </AppText>
@@ -185,7 +166,6 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
         />
       </View>
 
-      {/* ── Section 3 : Assistance & Légal ── */}
       <AppText variant="overline" color={colors.text.muted} style={styles.sectionHeader}>
         ASSISTANCE & LÉGAL
       </AppText>
@@ -223,7 +203,6 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
         />
       </View>
 
-      {/* ── Bouton Déconnexion ── */}
       <AppPressable
         onPress={onLogout}
         style={styles.logoutBtn}
@@ -239,71 +218,15 @@ export const ProfileMenuSections: React.FC<ProfileMenuSectionsProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing[4],
-    marginBottom: spacing[6],
-  },
-  sectionHeader: {
-    fontFamily: typography.families.extrabold,
-    fontSize: 10,
-    letterSpacing: 0.6,
-    marginBottom: spacing[2],
-    marginTop: spacing[2],
-  },
-  cardGroup: {
-    backgroundColor: colors.bg.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    overflow: 'hidden',
-    marginBottom: spacing[3],
-  },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing[3],
-    gap: spacing[3],
-  },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuTexts: {
-    flex: 1,
-    minWidth: 0,
-  },
-  menuLabel: {
-    fontFamily: typography.families.bold,
-    fontSize: 13,
-  },
-  menuSublabel: {
-    fontSize: 11,
-    color: colors.text.subtle,
-    marginTop: 1,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.border.subtle,
-    marginLeft: spacing[3] + 32 + spacing[3],
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[2],
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    paddingVertical: spacing[3],
-    borderRadius: radii.xl,
-    marginTop: spacing[2],
-  },
-  logoutText: {
-    fontFamily: typography.families.extrabold,
-    fontSize: 13,
-  },
+  container: { paddingHorizontal: spacing[4], marginBottom: spacing[6] },
+  sectionHeader: { fontFamily: typography.families.extrabold, fontSize: 10, letterSpacing: 0.6, marginBottom: spacing[2], marginTop: spacing[2] },
+  cardGroup: { backgroundColor: colors.bg.surface, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border.subtle, overflow: 'hidden', marginBottom: spacing[3] },
+  menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], paddingHorizontal: spacing[3], gap: spacing[3] },
+  iconCircle: { width: 32, height: 32, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
+  menuTexts: { flex: 1, minWidth: 0 },
+  menuLabel: { fontFamily: typography.families.bold, fontSize: 13 },
+  menuSublabel: { fontSize: 11, color: colors.text.subtle, marginTop: 1 },
+  separator: { height: 1, backgroundColor: colors.border.subtle, marginLeft: spacing[3] + 32 + spacing[3] },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FEE2E2', paddingVertical: spacing[3], borderRadius: radii.xl, marginTop: spacing[2] },
+  logoutText: { fontFamily: typography.families.extrabold, fontSize: 13 },
 });

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Haptics } from '@daloa/utils';
-import { ordersService, paymentService, analyticsService, QUOTE_RETRY_REASONS, ServerQuote, daloaCashService } from '@daloa/api';
+import { ordersService, paymentService, analyticsService, QUOTE_RETRY_REASONS, ServerQuote } from '@daloa/api';
 import { PaymentMode, MobileMoneyOperator } from './PaymentMethodSelector';
 import { resolveBuyerPoint } from '@daloa/utils';
 import { showAlert } from '@daloa/ui';
@@ -180,9 +180,6 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
           quoteId: params.quote?.id,
         });
 
-        if (params.daloaCashDiscount && params.daloaCashDiscount > 0 && firstOrderId) {
-          await daloaCashService.applyDaloaCashToOrder(firstOrderId, params.daloaCashDiscount);
-        }
         Haptics.success();
         const targetPath = firstOrderId ? `/order/${firstOrderId}` : '/(tabs)/orders';
         router.replace(targetPath as any);
@@ -260,10 +257,6 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
         delivery_lng: deliveryLng,
         buyer_phone: params.buyerPhone.trim(),
       }, params.distanceKm, params.quote?.id);
-
-      if (params.daloaCashDiscount && params.daloaCashDiscount > 0 && order?.id) {
-        await daloaCashService.applyDaloaCashToOrder(order.id, params.daloaCashDiscount);
-      }
 
       analyticsService.logEvent({
         eventName: 'purchase',

@@ -19,6 +19,7 @@ import { CheckoutWizardBar } from '../../src/components/checkout/CheckoutWizardB
 import { CheckoutStepReception } from '../../src/components/checkout/CheckoutStepReception';
 import { CheckoutStepLocation } from '../../src/components/checkout/CheckoutStepLocation';
 import { CheckoutStepPayment } from '../../src/components/checkout/CheckoutStepPayment';
+import { AppliedMobilePromo } from '../../src/components/checkout/PromoCodeBox';
 import { PaymentMode, MobileMoneyOperator } from '../../src/components/checkout/PaymentMethodSelector';
 import { useCheckoutOrder } from '../../src/components/checkout/useCheckoutOrder';
 import { resolveSellerPoint, resolveBuyerPoint, resolveBillableDistanceKm } from '@daloa/utils';
@@ -107,8 +108,7 @@ export default function CheckoutScreen() {
     }
   }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode, onlineDisabled]);
   const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
-  const [useDaloaCash, setUseDaloaCash] = useState(false);
-  const daloaCashBalance = profile?.daloa_cash_balance ?? 0;
+  const [appliedPromo, setAppliedPromo] = useState<AppliedMobilePromo | null>(null);
 
   // Position de la boutique relue en base à chaque ouverture du checkout.
   // L'annonce en cache pouvait dater de plusieurs heures (ou venir d'une liste
@@ -357,13 +357,10 @@ export default function CheckoutScreen() {
 
   const currentDeliveryFee = serverQuote ? serverQuote.deliveryTotal : breakdown.deliveryFee;
   const currentBuyerServiceFee = isCashPayment ? 0 : (serverQuote ? serverQuote.buyerFeeTotal : breakdown.buyerServiceFee);
-  const daloaCashDiscount =
-    useDaloaCash && deliveryMode === 'delivery' && daloaCashBalance > 0
-      ? Math.min(daloaCashBalance, currentDeliveryFee)
-      : 0;
   const currentTotalAmount = isCashPayment
     ? (isCartMode ? cartProductTotal : activePrice * quantity) + currentDeliveryFee
     : (serverQuote ? serverQuote.totalAmount : breakdown.totalAmount);
+  const daloaCashDiscount = appliedPromo ? Math.min(appliedPromo.discountAmount, currentTotalAmount) : 0;
   const effectiveTotalAmount = Math.max(0, currentTotalAmount - daloaCashDiscount);
 
   const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({
@@ -553,10 +550,9 @@ export default function CheckoutScreen() {
                 // En panier, pas d'annonce unique : le prix affiché valait 0 FCFA.
                 quantity={isCartMode ? 1 : quantity}
                 activePrice={isCartMode ? cartProductTotal : activePrice}
-                daloaCashBalance={daloaCashBalance}
-                useDaloaCash={useDaloaCash}
-                onToggleDaloaCash={setUseDaloaCash}
-                daloaCashDiscount={daloaCashDiscount}
+                appliedPromo={appliedPromo}
+                onApplyPromo={setAppliedPromo}
+                promoDiscount={daloaCashDiscount}
                 groupedDeliveryDiscount={groupedSavings}
                 deliveryFee={currentDeliveryFee}
               buyerServiceFee={currentBuyerServiceFee}
