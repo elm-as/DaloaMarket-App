@@ -15,9 +15,10 @@ export const ProfileProBanner: React.FC<ProfileProBannerProps> = ({
   onBecomePro,
 }) => {
   const accent = useAccent();
-  const { isPhase0, enableSellerBadge } = usePhase();
+  const { enableSellerBadge } = usePhase();
 
   // Si l'utilisateur est déjà Pro ou si l'abonnement Pass Vendeur Pro est désactivé dans /admin : masquer
+  // Si l'utilisateur est déjà Pro ou si le Pass Vendeur Pro est désactivé dans /admin : masquer
   if (isPro || !enableSellerBadge) return null;
 
   return (

@@ -27,6 +27,10 @@ interface OwnerActionSheetProps {
   onListingUpdated?: () => void;
 }
 
+/**
+ * Feuille d'actions rapides pour le propriétaire d'une annonce.
+ * Permet de modifier, marquer vendu / réactiver, booster, supprimer ou voir dans ses annonces.
+ */
 export const OwnerActionSheet: React.FC<OwnerActionSheetProps> = ({
   visible,
   onClose,
