@@ -3,24 +3,24 @@ import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { PRICING_CONFIG, BOOST_CREDIT_OPTIONS } from '@daloa/config';
+import { PRICING_CONFIG } from '@daloa/config';
 import { paymentService, systemSettingsService } from '@daloa/api';
-import { colors, radii, spacing, typography, Card, Button, Badge, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
-import { Zap, ArrowLeft, AlertCircle, CheckCircle, ShieldCheck, Flame, Sparkles } from 'lucide-react-native';
+import { colors, radii, spacing, typography, Card, Button, AppText, AppPressable, useAccent, showAlert } from '@daloa/ui';
+import { Zap, ArrowLeft, AlertCircle, CheckCircle, ShieldCheck, Sparkles, Check } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
 import { openPaymentGateway } from '../../src/lib/openPaymentGateway';
 
 interface PackMeta {
-  badge?: string;
+  badge: string;
   perCredit: number;
   savings?: string;
 }
 
 const PACKS_META: Record<string, PackMeta> = {
   bronze: { badge: 'DÉCOUVERTE', perCredit: 100 },
-  silver: { badge: 'LE PLUS POPULAIRE', perCredit: 83, savings: '-17%' },
-  gold: { badge: 'MEILLEURE VALEUR', perCredit: 67, savings: '-33%' },
+  silver: { badge: 'POPULAIRE', perCredit: 83, savings: '-17%' },
+  gold: { badge: 'MEILLEURE OFFRE', perCredit: 67, savings: '-33%' },
 };
 
 export default function PacksScreen() {
@@ -82,6 +82,7 @@ export default function PacksScreen() {
   };
 
   const selectedPack = PRICING_CONFIG.packs.find((p) => p.id === selectedPackId) || PRICING_CONFIG.packs[1];
+  const creditBalance = (profile as any)?.boost_credits ?? (profile as any)?.listing_credits ?? 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -110,9 +111,9 @@ export default function PacksScreen() {
             </AppText>
           </View>
           <View style={styles.balanceBadge}>
-            <Zap size={14} color="#F59E0B" fill="#F59E0B" />
-            <AppText variant="caption" color={colors.text.inverse} style={styles.tabular}>
-              {(profile as any)?.boost_credits ?? 0}
+            <Zap size={14} color="#FBBF24" fill="#FBBF24" />
+            <AppText variant="caption" color={colors.text.inverse} style={styles.balanceText}>
+              {creditBalance} crédit{creditBalance > 1 ? 's' : ''}
             </AppText>
           </View>
         </View>
@@ -144,59 +145,68 @@ export default function PacksScreen() {
         <View style={styles.packsList}>
           {PRICING_CONFIG.packs.map((pack) => {
             const isSelected = selectedPackId === pack.id;
-            const meta = PACKS_META[pack.id] || { perCredit: Math.round(pack.price / pack.credits) };
-            const isPopular = pack.id === 'silver';
+            const meta = PACKS_META[pack.id] || { badge: 'PACK', perCredit: Math.round(pack.price / pack.credits) };
 
             return (
               <AppPressable
                 key={pack.id}
-                onPress={() => {
-                  Haptics.selection();
-                  setSelectedPackId(pack.id);
-                }}
-                style={[
-                  styles.packCard,
-                  isSelected && { borderColor: accent.DEFAULT, backgroundColor: accent[50] },
-                  isPopular && !isSelected && styles.popularBorder,
-                ]}
+                haptic="selection"
+                onPress={() => setSelectedPackId(pack.id)}
               >
-                <View style={styles.packTopRow}>
-                  <View style={styles.packTitleCol}>
-                    <View style={styles.badgeRow}>
-                      <AppText variant="bodyStrong" color={colors.text.DEFAULT}>
-                        {pack.name}
-                      </AppText>
-                      {meta.badge && (
-                        <View style={[styles.tagBadge, isPopular ? styles.tagPopular : styles.tagDefault]}>
-                          <AppText variant="caption" color={isPopular ? '#C2410C' : colors.text.muted} style={styles.tagText}>
+                <View
+                  style={[
+                    styles.packCard,
+                    isSelected ? styles.packCardSelected : styles.packCardUnselected,
+                  ]}
+                >
+                  <View style={styles.packTopRow}>
+                    <View style={[styles.radioCircle, isSelected ? styles.radioSelected : styles.radioUnselected]}>
+                      {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                    </View>
+
+                    <View style={styles.packTitleCol}>
+                      <View style={styles.badgeRow}>
+                        <AppText variant="bodyStrong" color={colors.text.DEFAULT}>
+                          {pack.name}
+                        </AppText>
+                        <View style={[styles.tagBadge, isSelected ? styles.tagSelected : styles.tagDefault]}>
+                          <AppText
+                            variant="caption"
+                            color={isSelected ? '#C2410C' : colors.text.muted}
+                            style={styles.tagText}
+                          >
                             {meta.badge}
                           </AppText>
                         </View>
-                      )}
+                      </View>
+                      <AppText variant="caption" color={colors.text.subtle}>
+                        {pack.credits} crédits de mise en avant
+                      </AppText>
                     </View>
-                    <AppText variant="caption" color={colors.text.subtle}>
-                      {pack.credits} crédits de mise en avant
-                    </AppText>
+
+                    <View style={styles.priceCol}>
+                      <AppText
+                        variant="title"
+                        color={isSelected ? accent[700] : colors.text.DEFAULT}
+                        style={styles.tabular}
+                      >
+                        {formatFCFA(pack.price)}
+                      </AppText>
+                      <AppText variant="caption" color={colors.text.muted} style={styles.tabular}>
+                        ~{meta.perCredit} F / crédit
+                      </AppText>
+                    </View>
                   </View>
 
-                  <View style={styles.priceCol}>
-                    <AppText variant="title" color={accent[700]} style={styles.tabular}>
-                      {formatFCFA(pack.price)}
-                    </AppText>
-                    <AppText variant="caption" color={colors.text.muted} style={styles.tabular}>
-                      ~{meta.perCredit} F / crédit
-                    </AppText>
-                  </View>
+                  {meta.savings && (
+                    <View style={styles.savingsPill}>
+                      <Sparkles size={11} color="#15803D" />
+                      <AppText variant="caption" color="#15803D" style={styles.savingsText}>
+                        Économisez {meta.savings} sur le prix unitaire
+                      </AppText>
+                    </View>
+                  )}
                 </View>
-
-                {meta.savings && (
-                  <View style={styles.savingsPill}>
-                    <Sparkles size={11} color="#15803D" />
-                    <AppText variant="caption" color="#15803D" style={styles.savingsText}>
-                      Économisez {meta.savings} sur le prix unitaire
-                    </AppText>
-                  </View>
-                )}
               </AppPressable>
             );
           })}
@@ -257,79 +267,31 @@ export default function PacksScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
-  hero: {
-    paddingHorizontal: spacing[4],
-    paddingTop: spacing[3],
-    paddingBottom: spacing[4],
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-  },
+  hero: { paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[4], borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  backBtn: { width: 36, height: 36, borderRadius: radii.md, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   heroTitles: { flex: 1, marginLeft: spacing[3] },
-  balanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    paddingHorizontal: spacing[2],
-    paddingVertical: 4,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
+  balanceBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.25)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radii.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  balanceText: { fontFamily: typography.families.bold, fontVariant: ['tabular-nums'] },
   scrollContent: { padding: spacing[4], gap: spacing[3] },
-  disabledBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: radii.lg,
-    padding: spacing[3],
-    gap: spacing[2],
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginTop: spacing[1],
-  },
+  disabledBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A', borderRadius: radii.lg, padding: spacing[3], gap: spacing[2] },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: spacing[1] },
   packsList: { gap: spacing[3] },
-  packCard: {
-    backgroundColor: colors.neutrals.surface,
-    borderRadius: radii.xl,
-    padding: spacing[3],
-    borderWidth: 1.5,
-    borderColor: colors.border.DEFAULT,
-    gap: spacing[2],
-  },
-  popularBorder: { borderColor: '#FDBA74' },
+  packCard: { borderRadius: radii.xl, padding: spacing[3], gap: spacing[2] },
+  packCardSelected: { backgroundColor: '#FFF4E6', borderWidth: 2, borderColor: '#FF9800' },
+  packCardUnselected: { backgroundColor: colors.neutrals.surface, borderWidth: 1, borderColor: colors.border.DEFAULT },
+  radioCircle: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 2, marginRight: spacing[2] },
+  radioSelected: { backgroundColor: '#FF9800', borderWidth: 2, borderColor: '#FF9800' },
+  radioUnselected: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: colors.border.strong },
   packTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   packTitleCol: { flex: 1, gap: 2 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   tagBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radii.sm },
   tagDefault: { backgroundColor: colors.bg.subtle },
-  tagPopular: { backgroundColor: '#FFEDD5' },
+  tagSelected: { backgroundColor: '#FFEDD5' },
   tagText: { fontSize: 10, fontFamily: typography.families.bold },
   priceCol: { alignItems: 'flex-end', marginLeft: spacing[2] },
-  savingsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: spacing[2],
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    alignSelf: 'flex-start',
-  },
+  savingsPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#DCFCE7', paddingHorizontal: spacing[2], paddingVertical: 2, borderRadius: radii.sm, alignSelf: 'flex-start', marginLeft: 28 },
   savingsText: { fontSize: 11, fontFamily: typography.families.bold },
   perksCard: { backgroundColor: colors.neutrals.surface, borderRadius: radii.xl, padding: spacing[3], gap: spacing[2] },
   perksTitle: { marginBottom: 2 },
