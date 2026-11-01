@@ -126,7 +126,7 @@ export function reconcileRoadDistanceKm(
 /** Calcule le tarif de livraison en FCFA en fonction de la distance en kilomètres */
 export function calculateDeliveryFee(distanceKm: number, customFeeOverride?: number | null): number {
   if (customFeeOverride != null && customFeeOverride >= 0) {
-    return Math.round(customFeeOverride);
+    return Math.round(customFeeOverride / 50) * 50;
   }
 
   const { baseFee, baseKm, ratePerAdditionalKm } = PRICING_CONFIG.delivery;
@@ -136,7 +136,7 @@ export function calculateDeliveryFee(distanceKm: number, customFeeOverride?: num
 
   const extraKm = distanceKm - baseKm;
   const extraFee = Math.round(extraKm * ratePerAdditionalKm);
-  return baseFee + extraFee;
+  return Math.round((baseFee + extraFee) / 50) * 50;
 }
 
 /** Calcule la ventilation complète d'une commande Escrow */
