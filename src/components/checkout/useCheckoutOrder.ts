@@ -98,7 +98,9 @@ export function useCheckoutOrder(params: UseCheckoutOrderParams) {
       const fullAddress = isDigital
         ? 'Envoi numérique direct en privé (Messagerie / WhatsApp)'
         : params.deliveryMode === 'delivery'
-          ? params.deliveryAddress.trim()
+          ? (params.deliveryDistrict && !params.deliveryAddress.toLowerCase().includes(params.deliveryDistrict.toLowerCase())
+              ? `Quartier ${params.deliveryDistrict} — ${params.deliveryAddress.trim()}`
+              : params.deliveryAddress.trim())
           : 'Retrait direct en boutique';
 
       const resolvedDeliveryPoint = resolveBuyerPoint(

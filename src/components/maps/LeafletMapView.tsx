@@ -52,7 +52,7 @@ export const LeafletMapView: React.FC<LeafletMapViewProps> = ({
   const html = useMemo(() => {
     const tileUrl = MAPBOX_PUBLIC_TOKEN
       ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_PUBLIC_TOKEN}`
-      : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png';
+      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>*{margin:0;padding:0;box-sizing:border-box;}body,html,#map{width:100%;height:100%;background:#e5e7eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}</style></head><body><div id="map"></div><script>
 var map=L.map('map',{zoomControl:false,minZoom:10}).setView([${initialPin.latitude},${initialPin.longitude}],${initialZoom});
 L.control.zoom({position:'topright'}).addTo(map);
