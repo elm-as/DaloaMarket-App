@@ -2,7 +2,7 @@
   "expo": {
     "name": "DaloaMarket",
     "slug": "daloamarket",
-    "version": "1.15",
+    "version": "1.16",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "daloamarket",
@@ -30,7 +30,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.daloamarket.app",
-      "versionCode": 15,
+      "versionCode": 16,
       "navigationBar": {
         "backgroundColor": "#FFFFFF",
         "barStyle": "dark-content"
