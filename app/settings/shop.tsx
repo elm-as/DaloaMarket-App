@@ -34,6 +34,7 @@ export default function ShopSettingsScreen() {
   const { isPhase0 } = usePhase();
 
   const isPro = profile?.isPro ?? Boolean(profile?.pro_until && new Date(profile.pro_until) > new Date());
+  const isSuperOrAdmin = (profile as any)?.role === 'admin' || (profile as any)?.role === 'superadmin';
   const shopUnlocked = isPro || isPhase0;
 
   const [shopName, setShopName] = useState(profile?.shop_name || profile?.full_name || '');
@@ -43,8 +44,8 @@ export default function ShopSettingsScreen() {
   const [district, setDistrict] = useState(profile?.district || '');
   const rawLat = (profile as any)?.shop_latitude;
   const rawLng = (profile as any)?.shop_longitude;
-  const initCoord = rawLat != null && rawLng != null && isLocationInDaloa(rawLat, rawLng)
-    ? { lat: rawLat, lng: rawLng }
+  const initCoord = rawLat != null && rawLng != null
+    ? { lat: Number(rawLat), lng: Number(rawLng) }
     : (profile?.district && DALOA_DISTRICT_COORDINATES[profile.district])
       ? { lat: DALOA_DISTRICT_COORDINATES[profile.district].latitude, lng: DALOA_DISTRICT_COORDINATES[profile.district].longitude }
       : DALOA_CENTER;
@@ -69,53 +70,32 @@ export default function ShopSettingsScreen() {
     });
   }, [user?.id]);
 
-  const handleBannerAction = async () => {
-    if (!shopUnlocked) {
-      router.push('/pro/become-pro' as any);
-      return;
-    }
+  const handleImagePick = async (kind: 'banner' | 'logo') => {
+    if (!shopUnlocked) return router.push('/pro/become-pro' as any);
+    const isBanner = kind === 'banner';
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') return;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [16, 9], quality: 0.85, base64: true });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: isBanner ? [16, 9] : [1, 1],
+        quality: 0.85,
+        base64: true,
+      });
       if (result.canceled || !result.assets[0] || !user?.id) return;
-      setUploadingBanner(true);
+      isBanner ? setUploadingBanner(true) : setUploadingLogo(true);
       const url = await uploadShopAsset(user.id, result.assets[0], 'avatars');
       if (url) {
-        setBannerUrl(url);
-        await supabase.from('users').update({ shop_banner_url: url }).eq('id', user.id);
+        isBanner ? setBannerUrl(url) : setLogoUrl(url);
+        await supabase.from('users').update(isBanner ? { shop_banner_url: url } : { shop_logo_url: url }).eq('id', user.id);
         Haptics.success();
-        setFeedback({ type: 'success', text: 'Bannière mise à jour !' });
+        setFeedback({ type: 'success', text: isBanner ? 'Bannière mise à jour !' : 'Logo mis à jour !' });
       }
     } catch (err: any) {
-      setFeedback({ type: 'error', text: err?.message || 'Erreur importation bannière' });
+      setFeedback({ type: 'error', text: err?.message || 'Erreur importation image' });
     } finally {
-      setUploadingBanner(false);
-    }
-  };
-
-  const handleLogoAction = async () => {
-    if (!shopUnlocked) {
-      router.push('/pro/become-pro' as any);
-      return;
-    }
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') return;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', allowsEditing: true, aspect: [1, 1], quality: 0.85, base64: true });
-      if (result.canceled || !result.assets[0] || !user?.id) return;
-      setUploadingLogo(true);
-      const url = await uploadShopAsset(user.id, result.assets[0], 'avatars');
-      if (url) {
-        setLogoUrl(url);
-        await supabase.from('users').update({ shop_logo_url: url }).eq('id', user.id);
-        Haptics.success();
-        setFeedback({ type: 'success', text: 'Logo mis à jour !' });
-      }
-    } catch (err: any) {
-      setFeedback({ type: 'error', text: err?.message || 'Erreur importation logo' });
-    } finally {
-      setUploadingLogo(false);
+      isBanner ? setUploadingBanner(false) : setUploadingLogo(false);
     }
   };
 
@@ -125,17 +105,21 @@ export default function ShopSettingsScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const { latitude: rawLat, longitude: rawLng } = loc.coords;
-      if (isLocationInDaloa(rawLat, rawLng)) {
-        setLatitude(rawLat);
-        setLongitude(rawLng);
+      const { latitude: gpsLat, longitude: gpsLng } = loc.coords;
+      setLatitude(gpsLat);
+      setLongitude(gpsLng);
+      if (isLocationInDaloa(gpsLat, gpsLng)) {
         Haptics.success();
-      } else {
-        const target = (district && DALOA_DISTRICT_COORDINATES[district]) || DALOA_CENTER;
-        setLatitude((target as any).latitude ?? (target as any).lat);
-        setLongitude((target as any).longitude ?? (target as any).lng);
+        setFeedback({ type: 'success', text: 'Position GPS à Daloa détectée !' });
+      } else if (isSuperOrAdmin) {
         Haptics.selection();
-        setFeedback({ type: 'success', text: `Mode test : position calée sur ${district || 'Daloa Centre'}.` });
+        setFeedback({ type: 'success', text: 'Mode Admin : position hors de Daloa autorisée pour vos tests.' });
+      } else {
+        Haptics.error();
+        setFeedback({
+          type: 'error',
+          text: "Nous ne sommes encore présents qu'à Daloa pour le moment. Vous n'êtes pas autorisé à vendre hors de Daloa.",
+        });
       }
     } finally {
       setLocating(false);
@@ -146,21 +130,21 @@ export default function ShopSettingsScreen() {
     if (!user?.id) return;
     if (!district?.trim()) return setFeedback({ type: 'error', text: 'Veuillez sélectionner le quartier de votre boutique à Daloa.' });
     if (latitude == null || longitude == null) return setFeedback({ type: 'error', text: 'Veuillez positionner votre boutique sur la carte (GPS).' });
+    if (!isLocationInDaloa(latitude, longitude) && !isSuperOrAdmin) {
+      Haptics.error();
+      return setFeedback({
+        type: 'error',
+        text: "Nous ne sommes encore présents qu'à Daloa pour le moment. Vous n'êtes pas autorisé à vendre hors de Daloa.",
+      });
+    }
     if (slugCheck.isTaken) return setFeedback({ type: 'error', text: 'Cet identifiant URL est déjà utilisé. Veuillez en choisir un autre.' });
     try {
       setIsSaving(true);
       setFeedback(null);
-      let finalLat = latitude;
-      let finalLng = longitude;
-      if (!isLocationInDaloa(finalLat, finalLng)) {
-        const target = (district && DALOA_DISTRICT_COORDINATES[district]) || DALOA_CENTER;
-        finalLat = (target as any).latitude ?? (target as any).lat;
-        finalLng = (target as any).longitude ?? (target as any).lng;
-      }
       const updates: any = {
         district: district || 'Daloa',
-        shop_latitude: finalLat,
-        shop_longitude: finalLng,
+        shop_latitude: latitude,
+        shop_longitude: longitude,
         shop_updated_at: new Date().toISOString(),
       };
 
@@ -219,8 +203,8 @@ export default function ShopSettingsScreen() {
           themeColor={themeColor}
           uploadingBanner={uploadingBanner}
           uploadingLogo={uploadingLogo}
-          onPickBanner={handleBannerAction}
-          onPickLogo={handleLogoAction}
+          onPickBanner={() => handleImagePick('banner')}
+          onPickLogo={() => handleImagePick('logo')}
           isLocked={!shopUnlocked}
         />
 
@@ -298,11 +282,19 @@ export default function ShopSettingsScreen() {
             latitude={latitude}
             longitude={longitude}
             onChangeLocation={({ latitude: lat, longitude: lng }: { latitude: number; longitude: number }) => {
+              if (!isLocationInDaloa(lat, lng) && !isSuperOrAdmin) {
+                setFeedback({
+                  type: 'error',
+                  text: "Nous ne sommes encore présents qu'à Daloa pour le moment. Vous n'êtes pas autorisé à vendre hors de Daloa.",
+                });
+                return;
+              }
               setLatitude(lat);
               setLongitude(lng);
             }}
             onLocateGps={handleLocate}
             isLocating={locating}
+            isAdmin={isSuperOrAdmin}
           />
         </View>
 

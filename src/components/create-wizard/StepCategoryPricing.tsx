@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, StyleSheet, TextInput } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles, Tag, FileText } from 'lucide-react-native';
 import { MARKET_CATEGORIES, LISTING_CONDITIONS } from '@daloa/config';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { formatFCFA } from '@daloa/utils';
 import { StepVariantsSection, DraftVariant } from './StepVariantsSection';
+import { PricingPayoutPromoBox } from './PricingPayoutPromoBox';
 
 interface StepCategoryPricingProps {
   selectedCategory: string;
@@ -17,6 +17,8 @@ interface StepCategoryPricingProps {
   setOriginalPrice: (p: string) => void;
   variants: DraftVariant[];
   onVariantsChange: (variants: DraftVariant[]) => void;
+  isProSeller?: boolean;
+  sellerFeeOverride?: number | null;
 }
 
 const ICON_MAP: Record<string, React.FC<any>> = {
@@ -40,10 +42,10 @@ const CONDITION_COLORS: Record<string, string> = {
 };
 
 const CONDITION_DESC: Record<string, string> = {
-  new: 'Jamais utilisé, emballage d\'origine',
+  new: "Jamais utilisé, emballage d'origine",
   like_new: 'Utilisé mais sans défaut visible',
   good: 'Fonctionne parfaitement, légères traces',
-  used: 'Signes d\'usure, fonctionnel',
+  used: "Signes d'usure, fonctionnel",
 };
 
 export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
@@ -57,12 +59,10 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
   setOriginalPrice,
   variants,
   onVariantsChange,
+  isProSeller = false,
+  sellerFeeOverride = null,
 }) => {
   const accent = useAccent();
-  const numPrice = parseFloat(price) || 0;
-  const numOriginal = originalPrice ? parseFloat(originalPrice) : null;
-  const hasDiscount = numOriginal != null && numOriginal > numPrice && numPrice > 0;
-  const discountPct = hasDiscount && numOriginal ? Math.round(((numOriginal - numPrice) / numOriginal) * 100) : 0;
 
   return (
     <View style={styles.container}>
@@ -160,64 +160,15 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
       {/* ── Variantes ── */}
       <StepVariantsSection basePrice={price} variants={variants} onVariantsChange={onVariantsChange} />
 
-      {/* ── Prix ── */}
-      <View style={styles.section}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <AppText variant="label" color={colors.text.body}>Prix de vente (FCFA) *</AppText>
-          <AppText variant="caption" color={colors.text.subtle}>Min. 300 FCFA</AppText>
-        </View>
-        <View style={[styles.priceInputWrapper, { borderColor: price ? (numPrice < 300 ? colors.status.error : accent[300]) : colors.border.DEFAULT }]}>
-          <TextInput
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="numeric"
-            placeholder="Ex: 25 000"
-            placeholderTextColor={colors.text.subtle}
-            style={styles.priceInput}
-          />
-          <AppText variant="bodyStrong" color={accent[600]}>FCFA</AppText>
-        </View>
-        {numPrice > 0 && numPrice < 300 && (
-          <View style={[styles.pricePreview, { backgroundColor: colors.status.errorLight, borderColor: colors.status.errorBorder }]}>
-            <AppText variant="caption" color={colors.status.errorDark}>
-              ⚠️ Le montant minimum pour une annonce est de 300 FCFA.
-            </AppText>
-          </View>
-        )}
-        {numPrice >= 300 && (
-          <View style={[styles.pricePreview, { backgroundColor: accent[50], borderColor: accent[100] }]}>
-            <AppText variant="caption" color={accent[700]}>
-              Votre article sera affiché à{' '}
-              <AppText variant="bodyStrong" color={accent[700]}>{formatFCFA(numPrice)}</AppText>
-              {hasDiscount && (
-                <AppText variant="caption" color={colors.status.successDark}> (-{discountPct}% de réduction)</AppText>
-              )}
-            </AppText>
-          </View>
-        )}
-      </View>
-
-      {/* ── Prix barré (optionnel) ── */}
-      <View style={styles.section}>
-        <AppText variant="label" color={colors.text.body}>
-          Prix d'origine barré{' '}
-          <AppText variant="caption" color={colors.text.subtle}>(optionnel)</AppText>
-        </AppText>
-        <AppText variant="caption" color={colors.text.muted} style={styles.hint}>
-          Ajoute un badge "−X%" et rayé l'ancien prix pour attirer l'attention.
-        </AppText>
-        <View style={[styles.priceInputWrapper, { borderColor: originalPrice ? colors.status.warning : colors.border.DEFAULT }]}>
-          <TextInput
-            value={originalPrice}
-            onChangeText={setOriginalPrice}
-            keyboardType="numeric"
-            placeholder="Ex: 35 000"
-            placeholderTextColor={colors.text.subtle}
-            style={styles.priceInput}
-          />
-          <AppText variant="bodyStrong" color={colors.text.subtle}>FCFA</AppText>
-        </View>
-      </View>
+      {/* ── Prix, Gain net vendeur & Promo Flash (FOMO) ── */}
+      <PricingPayoutPromoBox
+        price={price}
+        setPrice={setPrice}
+        originalPrice={originalPrice}
+        setOriginalPrice={setOriginalPrice}
+        isProSeller={isProSeller}
+        sellerFeeOverride={sellerFeeOverride}
+      />
     </View>
   );
 };
@@ -231,10 +182,6 @@ const styles = StyleSheet.create({
     gap: spacing[2],
     paddingTop: spacing[3],
   },
-  hint: {
-    marginTop: -4,
-  },
-  // ─── Catégorie ───
   catGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -272,7 +219,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: radii.full,
   },
-  // ─── État ───
   conditionList: {
     gap: spacing[2],
   },
@@ -312,31 +258,6 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#FFFFFF',
-  },
-  // ─── Prix ───
-  priceInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: radii.xl,
-    backgroundColor: colors.grey[50],
-    paddingHorizontal: spacing[3],
-    height: 52,
-    gap: spacing[2],
-  },
-  priceInput: {
-    flex: 1,
-    fontSize: typography.sizes.lg,
-    fontFamily: typography.families.bold,
-    color: colors.text.DEFAULT,
-  },
-  pricePreview: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    paddingHorizontal: spacing[3],
-    paddingVertical: 8,
-    marginTop: -4,
   },
   digitalNotice: {
     backgroundColor: '#E0F2FE',

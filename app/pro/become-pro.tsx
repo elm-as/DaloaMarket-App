@@ -10,6 +10,7 @@ import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import { useAuth } from '../../src/context/AuthContext';
 import { openPaymentGateway } from '../../src/lib/openPaymentGateway';
+import { ProBeforeAfterCard } from '../../src/components/pro/ProBeforeAfterCard';
 
 const PERKS = [
   { title: 'Badge PRO certifié', desc: 'Renforcez la confiance des acheteurs sur toutes vos annonces.' },
@@ -112,6 +113,9 @@ export default function BecomeProScreen() {
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Avant / Après & Appartenance */}
+        <ProBeforeAfterCard />
+
         {/* Plans */}
         <AppText variant="subtitle">Choisissez votre formule</AppText>
         <View style={styles.plansRow}>
