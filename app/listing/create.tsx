@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { usePhase } from '../../src/context/PhaseContext';
 import { listingsService, supabase } from '@daloa/api';
 import { colors, spacing, Button, KeyboardScreen, ConfirmDialog, showAlert } from '@daloa/ui';
 import { ArrowRight, Check, CreditCard, MapPin } from 'lucide-react-native';
-import { Haptics } from '@daloa/utils';
+import { Haptics, isLocationInDaloa, formatFCFA } from '@daloa/utils';
 import { PRICING_CONFIG } from '@daloa/config';
 import { safeBack } from '../../src/utils/navigation';
 import { AuthGuardView } from '../../src/components/common/AuthGuardView';
@@ -31,6 +32,7 @@ const STEP_TITLES = ['Photos & Titre', 'Catégorie & Prix', 'Quartier & Livraiso
 export default function ListingCreateScreen() {
   const router = useRouter();
   const { user, profile, isAuthenticated } = useAuth();
+  const { sellerFeeOverride } = usePhase();
   const { id: editId } = useLocalSearchParams<{ id?: string }>();
   const isEditing = Boolean(editId);
   const [isLoadingListing, setIsLoadingListing] = useState(isEditing);
@@ -112,6 +114,11 @@ export default function ListingCreateScreen() {
 
   const hasPayoutInfo = Boolean((profile as any)?.payout_network && (profile as any)?.payout_number);
   const hasShopLocation = Boolean(profile?.district && (profile as any)?.shop_latitude != null && (profile as any)?.shop_longitude != null);
+  const isSuperOrAdmin = (profile as any)?.role === 'admin' || (profile as any)?.role === 'superadmin';
+  const isShopInDaloa =
+    hasShopLocation &&
+    (isSuperOrAdmin ||
+      isLocationInDaloa(Number((profile as any)?.shop_latitude), Number((profile as any)?.shop_longitude)));
 
   if (!hasPayoutInfo) {
     return (
@@ -125,13 +132,17 @@ export default function ListingCreateScreen() {
     );
   }
 
-  if (!hasShopLocation) {
+  if (!hasShopLocation || !isShopInDaloa) {
     return (
       <RequirementGuardView
-        icon={<MapPin size={32} color={colors.status.infoDark} />}
-        title="Localisation de boutique requise"
-        description="Afin que vos acheteurs et les livreurs de Daloa puissent localiser vos articles et calculer la livraison, veuillez positionner votre boutique sur la carte."
-        actionLabel="Définir la position de ma boutique"
+        icon={<MapPin size={32} color={hasShopLocation ? colors.status.errorDark : colors.status.infoDark} />}
+        title={hasShopLocation ? 'Vente réservée à Daloa' : 'Localisation de boutique requise'}
+        description={
+          hasShopLocation
+            ? "Nous ne sommes encore présents qu'à Daloa pour le moment. Seuls les vendeurs situés à Daloa sont autorisés à vendre sur DaloaMarket."
+            : 'Afin que vos acheteurs et les livreurs de Daloa puissent localiser vos articles et calculer la livraison, veuillez positionner votre boutique sur la carte.'
+        }
+        actionLabel={hasShopLocation ? 'Mettre à jour ma position à Daloa' : 'Définir la position de ma boutique'}
         onAction={() => router.push('/settings/shop' as any)}
       />
     );
@@ -320,6 +331,8 @@ export default function ListingCreateScreen() {
               setOriginalPrice={setOriginalPrice}
               variants={variants}
               onVariantsChange={setVariants}
+              isProSeller={Boolean(profile?.isPro)}
+              sellerFeeOverride={sellerFeeOverride}
             />
           )}
           {currentStep === 3 && (
@@ -364,22 +377,28 @@ export default function ListingCreateScreen() {
           )}
         </View>
 
-        {/* Dialogue de succès stylisé */}
+        {/* Dialogue de succès stylisé (Joie & Appartenance) */}
         <ConfirmDialog
           visible={showSuccessDialog}
           type="info"
-          title={isEditing ? 'Annonce modifiée !' : 'Annonce en ligne !'}
+          title={isEditing ? 'Annonce modifiée !' : '🎉 Ton annonce est en ligne !'}
           message={
             isEditing
               ? 'Vos modifications sont visibles immédiatement.'
-              : 'Votre article est maintenant visible par tous les acheteurs à Daloa.'
+              : 'Partage le lien de ton article en statut WhatsApp dès maintenant pour multiplier tes vues à Daloa !'
           }
           confirmText="Voir l'annonce"
-          cancelText="Fermer"
+          cancelText={isEditing ? 'Fermer' : '📲 Partager WhatsApp'}
           onConfirm={handleGoToCreatedListing}
           onCancel={() => {
             setShowSuccessDialog(false);
-            router.replace('/(tabs)' as any);
+            if (!isEditing && createdListingId) {
+              const shareText = `🔥 Regarde ce que je viens de mettre en vente sur DaloaMarket : *${title.trim()}* à *${formatFCFA(parseFloat(price) || 0)}* !\n👉 https://daloamarket.com/listing/${createdListingId}`;
+              Linking.openURL(`https://wa.me/?text=${encodeURIComponent(shareText)}`).catch(() => {});
+              router.replace(`/listing/${createdListingId}` as any);
+            } else {
+              router.replace('/(tabs)' as any);
+            }
           }}
         />
 

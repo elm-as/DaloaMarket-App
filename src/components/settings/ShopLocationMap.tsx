@@ -12,6 +12,7 @@ interface ShopLocationMapProps {
   onChangeLocation: (coords: { latitude: number; longitude: number }) => void;
   onLocateGps?: () => void;
   isLocating?: boolean;
+  isAdmin?: boolean;
 }
 
 export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
@@ -20,12 +21,13 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
   onChangeLocation,
   onLocateGps,
   isLocating = false,
+  isAdmin = false,
 }) => {
   const accent = useAccent();
   const isValidCoords = latitude != null && longitude != null && isLocationInDaloa(latitude, longitude);
   const isOutsideDaloa = latitude != null && longitude != null && !isLocationInDaloa(latitude, longitude);
-  const currentLat = isValidCoords ? latitude : DALOA_CENTER.lat;
-  const currentLng = isValidCoords ? longitude : DALOA_CENTER.lng;
+  const currentLat = latitude ?? DALOA_CENTER.lat;
+  const currentLng = longitude ?? DALOA_CENTER.lng;
 
   const handleOpenGoogleMaps = () => {
     Haptics.selection();
@@ -39,22 +41,24 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
         <View style={styles.titleWrap}>
           <AppText variant="bodyStrong">Carte interactive de Daloa</AppText>
           <AppText variant="caption" color={colors.text.subtle}>
-            Cliquez ou glissez le repère pour ajuster l'emplacement
+            Utilisez le GPS ou placez le repère sur votre boutique à Daloa
           </AppText>
         </View>
 
         <View style={styles.headerButtons}>
-          <AppPressable
-            haptic="selection"
-            onPress={() => onChangeLocation({ latitude: DALOA_CENTER.lat, longitude: DALOA_CENTER.lng })}
-            style={[styles.gpsQuickBtn, { borderColor: accent[200], backgroundColor: accent[50] }]}
-            accessibilityLabel="Recentrer sur Daloa"
-          >
-            <MapPin size={13} color={accent[700]} />
-            <AppText variant="caption" color={accent[700]} style={styles.gpsBtnText}>
-              Centre Daloa
-            </AppText>
-          </AppPressable>
+          {(isAdmin || !isOutsideDaloa) && (
+            <AppPressable
+              haptic="selection"
+              onPress={() => onChangeLocation({ latitude: DALOA_CENTER.lat, longitude: DALOA_CENTER.lng })}
+              style={[styles.gpsQuickBtn, { borderColor: accent[200], backgroundColor: accent[50] }]}
+              accessibilityLabel="Recentrer sur Daloa"
+            >
+              <MapPin size={13} color={accent[700]} />
+              <AppText variant="caption" color={accent[700]} style={styles.gpsBtnText}>
+                Centre Daloa
+              </AppText>
+            </AppPressable>
+          )}
 
           {onLocateGps && (
             <AppPressable
@@ -77,17 +81,31 @@ export const ShopLocationMap: React.FC<ShopLocationMapProps> = ({
         </View>
       </View>
 
-      {/* Avertissement si coordonnées hors Daloa (ex: testeur à Abidjan) */}
+      {/* Avertissement ou blocage si coordonnées hors Daloa */}
       {isOutsideDaloa && (
-        <AppPressable
-          onPress={() => onChangeLocation({ latitude: DALOA_CENTER.lat, longitude: DALOA_CENTER.lng })}
-          style={styles.warningBanner}
+        <View
+          style={[
+            styles.warningBanner,
+            !isAdmin && {
+              backgroundColor: colors.status.errorLight,
+              borderColor: colors.status.errorBorder,
+            },
+          ]}
         >
-          <AlertTriangle size={13} color={colors.status.warningDark} />
-          <AppText variant="caption" color={colors.status.warningDark} style={styles.flex1}>
-            Position hors de Daloa détectée (Mode test). Emplacement calé sur Daloa.
+          <AlertTriangle
+            size={14}
+            color={isAdmin ? colors.status.warningDark : colors.status.errorDark}
+          />
+          <AppText
+            variant="caption"
+            color={isAdmin ? colors.status.warningDark : colors.status.errorDark}
+            style={styles.flex1}
+          >
+            {isAdmin
+              ? 'Position hors de Daloa détectée (Mode Admin / Test : vous êtes autorisé à vendre hors de Daloa).'
+              : "Nous ne sommes encore présents qu'à Daloa pour le moment. Vous n'êtes pas autorisé à vendre hors de Daloa."}
           </AppText>
-        </AppPressable>
+        </View>
       )}
 
       {/* Cadre de la carte */}

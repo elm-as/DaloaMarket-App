@@ -18,6 +18,7 @@ import { ListingStickyFooter } from '../../src/components/listing-detail/Listing
 import { ListingReviewsSection } from '../../src/components/listing-detail/ListingReviewsSection';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
+import { ListingPsychologicalSignals } from '../../src/components/listing-detail/ListingPsychologicalSignals';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -408,6 +409,14 @@ export default function ListingDetailScreen() {
               </AppText>
             </View>
           </View>
+
+          {/* Signaux psychologiques : FOMO, Confiance (Satisfait ou remboursé) & Livraison Express */}
+          <ListingPsychologicalSignals
+            listingId={listing.id}
+            stock={selectedVariant?.stock ?? listing.stock ?? 1}
+            currentPrice={activePrice}
+            originalPrice={listing.original_price}
+          />
  
           {/* Signalement article vendu / indisponible */}
           {unavailableReason ? (
