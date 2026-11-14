@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Image } from 'expo-image';
-import { ChevronLeft, Share2, Heart, Flag, Home } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable } from '@daloa/ui';
+import { ChevronLeft, Share2, Heart, Flag, Home, ShoppingCart } from 'lucide-react-native';
+import { colors, radii, spacing, typography, AppText, AppPressable } from '@daloa/ui';
 
 interface ListingPhotosGalleryProps {
   photos: string[];
@@ -13,6 +13,8 @@ interface ListingPhotosGalleryProps {
   onShare: () => void;
   onToggleFavorite: () => void;
   onReport: () => void;
+  cartCount?: number;
+  onOpenCart?: () => void;
 }
 
 const FALLBACK = 'https://images.pexels.com/photos/4386321/pexels-photo-4386321.jpeg?auto=compress&cs=tinysrgb&w=600';
@@ -26,6 +28,8 @@ export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
   onShare,
   onToggleFavorite,
   onReport,
+  cartCount,
+  onOpenCart,
 }) => {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const photos = rawPhotos && rawPhotos.length > 0 ? rawPhotos : [FALLBACK];
@@ -81,8 +85,29 @@ export const ListingPhotosGallery: React.FC<ListingPhotosGalleryProps> = ({
         )}
       </View>
 
-      {/* Floating top-right: share, heart, report */}
+      {/* Floating top-right: cart, share, heart, report */}
       <View style={styles.floatRight}>
+        {onOpenCart && (
+          <View style={styles.cartBtnWrap}>
+            <AppPressable
+              onPress={onOpenCart}
+              rippleBorderless
+              haptic="light"
+              style={styles.floatBtn}
+              accessibilityRole="button"
+              accessibilityLabel={cartCount && cartCount > 0 ? `Panier, ${cartCount} article${cartCount > 1 ? 's' : ''}` : 'Panier'}
+            >
+              <ShoppingCart size={17} color={colors.text.inverse} />
+            </AppPressable>
+            {cartCount != null && cartCount > 0 && (
+              <View style={styles.cartBadge} pointerEvents="none">
+                <AppText variant="caption" color={colors.text.inverse} style={styles.cartBadgeText}>
+                  {cartCount > 99 ? '99+' : cartCount}
+                </AppText>
+              </View>
+            )}
+          </View>
+        )}
         <AppPressable
           onPress={onShare}
           rippleBorderless
@@ -180,6 +205,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  cartBtnWrap: {
+    position: 'relative',
+    overflow: 'visible',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: colors.primary.DEFAULT,
+    minWidth: 17,
+    height: 17,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  cartBadgeText: {
+    fontSize: 9.5,
+    fontFamily: typography.families.bold,
+    fontVariant: ['tabular-nums'],
   },
   dotsRow: {
     position: 'absolute',

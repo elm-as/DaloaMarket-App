@@ -15,6 +15,7 @@ import { formatFCFA, Haptics, getListingPriceRange, getUnavailabilityReason, bui
 import { ListingPhotosGallery } from '../../src/components/listing-detail/ListingPhotosGallery';
 import { ListingSellerBox } from '../../src/components/listing-detail/ListingSellerBox';
 import { ListingStickyFooter } from '../../src/components/listing-detail/ListingStickyFooter';
+import { CartNotificationBanner } from '../../src/components/listing-detail/CartNotificationBanner';
 import { ListingReviewsSection } from '../../src/components/listing-detail/ListingReviewsSection';
 import { VariantPickerSheet } from '../../src/components/listing-detail/VariantPickerSheet';
 import { OwnerActionSheet } from '../../src/components/listing-detail/OwnerActionSheet';
@@ -44,7 +45,7 @@ export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const accent = useAccent();
-  const { addToCart, updateQuantity, removeFromCart, setListingVariants, items } = useCart();
+  const { addToCart, updateQuantity, removeFromCart, setListingVariants, items, itemCount } = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
   const { user, isAuthenticated } = useAuth();
   const { width: screenWidth } = useResponsive();
@@ -53,6 +54,7 @@ export default function ListingDetailScreen() {
   const [descExpanded, setDescExpanded] = useState(false);
   const [showVariantPicker, setShowVariantPicker] = useState(false);
   const [showOwnerSheet, setShowOwnerSheet] = useState(false);
+  const [showCartBanner, setShowCartBanner] = useState(false);
 
   const isFavorite = id ? isFavorited(id) : false;
 
@@ -267,6 +269,7 @@ export default function ListingDetailScreen() {
     }
     Haptics.lightImpact();
     addToCart(listing, null, 1);
+    setShowCartBanner(true);
     userBehaviorService.trackInteraction(
       {
         type: 'add_to_cart',
@@ -284,6 +287,7 @@ export default function ListingDetailScreen() {
     setShowVariantPicker(false);
     Haptics.success();
     setListingVariants(listing, selections);
+    setShowCartBanner(true);
     userBehaviorService.trackInteraction(
       {
         type: 'add_to_cart',
@@ -302,6 +306,7 @@ export default function ListingDetailScreen() {
     setShowVariantPicker(false);
     Haptics.success();
     addToCart(listing, variant, 1);
+    setShowCartBanner(true);
     userBehaviorService.trackInteraction(
       {
         type: 'add_to_cart',
@@ -356,6 +361,8 @@ export default function ListingDetailScreen() {
           onShare={handleShare}
           onToggleFavorite={handleToggleFavorite}
           onReport={handleReport}
+          cartCount={itemCount}
+          onOpenCart={() => router.push('/(tabs)/cart' as any)}
         />
 
         {/* ② Bloc info principal */}
@@ -607,6 +614,13 @@ export default function ListingDetailScreen() {
         />
       )}
 
+      {/* Notification toast/banner when item added to cart */}
+      <CartNotificationBanner
+        visible={showCartBanner}
+        onClose={() => setShowCartBanner(false)}
+        onViewCart={() => router.push('/(tabs)/cart' as any)}
+      />
+
       {/* Sticky footer */}
       <ListingStickyFooter
         cartQty={hasVariants ? totalListingCartQty : cartQty}
@@ -617,6 +631,7 @@ export default function ListingDetailScreen() {
         onUpdateQty={updateQuantity}
         onRemoveFromCart={removeFromCart}
         onBuyNow={handleBuyNow}
+        onViewCart={() => router.push('/(tabs)/cart' as any)}
         isOwner={isOwner}
         onEditListing={() => router.push(`/listing/create?id=${listing.id}` as any)}
         onManageListing={() => setShowOwnerSheet(true)}

@@ -28,7 +28,6 @@ export * from './services/favoritesService';
 export * from './services/deliveryPersonService';
 export * from './services/referralService';
 export * from './services/antiLapinService';
-export * from './services/daloaCashService';
 export * from './services/groupedDeliveryService';
 export * from './queries/index';
 export * from './lib/feedCuration';

@@ -13,6 +13,7 @@ interface ListingStickyFooterProps {
   onUpdateQty: (itemId: string, qty: number) => void;
   onRemoveFromCart: (itemId: string) => void;
   onBuyNow: () => void;
+  onViewCart?: () => void;
   isOwner?: boolean;
   onEditListing?: () => void;
   onManageListing?: () => void;
@@ -30,6 +31,7 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
   onUpdateQty,
   onRemoveFromCart,
   onBuyNow,
+  onViewCart,
   isOwner = false,
   onEditListing,
   onManageListing,
@@ -61,11 +63,8 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
             accessibilityRole="button"
             accessibilityLabel="Gérer le statut de l'annonce"
           >
-            <AppText variant="label" color={colors.text.body}>
-              Gérer le statut
-            </AppText>
+            <AppText variant="label" color={colors.text.body}>Gérer le statut</AppText>
           </AppPressable>
-
           <AppPressable
             haptic="medium"
             onPress={onEditListing}
@@ -74,17 +73,13 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
             accessibilityLabel="Modifier l'annonce"
           >
             <Edit3 size={15} color={colors.text.inverse} />
-            <AppText variant="label" color={colors.text.inverse}>
-              Modifier
-            </AppText>
+            <AppText variant="label" color={colors.text.inverse}>Modifier</AppText>
           </AppPressable>
         </View>
       </View>
     );
   }
 
-  // La barre d'achat restait active sur une annonce à stock 0 : l'article partait
-  // au panier puis en était éjecté en « rupture de stock » à l'ouverture.
   if (unavailableReason) {
     return (
       <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing[3]) }]}>
@@ -104,9 +99,7 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
               accessibilityLabel="Voir les autres articles disponibles"
             >
               <ShoppingCart size={15} color={colors.text.inverse} strokeWidth={2.2} />
-              <AppText variant="label" color={colors.text.inverse}>
-                Voir les autres articles
-              </AppText>
+              <AppText variant="label" color={colors.text.inverse}>Voir les autres articles</AppText>
             </AppPressable>
           )}
         </View>
@@ -120,41 +113,46 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
       <View style={styles.row}>
         {hasVariants ? (
           cartQty > 0 ? (
-            <AppPressable
-              haptic="light"
-              onPress={onOpenOptions || onAddToCart}
-              style={[
-                styles.variantFooterBtn,
-                { backgroundColor: accent[50], borderColor: accent[300] },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`Gérer les ${cartQty} articles au panier`}
-            >
-              <View style={styles.variantFooterLeft}>
-                <Check size={16} color={accent[700]} strokeWidth={2.5} />
-                <AppText variant="bodyStrong" color={accent[800] ?? accent[700]}>
-                  {cartQty} au panier
-                </AppText>
-              </View>
-              <View style={[styles.variantFooterPill, { backgroundColor: accent.DEFAULT }]}>
-                <Edit3 size={13} color={colors.text.inverse} />
-                <AppText variant="label" color={colors.text.inverse}>
-                  Modifier les options
-                </AppText>
-              </View>
-            </AppPressable>
+            <>
+              <AppPressable
+                haptic="light"
+                onPress={onOpenOptions || onAddToCart}
+                style={[styles.variantFooterBtn, { backgroundColor: accent[50], borderColor: accent[300] }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Gérer les ${cartQty} articles au panier`}
+              >
+                <View style={styles.variantFooterLeft}>
+                  <Check size={16} color={accent[700]} strokeWidth={2.5} />
+                  <AppText variant="bodyStrong" color={accent[800] ?? accent[700]}>{cartQty} au panier</AppText>
+                </View>
+                <View style={[styles.variantFooterPill, { backgroundColor: accent.DEFAULT }]}>
+                  <Edit3 size={13} color={colors.text.inverse} />
+                  <AppText variant="label" color={colors.text.inverse}>Options</AppText>
+                </View>
+              </AppPressable>
+              {onViewCart && (
+                <AppPressable
+                  haptic="medium"
+                  onPress={onViewCart}
+                  style={[styles.viewCartBtn, { backgroundColor: accent.DEFAULT }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Voir mon panier"
+                >
+                  <ShoppingCart size={15} color={colors.text.inverse} strokeWidth={2.2} />
+                  <AppText variant="label" color={colors.text.inverse}>Voir le panier</AppText>
+                </AppPressable>
+              )}
+            </>
           ) : (
             <AppPressable
               haptic="light"
               onPress={onOpenOptions || onAddToCart}
-              style={[styles.addBtn, { backgroundColor: accent.DEFAULT }]}
+              style={[styles.addBtn, { backgroundColor: accent[50], borderColor: accent[300], borderWidth: 1.5 }]}
               accessibilityRole="button"
               accessibilityLabel="Choisir les options du produit"
             >
-              <ShoppingCart size={16} color={colors.text.inverse} strokeWidth={2} />
-              <AppText variant="label" color={colors.text.inverse}>
-                Choisir les options
-              </AppText>
+              <ShoppingCart size={16} color={accent[700]} strokeWidth={2} />
+              <AppText variant="label" color={accent[700]}>Choisir les options</AppText>
             </AppPressable>
           )
         ) : cartQty > 0 ? (
@@ -167,14 +165,9 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
                 style={styles.stepBtn}
                 accessibilityLabel={cartQty <= 1 ? 'Retirer du panier' : 'Diminuer la quantité'}
               >
-                {cartQty <= 1
-                  ? <Trash2 size={14} color={colors.status.error} />
-                  : <Minus size={14} color={accent[700]} strokeWidth={2.5} />
-                }
+                {cartQty <= 1 ? <Trash2 size={14} color={colors.status.error} /> : <Minus size={14} color={accent[700]} strokeWidth={2.5} />}
               </AppPressable>
-              <AppText variant="bodyStrong" color={accent[800] ?? accent[700]} style={styles.qtyText}>
-                {cartQty}
-              </AppText>
+              <AppText variant="bodyStrong" color={accent[800] ?? accent[700]} style={styles.qtyText}>{cartQty}</AppText>
               <AppPressable
                 haptic="light"
                 rippleBorderless
@@ -185,25 +178,34 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
                 <Plus size={14} color={colors.text.inverse} strokeWidth={2.5} />
               </AppPressable>
             </View>
-            <View style={styles.inCartLabel}>
-              <Check size={12} color={accent[700]} />
-              <AppText variant="overline" color={accent[700]}>
-                Dans le panier
-              </AppText>
-            </View>
+            {onViewCart ? (
+              <AppPressable
+                haptic="medium"
+                onPress={onViewCart}
+                style={[styles.viewCartBtn, { backgroundColor: accent.DEFAULT }]}
+                accessibilityRole="button"
+                accessibilityLabel="Voir mon panier"
+              >
+                <ShoppingCart size={15} color={colors.text.inverse} strokeWidth={2.2} />
+                <AppText variant="label" color={colors.text.inverse}>Voir le panier</AppText>
+              </AppPressable>
+            ) : (
+              <View style={styles.inCartLabel}>
+                <Check size={12} color={accent[700]} />
+                <AppText variant="overline" color={accent[700]}>Dans le panier</AppText>
+              </View>
+            )}
           </>
         ) : (
           <AppPressable
             haptic="light"
             onPress={onAddToCart}
-            style={[styles.addBtn, { backgroundColor: accent.DEFAULT }]}
+            style={[styles.addBtn, { backgroundColor: accent[50], borderColor: accent[300], borderWidth: 1.5 }]}
             accessibilityRole="button"
             accessibilityLabel="Ajouter au panier"
           >
-            <ShoppingCart size={16} color={colors.text.inverse} strokeWidth={2} />
-            <AppText variant="label" color={colors.text.inverse}>
-              Ajouter au panier
-            </AppText>
+            <ShoppingCart size={16} color={accent[700]} strokeWidth={2} />
+            <AppText variant="label" color={accent[700]}>Ajouter au panier</AppText>
           </AppPressable>
         )}
       </View>
@@ -212,14 +214,17 @@ export const ListingStickyFooter: React.FC<ListingStickyFooterProps> = ({
       <AppPressable
         haptic="success"
         onPress={onBuyNow}
-        style={[styles.buyBtn, { borderColor: accent[300] }]}
+        style={[
+          styles.buyBtn,
+          cartQty === 0
+            ? { backgroundColor: accent.DEFAULT, borderColor: accent.DEFAULT }
+            : { borderColor: accent[300], backgroundColor: colors.bg.surface },
+        ]}
         accessibilityLabel="Acheter maintenant"
       >
-        <CreditCard size={15} color={accent[700]} strokeWidth={2} />
-        <AppText variant="label" color={accent[700]}>
-          Acheter maintenant
-        </AppText>
-        <Lock size={13} color={accent[500] ?? accent[400]} />
+        <CreditCard size={15} color={cartQty === 0 ? colors.text.inverse : accent[700]} strokeWidth={2} />
+        <AppText variant="label" color={cartQty === 0 ? colors.text.inverse : accent[700]}>Acheter maintenant</AppText>
+        <Lock size={13} color={cartQty === 0 ? colors.text.inverse : (accent[500] ?? accent[400])} />
       </AppPressable>
     </View>
   );
@@ -242,106 +247,52 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   unavailableRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], height: 48 },
   unavailableBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing[3],
-    height: 48,
-    borderRadius: radii.xl,
-    backgroundColor: colors.bg.subtle,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: spacing[3], height: 48, borderRadius: radii.xl, backgroundColor: colors.bg.subtle,
   },
   browseOtherBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: radii.xl,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, height: 48, borderRadius: radii.xl,
   },
-  // ─── Stepper ───
   stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 48,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    paddingHorizontal: 4,
-    gap: 2,
+    flexDirection: 'row', alignItems: 'center', height: 48,
+    borderRadius: radii.xl, borderWidth: 1, paddingHorizontal: 4, gap: 2,
   },
   stepBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg.surface,
+    width: 36, height: 36, borderRadius: radii.lg,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.surface,
   },
   qtyText: { minWidth: 28, textAlign: 'center', fontVariant: ['tabular-nums'] },
   inCartLabel: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  // ─── Ajouter au panier ───
+  viewCartBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 48, borderRadius: radii.xl, gap: 7,
+  },
   addBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
-    borderRadius: radii.xl,
-    gap: 7,
-    overflow: 'hidden',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 48, borderRadius: radii.xl, gap: 7, overflow: 'hidden',
   },
-  // ─── Commander directement ───
   buyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 46,
-    borderRadius: radii.xl,
-    borderWidth: 1.5,
-    backgroundColor: colors.bg.surface,
-    gap: 8,
-    overflow: 'hidden',
-    paddingHorizontal: spacing[3],
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 46, borderRadius: radii.xl, borderWidth: 1.5, gap: 8,
+    overflow: 'hidden', paddingHorizontal: spacing[3],
   },
-  // ─── Owner ───
   ownerActionsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   ownerManageBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg.surface,
+    flex: 1, height: 48, borderRadius: radii.xl, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg.surface,
   },
   ownerEditBtn: {
-    flex: 1.2,
-    height: 48,
-    borderRadius: radii.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    flex: 1.2, height: 48, borderRadius: radii.xl, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  // ─── Variante en cart ───
   variantFooterBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 48,
-    borderRadius: radii.xl,
-    borderWidth: 1.5,
-    paddingHorizontal: spacing[3],
-    overflow: 'hidden',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: 48, borderRadius: radii.xl, borderWidth: 1.5, paddingHorizontal: spacing[3], overflow: 'hidden',
   },
   variantFooterLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   variantFooterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing[3],
-    paddingVertical: 6,
-    borderRadius: radii.full,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radii.full,
   },
 });

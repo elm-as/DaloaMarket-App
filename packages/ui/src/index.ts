@@ -34,6 +34,5 @@ export * from './components/WhatsAppIcon';
 export * from './components/GoogleIcon';
 export * from './components/ConfirmDialog';
 export * from './components/BuyerReliabilityBadge';
-export * from './components/DaloaCashCard';
 export * from './components/GroupedStopsTimeline';
 export * from './components/GroupedDeliveryBanner';

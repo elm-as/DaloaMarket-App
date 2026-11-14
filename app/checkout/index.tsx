@@ -331,16 +331,18 @@ export default function CheckoutScreen() {
     staleTime: 5 * 60 * 1000,
     gcTime: 0,
     retry: 1,
-    queryFn: () =>
-      quoteService.getQuote({
+    queryFn: () => {
+      const resolvedBuyerPoint = resolveBuyerPoint(deliveryCoords, deliveryDistrict);
+      return quoteService.getQuote({
         items: quoteItems,
         deliveryMode,
         paymentMethod: paymentMode,
-        deliveryLat: deliveryCoords?.latitude,
-        deliveryLng: deliveryCoords?.longitude,
+        deliveryLat: resolvedBuyerPoint.latitude,
+        deliveryLng: resolvedBuyerPoint.longitude,
         deliveryDistrict,
         deliveryAddress: deliveryMode === 'delivery' ? deliveryAddress.trim() : 'Retrait direct en boutique',
-      }),
+      });
+    },
   });
   // Refus métier (article indisponible, retrait refusé…) : bloquant. Panne
   // technique du serveur de devis : on laisse commander par l'ancien chemin,
@@ -512,13 +514,17 @@ export default function CheckoutScreen() {
               isDigital={isDigital}
               onNext={() => {
                 if (deliveryMode === 'delivery' && !isDigital) {
-                  if (!deliveryCoords?.latitude || !deliveryCoords?.longitude) {
-                    setErrorMsg('La position GPS est obligatoire pour la livraison. Veuillez activer votre GPS.');
+                  if (!deliveryDistrict.trim()) {
+                    setErrorMsg('Veuillez sélectionner votre quartier à Daloa.');
                     return;
                   }
                   if (!deliveryAddress.trim()) {
                     setErrorMsg('Veuillez préciser votre repère ou adresse de livraison.');
                     return;
+                  }
+                  if (!deliveryCoords?.latitude || !deliveryCoords?.longitude) {
+                    const fallbackPoint = resolveBuyerPoint(null, deliveryDistrict);
+                    setDeliveryCoords(fallbackPoint);
                   }
                 }
                 if (!buyerPhone.trim() || buyerPhone.length < 8) {
