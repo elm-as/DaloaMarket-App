@@ -1,15 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, TextInput } from 'react-native';
 import { PRICING_CONFIG } from '@daloa/config';
-import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { formatFCFA, Haptics } from '@daloa/utils';
-
-const FLASH_PROMO_PRESETS = [
-  { label: 'Promo -10%', pct: 0.1 },
-  { label: 'Promo -15%', pct: 0.15 },
-  { label: 'Promo -20%', pct: 0.2 },
-  { label: 'Promo -30%', pct: 0.3 },
-];
+import { colors, radii, spacing, typography, AppText, useAccent } from '@daloa/ui';
+import { formatFCFA } from '@daloa/utils';
 
 interface PricingPayoutPromoBoxProps {
   price: string;
@@ -22,7 +15,7 @@ interface PricingPayoutPromoBoxProps {
 
 /**
  * Saisie du prix avec simulateur en direct du gain net vendeur
- * et activation rapide de promotions flash (levier FOMO).
+ * et champ optionnel d'ancien prix barré.
  */
 export const PricingPayoutPromoBox: React.FC<PricingPayoutPromoBoxProps> = ({
   price,
@@ -45,14 +38,6 @@ export const PricingPayoutPromoBox: React.FC<PricingPayoutPromoBoxProps> = ({
   const sellerFeeRate = sellerFeeOverride != null ? sellerFeeOverride : defaultFeeRate;
   const sellerFee = numPrice >= 300 ? Math.round(numPrice * sellerFeeRate) : 0;
   const netPayout = numPrice >= 300 ? numPrice - sellerFee : 0;
-
-  const applyFlashPromoPreset = (pct: number) => {
-    if (numPrice < 300) return;
-    Haptics.selection();
-    const rawOriginal = Math.round(numPrice / (1 - pct));
-    const roundedOriginal = Math.ceil(rawOriginal / 50) * 50;
-    setOriginalPrice(String(roundedOriginal));
-  };
 
   return (
     <>
@@ -132,46 +117,19 @@ export const PricingPayoutPromoBox: React.FC<PricingPayoutPromoBoxProps> = ({
         )}
       </View>
 
-      {/* ── Promo Flash / Prix barré (FOMO) ── */}
+      {/* ── Ancien prix barré (optionnel) ── */}
       <View style={styles.section}>
-        <AppText variant="label" color={colors.text.body}>
-          🔥 Activer une Promo Flash{' '}
-          <AppText variant="caption" color={colors.text.subtle}>(FOMO — optionnel)</AppText>
-        </AppText>
-        <AppText variant="caption" color={colors.text.muted} style={styles.hint}>
-          Ajoute un badge "−X%" et raye l'ancien prix pour déclencher l'achat rapide.
-        </AppText>
-        {numPrice >= 300 && (
-          <View style={styles.presetsWrap}>
-            {FLASH_PROMO_PRESETS.map((preset) => (
-              <AppPressable
-                key={preset.label}
-                haptic="selection"
-                onPress={() => applyFlashPromoPreset(preset.pct)}
-                style={[
-                  styles.presetChip,
-                  { borderColor: accent[200], backgroundColor: accent[50] },
-                ]}
-              >
-                <AppText variant="caption" color={accent[700]} style={styles.presetChipText}>
-                  ⚡ {preset.label}
-                </AppText>
-              </AppPressable>
-            ))}
-            {hasDiscount && (
-              <AppPressable
-                haptic="selection"
-                onPress={() => setOriginalPrice('')}
-                style={[
-                  styles.presetChip,
-                  { borderColor: colors.border.DEFAULT, backgroundColor: colors.grey[100] },
-                ]}
-              >
-                <AppText variant="caption" color={colors.text.muted}>Retirer</AppText>
-              </AppPressable>
-            )}
-          </View>
-        )}
+        <View style={styles.rowBetween}>
+          <AppText variant="label" color={colors.text.body}>
+            Ancien prix barré{' '}
+            <AppText variant="caption" color={colors.text.subtle}>(optionnel)</AppText>
+          </AppText>
+          {hasDiscount && (
+            <AppText variant="caption" color={colors.status.errorDark} style={styles.tabular}>
+              −{discountPct}%
+            </AppText>
+          )}
+        </View>
         <View
           style={[
             styles.priceInputWrapper,
@@ -202,9 +160,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  hint: {
-    marginTop: -4,
   },
   priceInputWrapper: {
     flexDirection: 'row',
@@ -250,20 +205,6 @@ const styles = StyleSheet.create({
   },
   tabular: {
     fontVariant: ['tabular-nums'],
-  },
-  presetsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  presetChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radii.md,
-    borderWidth: 1,
-  },
-  presetChipText: {
-    fontFamily: typography.families.bold,
   },
 });
 

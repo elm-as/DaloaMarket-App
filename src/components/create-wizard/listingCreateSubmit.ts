@@ -72,6 +72,40 @@ export function validateListingPricing(price: string, variants: DraftVariant[]):
   return null;
 }
 
+export interface StepValidationInput {
+  photosCount: number;
+  title: string;
+  price: string;
+  variants: DraftVariant[];
+}
+
+export interface StepValidationError {
+  title: string;
+  message: string;
+}
+
+/**
+ * Valide les champs obligatoires d'une étape du wizard mobile avant d'avancer.
+ */
+export function validateMobileWizardStep(
+  step: number,
+  input: StepValidationInput,
+): StepValidationError | null {
+  if (step === 1) {
+    if (input.photosCount === 0) {
+      return { title: 'Photo requise', message: 'Ajoutez au moins une photo de votre article.' };
+    }
+    if (!input.title.trim() || input.title.trim().length < 3) {
+      return { title: 'Titre requis', message: 'Saisissez un titre d’au moins 3 caractères.' };
+    }
+  }
+  if (step === 2) {
+    const invalid = validateListingPricing(input.price, input.variants);
+    if (invalid) return { title: 'Prix invalide', message: invalid };
+  }
+  return null;
+}
+
 export interface PublishMobileListingParams {
   editId?: string;
   userId: string;

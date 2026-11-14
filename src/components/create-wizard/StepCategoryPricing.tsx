@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles, Tag, FileText } from 'lucide-react-native';
+import { Shirt, Smartphone, Home, Car, UtensilsCrossed, Dumbbell, BookOpen, Sparkles, Tag, FileText, Check } from 'lucide-react-native';
 import { MARKET_CATEGORIES, LISTING_CONDITIONS } from '@daloa/config';
 import { colors, radii, spacing, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
 import { StepVariantsSection, DraftVariant } from './StepVariantsSection';
@@ -79,24 +79,22 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
                 haptic="selection"
                 onPress={() => setSelectedCategory(cat.id)}
                 style={[
-                  styles.catCard,
-                  isSelected && { borderColor: cat.color, backgroundColor: cat.color + '14' },
+                  styles.catPill,
+                  isSelected && {
+                    borderColor: cat.color,
+                    backgroundColor: cat.color + '14',
+                  },
                 ]}
               >
-                <View style={[styles.catIconCircle, { backgroundColor: cat.color + '22' }]}>
-                  <IconComp size={20} color={cat.color} strokeWidth={1.8} />
-                </View>
+                <IconComp size={15} color={cat.color} strokeWidth={2} />
                 <AppText
-                  variant="overline"
-                  color={isSelected ? cat.color : colors.text.muted}
-                  numberOfLines={2}
-                  style={styles.catLabel}
+                  variant="caption"
+                  color={isSelected ? colors.text.DEFAULT : colors.text.body}
+                  style={isSelected ? styles.catLabelActive : styles.catLabel}
                 >
                   {cat.name}
                 </AppText>
-                {isSelected && (
-                  <View style={[styles.catSelectedDot, { backgroundColor: cat.color }]} />
-                )}
+                {isSelected && <Check size={13} color={cat.color} strokeWidth={2.8} />}
               </AppPressable>
             );
           })}
@@ -192,37 +190,22 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing[2],
   },
-  catCard: {
-    width: '30%',
+  catPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing[2],
-    borderRadius: radii.xl,
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: radii.lg,
     borderWidth: 1.5,
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.bg.surface,
-    gap: 6,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  catIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   catLabel: {
-    textAlign: 'center',
-    lineHeight: 14,
+    fontFamily: typography.families.medium,
   },
-  catSelectedDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: radii.full,
+  catLabelActive: {
+    fontFamily: typography.families.semibold,
   },
   conditionList: {
     gap: spacing[2],

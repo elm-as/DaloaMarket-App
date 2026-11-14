@@ -17,7 +17,7 @@ import { StepLocationDelivery } from '../../src/components/create-wizard/StepLoc
 import {
   loadEditableListing,
   submitMobileListing,
-  validateListingPricing,
+  validateMobileWizardStep,
 } from '../../src/components/create-wizard/listingCreateSubmit';
 import { clearListingDraft, loadListingDraft, saveListingDraft } from '../../src/services/listingDraftStorage';
 
@@ -155,36 +155,41 @@ export default function ListingCreateScreen() {
     setIsDraftRestored(false);
   };
 
+  const validateStepOrAlert = (step: number): boolean => {
+    const err = validateMobileWizardStep(step, { photosCount: photos.length, title, price, variants });
+    if (!err) return true;
+    showAlert(err.title, err.message);
+    return false;
+  };
+
   const handleNext = () => {
     Haptics.selection();
-    if (currentStep === 1 && photos.length === 0) {
-      showAlert('Photo requise', 'Ajoutez au moins une photo de votre article.');
-      return;
-    }
-    if (currentStep === 1 && (!title.trim() || title.trim().length < 3)) {
-      showAlert('Titre requis', 'Saisissez un titre d’au moins 3 caractères.');
-      return;
-    }
-    if (currentStep === 2) {
-      const invalid = validateListingPricing(price, variants);
-      if (invalid) {
-        showAlert('Prix invalide', invalid);
-        return;
-      }
-    }
+    if (!validateStepOrAlert(currentStep)) return;
     setCurrentStep((p) => Math.min(3, p + 1));
+  };
+
+  const handleSelectStep = (targetStep: number) => {
+    if (targetStep === currentStep) return;
+    Haptics.selection();
+    if (targetStep < currentStep) {
+      setCurrentStep(targetStep);
+      return;
+    }
+    for (let s = currentStep; s < targetStep; s += 1) {
+      if (validateStepOrAlert(s)) continue;
+      if (s !== currentStep) setCurrentStep(s);
+      return;
+    }
+    setCurrentStep(targetStep);
   };
 
   const handlePublish = async () => {
     if (!user) return;
-    const invalidPricing = validateListingPricing(price, variants);
-    if (invalidPricing) {
-      showAlert('Prix invalide', invalidPricing);
+    if (!validateStepOrAlert(2)) {
       setCurrentStep(2);
       return;
     }
-    if (photos.length === 0) {
-      showAlert('Photo requise', 'Ajoutez au moins une photo de votre article.');
+    if (!validateStepOrAlert(1)) {
       setCurrentStep(1);
       return;
     }
@@ -237,7 +242,7 @@ export default function ListingCreateScreen() {
           isEditing={isEditing}
           isDraftRestored={isDraftRestored}
           onBack={() => (currentStep === 1 ? safeBack(router, '/(tabs)') : setCurrentStep((p) => Math.max(1, p - 1)))}
-          onSelectStep={(step) => setCurrentStep(step)}
+          onSelectStep={handleSelectStep}
           onResetDraft={handleResetDraft}
         />
 
