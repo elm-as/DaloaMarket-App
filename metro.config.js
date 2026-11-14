@@ -110,15 +110,44 @@ if (FileStore) {
   ];
 }
 
-// Empêche HmrServer/jsc-safe-url de planter lorsque HMR Web envoie /?platform=web sans /index.bundle
+const NON_BUNDLE_PATHS = new Set(['/hot', '/symbolicate', '/assets']);
+
+/**
+ * Redirige les routes SPA envoyées par le client HMR Web (?platform=web sans .bundle)
+ * vers /index.bundle pour empêcher HmrServer de résoudre une URL de page comme module.
+ */
+function rewriteHmrSpaUrl(urlString) {
+  let parsed;
+  try {
+    parsed = urlString.startsWith('/') ? new URL(urlString, 'http://localhost') : new URL(urlString);
+  } catch {
+    return urlString;
+  }
+  if (!parsed.searchParams.has('platform')) return urlString;
+
+  const entry = parsed.searchParams.get('bundleEntry');
+  if (entry && (entry === '/' || (entry.startsWith('/') && !/\.(bundle|js|ts|tsx|jsx)$/.test(entry)))) {
+    parsed.searchParams.set('bundleEntry', 'index.bundle');
+    return urlString.startsWith('/') ? `${parsed.pathname}${parsed.search}${parsed.hash}` : parsed.toString();
+  }
+
+  const { pathname } = parsed;
+  const isMetroAssetOrBundle =
+    NON_BUNDLE_PATHS.has(pathname) ||
+    pathname.startsWith('/assets/') ||
+    /\.(bundle|map|delta|assets)$/.test(pathname);
+  if (isMetroAssetOrBundle) return urlString;
+
+  parsed.pathname = '/index.bundle';
+  return urlString.startsWith('/') ? `${parsed.pathname}${parsed.search}${parsed.hash}` : parsed.toString();
+}
+
 const defaultRewriteRequestUrl = config.server?.rewriteRequestUrl;
 config.server = {
   ...config.server,
   rewriteRequestUrl: (requestUrl) => {
     const rewritten = defaultRewriteRequestUrl ? defaultRewriteRequestUrl(requestUrl) : requestUrl;
-    return rewritten
-      .replace(/^(https?:\/\/[^/?#]+)\/\?/, '$1/index.bundle?')
-      .replace(/^\/\?/, '/index.bundle?');
+    return rewriteHmrSpaUrl(rewritten);
   },
 };
 
