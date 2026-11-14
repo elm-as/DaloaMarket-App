@@ -45,6 +45,7 @@ export const HomeBannerCarousel: React.FC = () => {
   const isDraggingRef = useRef(false);
   const isProgrammaticRef = useRef(false);
   const cooldownUntilRef = useRef(0);
+  const lastSettledAtRef = useRef(Date.now());
   const cancelWebGlideRef = useRef<(() => void) | null>(null);
   const nativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -89,9 +90,10 @@ export const HomeBannerCarousel: React.FC = () => {
       const cancel = animateWebScrollLeft({
         scrollView: scrollRef.current,
         targetX,
-        durationMs: isManual ? 650 : 1000,
+        durationMs: isManual ? 750 : 2400,
         onSettled: () => {
           isProgrammaticRef.current = false;
+          lastSettledAtRef.current = Date.now();
         },
       });
       if (cancel) {
@@ -103,15 +105,18 @@ export const HomeBannerCarousel: React.FC = () => {
     scrollRef.current?.scrollTo({ x: targetX, animated: true });
     nativeTimerRef.current = setTimeout(() => {
       isProgrammaticRef.current = false;
+      lastSettledAtRef.current = Date.now();
     }, 650);
   }, [banners.length, slideInterval]);
 
   useEffect(() => {
     if (banners.length <= 1) return;
     const timer = setInterval(() => {
-      if (isDraggingRef.current || isProgrammaticRef.current || Date.now() < cooldownUntilRef.current) return;
+      if (isDraggingRef.current || isProgrammaticRef.current) return;
+      if (Date.now() < cooldownUntilRef.current) return;
+      if (Date.now() - lastSettledAtRef.current < AUTO_PLAY_MS) return;
       scrollToSlide((activeIndexRef.current + 1) % banners.length, false);
-    }, AUTO_PLAY_MS);
+    }, 500);
     return () => clearInterval(timer);
   }, [banners.length, scrollToSlide]);
 

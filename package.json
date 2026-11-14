@@ -1,7 +1,7 @@
 {
   "name": "@daloa/market",
   "version": "2.0.0",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",

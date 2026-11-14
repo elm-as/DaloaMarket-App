@@ -1,7 +1,7 @@
 import { PromoBanner } from '@daloa/types';
 
 export const BANNER_HEIGHT = 188;
-export const AUTO_PLAY_MS = 3000;
+export const AUTO_PLAY_MS = 9000;
 
 export const DEFAULT_MOBILE_BANNERS: PromoBanner[] = [
   {
@@ -83,9 +83,7 @@ export function animateWebScrollLeft(params: {
   const step = (now: number) => {
     if (cancelled) return;
     const progress = Math.min(1, (now - startedAt) / durationMs);
-    const eased = progress < 0.5
-      ? 4 * progress * progress * progress
-      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+    const eased = -(Math.cos(Math.PI * progress) - 1) / 2;
 
     node.scrollLeft = startLeft + distance * eased;
 
