@@ -1,7 +1,22 @@
 import { PromoBanner } from '@daloa/types';
 
-export const BANNER_HEIGHT = 188;
+export const BANNER_HEIGHT = 196;
 export const AUTO_PLAY_MS = 9000;
+export const AUTO_GLIDE_MS = 2400;
+export const MANUAL_GLIDE_MS = 650;
+export const SWIPE_SETTLE_MS = 380;
+export const INTERACTION_COOLDOWN_MS = 5500;
+
+export interface LoopBannerItem {
+  key: string;
+  banner: PromoBanner;
+  realIndex: number;
+}
+
+export interface BannerTargetAction {
+  externalUrl?: string;
+  internalRoute?: string;
+}
 
 export const DEFAULT_MOBILE_BANNERS: PromoBanner[] = [
   {
@@ -43,69 +58,112 @@ export const DEFAULT_MOBILE_BANNERS: PromoBanner[] = [
 ];
 
 /**
- * Exécute un glissement horizontal doux sur Web (Expo Web) sans saut brutal ni
- * conflit avec le scroll-snap du navigateur. Retourne une fonction d'annulation.
+ * Construit la liste cyclique [cloneFin, ...bannières, cloneDébut] afin que les
+ * transitions d'une extrémité à l'autre continuent dans le même sens sans saut.
  */
-export function animateWebScrollLeft(params: {
-  scrollView: any;
-  targetX: number;
-  durationMs: number;
-  onSettled: () => void;
-}): (() => void) | null {
-  const { scrollView, targetX, durationMs, onSettled } = params;
-  const node = scrollView?.getScrollableNode?.() as HTMLElement | undefined;
-  if (!node || typeof window === 'undefined' || typeof node.scrollLeft !== 'number') {
-    return null;
+export function buildLoopBannerItems(banners: PromoBanner[]): LoopBannerItem[] {
+  if (banners.length <= 1) {
+    return banners.map((banner, realIndex) => ({
+      key: `single-${banner.id}`,
+      banner,
+      realIndex,
+    }));
   }
 
-  const maxScroll = Math.max(0, node.scrollWidth - node.clientWidth);
-  const clampedTarget = Math.max(0, Math.min(targetX, maxScroll));
-  const startLeft = node.scrollLeft;
-  const distance = clampedTarget - startLeft;
-  const prefersReduced =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (Math.abs(distance) < 2 || prefersReduced) {
-    node.scrollLeft = clampedTarget;
-    onSettled();
-    return () => {};
+  const first = banners[0];
+  const last = banners[banners.length - 1];
+
+  return [
+    { key: `clone-head-${last.id}`, banner: last, realIndex: banners.length - 1 },
+    ...banners.map((banner, realIndex) => ({
+      key: `slide-${banner.id}-${realIndex}`,
+      banner,
+      realIndex,
+    })),
+    { key: `clone-tail-${first.id}`, banner: first, realIndex: 0 },
+  ];
+}
+
+/**
+ * Résout l'emplacement visuel à animer et l'emplacement réel de repos après
+ * glissement (utile lors du passage continu dernière -> première bannière).
+ */
+export function resolveSlideSlot(params: {
+  count: number;
+  fromIndex: number;
+  targetIndex: number;
+  direction?: 'forward' | 'backward' | 'direct';
+}): { visualSlot: number; settledSlot: number } {
+  const { count, fromIndex, targetIndex, direction = 'direct' } = params;
+  if (count <= 1) return { visualSlot: 0, settledSlot: 0 };
+
+  if (direction === 'forward' && fromIndex === count - 1 && targetIndex === 0) {
+    return { visualSlot: count + 1, settledSlot: 1 };
   }
 
-  const prevSnap = node.style.scrollSnapType;
-  const prevBehavior = node.style.scrollBehavior;
-  node.style.scrollSnapType = 'none';
-  node.style.scrollBehavior = 'auto';
+  if (direction === 'backward' && fromIndex === 0 && targetIndex === count - 1) {
+    return { visualSlot: 0, settledSlot: count };
+  }
 
-  let rafId = 0;
-  let cancelled = false;
-  const startedAt = performance.now();
+  return { visualSlot: targetIndex + 1, settledSlot: targetIndex + 1 };
+}
 
-  const step = (now: number) => {
-    if (cancelled) return;
-    const progress = Math.min(1, (now - startedAt) / durationMs);
-    const eased = -(Math.cos(Math.PI * progress) - 1) / 2;
+/**
+ * Calcule le slot cible après relâchement d'un geste horizontal en tenant compte
+ * de la position de départ, du déplacement et de la vélocité.
+ */
+export function resolveSwipeReleaseTarget(params: {
+  startX: number;
+  currentX: number;
+  velocityX: number;
+  slideStep: number;
+  count: number;
+}): { visualSlot: number; settledSlot: number; realIndex: number } {
+  const { startX, currentX, velocityX, slideStep, count } = params;
+  if (count <= 1 || slideStep <= 0) {
+    return { visualSlot: 0, settledSlot: 0, realIndex: 0 };
+  }
 
-    node.scrollLeft = startLeft + distance * eased;
+  const baseSlot = Math.max(1, Math.min(count, Math.round(-startX / slideStep)));
+  const dx = currentX - startX;
+  const threshold = slideStep * 0.18;
 
-    if (progress < 1) {
-      rafId = window.requestAnimationFrame(step);
-      return;
-    }
+  let visualSlot = Math.max(0, Math.min(count + 1, Math.round(-currentX / slideStep)));
+  if (dx < -threshold || velocityX < -0.35) {
+    visualSlot = Math.min(count + 1, baseSlot + 1);
+  } else if (dx > threshold || velocityX > 0.35) {
+    visualSlot = Math.max(0, baseSlot - 1);
+  }
 
-    node.scrollLeft = clampedTarget;
-    rafId = window.requestAnimationFrame(() => {
-      if (cancelled) return;
-      node.style.scrollSnapType = prevSnap;
-      node.style.scrollBehavior = prevBehavior;
-      onSettled();
-    });
-  };
+  if (visualSlot === 0) {
+    return { visualSlot: 0, settledSlot: count, realIndex: count - 1 };
+  }
+  if (visualSlot === count + 1) {
+    return { visualSlot: count + 1, settledSlot: 1, realIndex: 0 };
+  }
+  return { visualSlot, settledSlot: visualSlot, realIndex: visualSlot - 1 };
+}
 
-  rafId = window.requestAnimationFrame(step);
-  return () => {
-    cancelled = true;
-    if (rafId) window.cancelAnimationFrame(rafId);
-    node.style.scrollSnapType = prevSnap;
-    node.style.scrollBehavior = prevBehavior;
-  };
+/**
+ * Résout la destination interne ou externe lors du clic sur une bannière.
+ */
+export function resolveBannerAction(
+  banner: PromoBanner,
+  boostDestination: string,
+): BannerTargetAction {
+  switch (banner.link_type) {
+    case 'express':
+      return { internalRoute: '/express' };
+    case 'listing':
+      return banner.link_target ? { internalRoute: `/listing/${banner.link_target}` } : {};
+    case 'seller':
+      return banner.link_target ? { internalRoute: `/seller/${banner.link_target}` } : {};
+    case 'external':
+      return banner.link_target ? { externalUrl: banner.link_target } : {};
+    default:
+      if (banner.link_target === '/pro/packs') {
+        return { internalRoute: boostDestination };
+      }
+      return banner.link_target ? { internalRoute: banner.link_target } : {};
+  }
 }

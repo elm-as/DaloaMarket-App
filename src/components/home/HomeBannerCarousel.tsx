@@ -1,36 +1,50 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
-  ScrollView,
+  Animated,
+  Easing,
+  PanResponder,
   useWindowDimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
   Linking,
   Platform,
 } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ArrowRight } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { colors, radii, spacing, AppPressable, useAccent } from '@daloa/ui';
 import { Haptics, getBoostDestination } from '@daloa/utils';
 import { PromoBanner } from '@daloa/types';
 import { promoBannersService } from '@daloa/api';
 import { useAuth } from '../../context/AuthContext';
+import { HomeBannerSlide } from './HomeBannerSlide';
 import {
-  animateWebScrollLeft,
+  AUTO_GLIDE_MS,
   AUTO_PLAY_MS,
-  BANNER_HEIGHT,
+  buildLoopBannerItems,
   DEFAULT_MOBILE_BANNERS,
+  INTERACTION_COOLDOWN_MS,
+  MANUAL_GLIDE_MS,
+  resolveBannerAction,
+  resolveSlideSlot,
+  resolveSwipeReleaseTarget,
+  SWIPE_SETTLE_MS,
 } from './homeBannerConfig';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+interface AnimateSlotParams {
+  visualSlot: number;
+  settledSlot: number;
+  realIndex: number;
+  durationMs: number;
+}
 
 export const HomeBannerCarousel: React.FC = () => {
   const router = useRouter();
   const accent = useAccent();
   const { width: windowWidth } = useWindowDimensions();
-  const bannerWidth = Math.max(260, Math.min(windowWidth - spacing[3] * 2, 420));
-  const slideInterval = bannerWidth + spacing[2];
+  const bannerWidth = Math.max(260, Math.min(windowWidth - spacing[3] * 2, 460));
+  const slideGap = spacing[2];
+  const slideStep = bannerWidth + slideGap;
 
   const { isAuthenticated, profile } = useAuth();
   const boostDestination = getBoostDestination(isAuthenticated, profile, {
@@ -41,223 +55,254 @@ export const HomeBannerCarousel: React.FC = () => {
 
   const [banners, setBanners] = useState<PromoBanner[]>(DEFAULT_MOBILE_BANNERS);
   const [activeIndex, setActiveIndex] = useState(0);
+  const loopItems = useMemo(() => buildLoopBannerItems(banners), [banners]);
+
+  const initialOffset = banners.length > 1 ? -slideStep : 0;
+  const translateX = useRef(new Animated.Value(initialOffset)).current;
+
   const activeIndexRef = useRef(0);
+  const slideStepRef = useRef(slideStep);
+  const bannersLengthRef = useRef(banners.length);
+  const currentOffsetRef = useRef(initialOffset);
+  const dragStartXRef = useRef(initialOffset);
+  const dragOriginDxRef = useRef(0);
   const isDraggingRef = useRef(false);
-  const isProgrammaticRef = useRef(false);
+  const isAnimatingRef = useRef(false);
   const cooldownUntilRef = useRef(0);
   const lastSettledAtRef = useRef(Date.now());
-  const cancelWebGlideRef = useRef<(() => void) | null>(null);
-  const nativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const animRunIdRef = useRef(0);
+  const runningAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  const fetchBanners = useCallback(async () => {
-    try {
-      const active = await promoBannersService.getActiveBanners();
-      const filtered = (active || []).filter((b: PromoBanner) => b.link_type !== 'referral');
-      if (filtered.length === 1) {
-        const companion = DEFAULT_MOBILE_BANNERS.find((d) => d.link_type !== filtered[0].link_type) ?? DEFAULT_MOBILE_BANNERS[1];
-        setBanners([filtered[0], companion]);
-      } else if (filtered.length > 1) {
-        setBanners(filtered);
-      }
-    } catch {
-      // Conserver les bannières par défaut
-    }
+  slideStepRef.current = slideStep;
+  bannersLengthRef.current = banners.length;
+
+  useEffect(() => {
+    const listenerId = translateX.addListener(({ value }) => {
+      currentOffsetRef.current = value;
+    });
+    return () => translateX.removeListener(listenerId);
+  }, [translateX]);
+
+  const stopActiveAnimation = useCallback(() => {
+    animRunIdRef.current += 1;
+    runningAnimRef.current?.stop();
+    runningAnimRef.current = null;
+    isAnimatingRef.current = false;
   }, []);
 
   useEffect(() => {
-    fetchBanners();
-    return () => {
-      cancelWebGlideRef.current?.();
-      if (nativeTimerRef.current) clearTimeout(nativeTimerRef.current);
-    };
-  }, [fetchBanners]);
+    stopActiveAnimation();
+    const count = banners.length;
+    const clampedIndex = Math.max(0, Math.min(activeIndexRef.current, Math.max(0, count - 1)));
+    activeIndexRef.current = clampedIndex;
+    setActiveIndex(clampedIndex);
+    const restingX = count > 1 ? -(clampedIndex + 1) * slideStep : 0;
+    currentOffsetRef.current = restingX;
+    translateX.setValue(restingX);
+  }, [banners.length, slideStep, stopActiveAnimation, translateX]);
 
-  const scrollToSlide = useCallback((targetIdx: number, isManual: boolean) => {
-    if (banners.length <= 1) return;
-    if (isManual) cooldownUntilRef.current = Date.now() + 5500;
-
-    cancelWebGlideRef.current?.();
-    cancelWebGlideRef.current = null;
-    if (nativeTimerRef.current) clearTimeout(nativeTimerRef.current);
-
-    activeIndexRef.current = targetIdx;
-    setActiveIndex(targetIdx);
-    isProgrammaticRef.current = true;
-    const targetX = targetIdx * slideInterval;
-
-    if (Platform.OS === 'web') {
-      const cancel = animateWebScrollLeft({
-        scrollView: scrollRef.current,
-        targetX,
-        durationMs: isManual ? 750 : 2400,
-        onSettled: () => {
-          isProgrammaticRef.current = false;
-          lastSettledAtRef.current = Date.now();
-        },
-      });
-      if (cancel) {
-        cancelWebGlideRef.current = cancel;
-        return;
+  useEffect(() => {
+    let mounted = true;
+    const loadBanners = async () => {
+      try {
+        const active = await promoBannersService.getActiveBanners();
+        if (!mounted) return;
+        const filtered = (active || []).filter((b: PromoBanner) => b.link_type !== 'referral');
+        if (filtered.length === 1) {
+          const fallback = DEFAULT_MOBILE_BANNERS.find((d) => d.link_type !== filtered[0].link_type)
+            ?? DEFAULT_MOBILE_BANNERS[1];
+          setBanners([filtered[0], fallback]);
+        } else if (filtered.length > 1) {
+          setBanners(filtered);
+        }
+      } catch {
+        // Conserver les bannières par défaut si hors-ligne
       }
-    }
+    };
+    loadBanners();
+    return () => {
+      mounted = false;
+      stopActiveAnimation();
+    };
+  }, [stopActiveAnimation]);
 
-    scrollRef.current?.scrollTo({ x: targetX, animated: true });
-    nativeTimerRef.current = setTimeout(() => {
-      isProgrammaticRef.current = false;
+  const animateToSlot = useCallback(({
+    visualSlot,
+    settledSlot,
+    realIndex,
+    durationMs,
+  }: AnimateSlotParams) => {
+    stopActiveAnimation();
+
+    const runId = animRunIdRef.current;
+    const step = slideStepRef.current;
+    activeIndexRef.current = realIndex;
+    setActiveIndex(realIndex);
+    isAnimatingRef.current = true;
+
+    const anim = Animated.timing(translateX, {
+      toValue: -visualSlot * step,
+      duration: durationMs,
+      easing: Easing.inOut(Easing.sin),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    });
+    runningAnimRef.current = anim;
+
+    anim.start(({ finished }) => {
+      if (animRunIdRef.current !== runId) return;
+      runningAnimRef.current = null;
+      isAnimatingRef.current = false;
+      if (!finished) return;
+
+      if (visualSlot !== settledSlot) {
+        const restingX = -settledSlot * slideStepRef.current;
+        currentOffsetRef.current = restingX;
+        translateX.setValue(restingX);
+      }
       lastSettledAtRef.current = Date.now();
-    }, 650);
-  }, [banners.length, slideInterval]);
+    });
+  }, [stopActiveAnimation, translateX]);
+
+  const animateToSlide = useCallback((
+    targetIndex: number,
+    direction: 'forward' | 'backward' | 'direct',
+    durationMs: number,
+  ) => {
+    const count = bannersLengthRef.current;
+    if (count <= 1) return;
+    const normalized = ((targetIndex % count) + count) % count;
+    const { visualSlot, settledSlot } = resolveSlideSlot({
+      count,
+      fromIndex: activeIndexRef.current,
+      targetIndex: normalized,
+      direction,
+    });
+    animateToSlot({ visualSlot, settledSlot, realIndex: normalized, durationMs });
+  }, [animateToSlot]);
+
+  const animateToSlotRef = useRef(animateToSlot);
+  animateToSlotRef.current = animateToSlot;
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponderCapture: (_, gs) => (
+      bannersLengthRef.current > 1
+      && Math.abs(gs.dx) > 8
+      && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.25
+    ),
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: (_, gs) => {
+      stopActiveAnimation();
+      isDraggingRef.current = true;
+      cooldownUntilRef.current = Date.now() + INTERACTION_COOLDOWN_MS;
+      dragOriginDxRef.current = gs.dx;
+      dragStartXRef.current = currentOffsetRef.current;
+      translateX.stopAnimation((stoppedValue) => {
+        dragStartXRef.current = stoppedValue;
+        currentOffsetRef.current = stoppedValue;
+      });
+    },
+    onPanResponderMove: (_, gs) => {
+      const count = bannersLengthRef.current;
+      const step = slideStepRef.current;
+      const minX = -(count + 1) * step;
+      const delta = gs.dx - dragOriginDxRef.current;
+      const nextX = Math.max(minX, Math.min(0, dragStartXRef.current + delta));
+      currentOffsetRef.current = nextX;
+      translateX.setValue(nextX);
+    },
+    onPanResponderRelease: (_, gs) => {
+      isDraggingRef.current = false;
+      cooldownUntilRef.current = Date.now() + INTERACTION_COOLDOWN_MS;
+      const release = resolveSwipeReleaseTarget({
+        startX: dragStartXRef.current,
+        currentX: currentOffsetRef.current,
+        velocityX: gs.vx,
+        slideStep: slideStepRef.current,
+        count: bannersLengthRef.current,
+      });
+      animateToSlotRef.current({
+        visualSlot: release.visualSlot,
+        settledSlot: release.settledSlot,
+        realIndex: release.realIndex,
+        durationMs: SWIPE_SETTLE_MS,
+      });
+    },
+    onPanResponderTerminate: () => {
+      isDraggingRef.current = false;
+      cooldownUntilRef.current = Date.now() + INTERACTION_COOLDOWN_MS;
+      const release = resolveSwipeReleaseTarget({
+        startX: dragStartXRef.current,
+        currentX: currentOffsetRef.current,
+        velocityX: 0,
+        slideStep: slideStepRef.current,
+        count: bannersLengthRef.current,
+      });
+      animateToSlotRef.current({
+        visualSlot: release.visualSlot,
+        settledSlot: release.settledSlot,
+        realIndex: release.realIndex,
+        durationMs: SWIPE_SETTLE_MS,
+      });
+    },
+  }), [stopActiveAnimation, translateX]);
 
   useEffect(() => {
     if (banners.length <= 1) return;
     const timer = setInterval(() => {
-      if (isDraggingRef.current || isProgrammaticRef.current) return;
+      if (isDraggingRef.current || isAnimatingRef.current) return;
       if (Date.now() < cooldownUntilRef.current) return;
       if (Date.now() - lastSettledAtRef.current < AUTO_PLAY_MS) return;
-      scrollToSlide((activeIndexRef.current + 1) % banners.length, false);
+      animateToSlide((activeIndexRef.current + 1) % banners.length, 'forward', AUTO_GLIDE_MS);
     }, 500);
     return () => clearInterval(timer);
-  }, [banners.length, scrollToSlide]);
+  }, [banners.length, animateToSlide]);
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (isProgrammaticRef.current) return;
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / slideInterval);
-    if (index !== activeIndexRef.current && index >= 0 && index < banners.length) {
-      activeIndexRef.current = index;
-      setActiveIndex(index);
-    }
+  const handleDotPress = (index: number) => {
+    cooldownUntilRef.current = Date.now() + INTERACTION_COOLDOWN_MS;
+    animateToSlide(index, 'direct', MANUAL_GLIDE_MS);
   };
 
   const handleBannerPress = (banner: PromoBanner) => {
     Haptics.selection();
     promoBannersService.trackBannerClick(banner.id);
-
-    switch (banner.link_type) {
-      case 'express':
-        router.push('/express' as any);
-        return;
-      case 'listing':
-        if (banner.link_target) router.push(`/listing/${banner.link_target}` as any);
-        return;
-      case 'seller':
-        if (banner.link_target) router.push(`/seller/${banner.link_target}` as any);
-        return;
-      case 'external':
-        if (banner.link_target) Linking.openURL(banner.link_target).catch(() => {});
-        return;
-      default:
-        if (banner.link_target === '/pro/packs') {
-          router.push(boostDestination as any);
-          return;
-        }
-        if (banner.link_target) router.push(banner.link_target as any);
-        return;
+    const action = resolveBannerAction(banner, boostDestination);
+    if (action.externalUrl) {
+      Linking.openURL(action.externalUrl).catch(() => {});
+      return;
+    }
+    if (action.internalRoute) {
+      router.push(action.internalRoute as any);
     }
   };
 
+  const webViewportStyle = Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as any) : null;
+
   return (
     <View style={styles.container}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled={false}
-        decelerationRate="fast"
-        snapToInterval={slideInterval}
-        snapToAlignment="center"
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        onScrollBeginDrag={() => {
-          cancelWebGlideRef.current?.();
-          isProgrammaticRef.current = false;
-          isDraggingRef.current = true;
-          cooldownUntilRef.current = Date.now() + 5500;
-        }}
-        onScrollEndDrag={() => { isDraggingRef.current = false; }}
-        onMomentumScrollEnd={(e) => {
-          isDraggingRef.current = false;
-          isProgrammaticRef.current = false;
-          handleScroll(e);
-        }}
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.scrollList}
+      <View
+        style={[styles.viewport, { width: bannerWidth }, webViewportStyle]}
+        {...panResponder.panHandlers}
       >
-        {banners.map((b, idx) => (
-          <AppPressable
-            key={b.id}
-            haptic="medium"
-            onPress={() => handleBannerPress(b)}
-            style={[styles.bannerCard, { width: bannerWidth }]}
-            accessibilityRole="button"
-            accessibilityLabel={`${b.title}. ${b.subtitle || ''}`}
-          >
-            <ExpoImage
-              source={{ uri: b.image_url }}
-              style={StyleSheet.absoluteFillObject}
-              contentFit="cover"
-              transition={250}
+        <Animated.View
+          style={[
+            styles.track,
+            { gap: slideGap, transform: [{ translateX }] },
+          ]}
+        >
+          {loopItems.map((item) => (
+            <HomeBannerSlide
+              key={item.key}
+              banner={item.banner}
+              realIndex={item.realIndex}
+              total={banners.length}
+              width={bannerWidth}
+              accentColor={accent.DEFAULT}
+              onPress={handleBannerPress}
             />
-
-            <LinearGradient
-              colors={['rgba(15,23,42,0.10)', 'rgba(15,23,42,0.45)', 'rgba(15,23,42,0.92)']}
-              locations={[0, 0.45, 1]}
-              style={StyleSheet.absoluteFillObject}
-            />
-
-            <View style={styles.cardContent}>
-              <View style={styles.topRow}>
-                {b.badge_text ? (
-                  <View style={[styles.badgeChip, { backgroundColor: b.badge_color || accent.DEFAULT }]}>
-                    <AppText variant="overline" color="#FFFFFF" style={styles.badgeText}>
-                      {b.badge_text}
-                    </AppText>
-                  </View>
-                ) : (
-                  <View />
-                )}
-
-                <View style={styles.topRightRow}>
-                  {b.sponsor_name ? (
-                    <View style={styles.sponsorChip}>
-                      <AppText variant="caption" color="#F8FAFC" style={styles.sponsorText} numberOfLines={1}>
-                        {b.sponsor_name}
-                      </AppText>
-                    </View>
-                  ) : null}
-                  {banners.length > 1 ? (
-                    <View style={styles.counterChip}>
-                      <AppText variant="caption" color="#FFFFFF" style={styles.counterText}>
-                        {idx + 1}/{banners.length}
-                      </AppText>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              <View style={styles.bottomRow}>
-                <View style={styles.textGroup}>
-                  <AppText variant="h2" color="#FFFFFF" numberOfLines={1} style={styles.title}>
-                    {b.title}
-                  </AppText>
-                  {b.subtitle ? (
-                    <AppText variant="caption" color="rgba(255,255,255,0.92)" numberOfLines={2} style={styles.subtitle}>
-                      {b.subtitle}
-                    </AppText>
-                  ) : null}
-                </View>
-
-                <View style={[styles.ctaPill, { backgroundColor: accent.DEFAULT }]}>
-                  <AppText variant="caption" color="#FFFFFF" style={styles.ctaText}>
-                    Voir
-                  </AppText>
-                  <ArrowRight size={12} color="#FFFFFF" strokeWidth={2.8} />
-                </View>
-              </View>
-            </View>
-          </AppPressable>
-        ))}
-      </ScrollView>
+          ))}
+        </Animated.View>
+      </View>
 
       {banners.length > 1 && (
         <View style={styles.dotsRow}>
@@ -265,7 +310,7 @@ export const HomeBannerCarousel: React.FC = () => {
             <AppPressable
               key={`dot-${b.id}-${i}`}
               hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-              onPress={() => scrollToSlide(i, true)}
+              onPress={() => handleDotPress(i)}
               accessibilityLabel={`Afficher la bannière ${b.title}`}
             >
               <View
@@ -285,38 +330,9 @@ export const HomeBannerCarousel: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { marginTop: spacing[2], marginBottom: spacing[1] },
-  scrollList: { paddingHorizontal: spacing[3], gap: spacing[2] },
-  bannerCard: {
-    height: BANNER_HEIGHT,
-    borderRadius: radii['2xl'],
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#0F172A',
-  },
-  cardContent: { flex: 1, justifyContent: 'space-between', padding: spacing[3] },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  topRightRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  badgeChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.full },
-  badgeText: { fontSize: 9, fontFamily: typography.families.extrabold, letterSpacing: 0.4 },
-  sponsorChip: {
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-    maxWidth: 130,
-  },
-  sponsorText: { fontSize: 10, fontFamily: typography.families.semibold },
-  counterChip: { backgroundColor: 'rgba(0, 0, 0, 0.5)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: radii.full },
-  counterText: { fontSize: 10, fontFamily: typography.families.bold, fontVariant: ['tabular-nums'] },
-  bottomRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
-  textGroup: { flex: 1, gap: 2 },
-  title: { fontSize: 16, lineHeight: 20, fontFamily: typography.families.black },
-  subtitle: { fontSize: 11, lineHeight: 14 },
-  ctaPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.full, flexShrink: 0 },
-  ctaText: { fontSize: 11, fontFamily: typography.families.extrabold },
+  container: { marginTop: spacing[2], marginBottom: spacing[1], alignItems: 'center' },
+  viewport: { overflow: 'hidden', borderRadius: radii['2xl'] },
+  track: { flexDirection: 'row', alignItems: 'center' },
   dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 6 },
   dot: { height: 5, borderRadius: radii.full },
 });
