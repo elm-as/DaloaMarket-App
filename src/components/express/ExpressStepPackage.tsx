@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, ScrollView, TextInput, Switch } from 'react-native';
-import { ShieldCheck, Lock, AlertTriangle, UserCheck } from 'lucide-react-native';
-import { colors, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { View, TextInput } from 'react-native';
+import { Package, Check, AlertTriangle } from 'lucide-react-native';
+import { colors, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { Haptics } from '@daloa/utils';
 import {
   PACKAGE_TYPES,
   expressFormStyles as styles,
@@ -12,11 +13,11 @@ import {
 interface StepPackageProps {
   state: Pick<
     ExpressFormState,
-    'packageType' | 'packageDescription' | 'isSealed' | 'isFragile' | 'isHandDelivery'
+    'packageType' | 'packageDescription' | 'isSealed' | 'isFragile'
   >;
   handlers: Pick<
     ExpressFormHandlers,
-    'setPackageType' | 'setPackageDescription' | 'setIsSealed' | 'setIsFragile' | 'setIsHandDelivery'
+    'setPackageType' | 'setPackageDescription' | 'setIsSealed' | 'setIsFragile'
   >;
 }
 
@@ -24,124 +25,96 @@ export const ExpressStepPackage: React.FC<StepPackageProps> = ({ state, handlers
   const accent = useAccent();
 
   return (
-    <View style={styles.stepContainer}>
-      <AppText variant="h2" style={styles.stepHeaderTitle}>
-        Que souhaitez-vous envoyer ?
-      </AppText>
-      <AppText variant="caption" color={colors.text.muted} style={styles.stepHeaderSubtitle}>
-        Sélectionnez le format indicatif du colis.
-      </AppText>
-
-      <View style={styles.antiTheftBanner}>
-        <ShieldCheck size={18} color="#16A34A" />
-        <View style={styles.antiTheftTexts}>
-          <AppText variant="caption" color="#166534" style={styles.antiTheftTitle}>
-            Confidentialité & Sécurité Anti-Vol
-          </AppText>
-          <AppText variant="caption" color="#15803D" style={styles.antiTheftSub}>
-            Le livreur voit uniquement le format et les consignes. Ne mentionnez pas de marque ni de valeur marchande.
-          </AppText>
-        </View>
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Package size={16} color={accent.DEFAULT} />
+        <AppText variant="bodyStrong">2. Type de colis</AppText>
       </View>
 
-      <AppText variant="label" style={styles.inputLabel}>
-        Format du paquet
-      </AppText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsScroll}>
-        {PACKAGE_TYPES.map((pt) => {
-          const selected = state.packageType === pt.id;
-          const IconComponent = pt.icon;
+      <View style={styles.typesGrid}>
+        {PACKAGE_TYPES.map(({ id, label, icon: IconComponent }) => {
+          const selected = state.packageType === id;
           return (
             <AppPressable
-              key={pt.id}
+              key={id}
               haptic="selection"
-              onPress={() => handlers.setPackageType(pt.id)}
+              onPress={() => handlers.setPackageType(id)}
               style={[
-                styles.typePill,
+                styles.typeTile,
                 selected
-                  ? { backgroundColor: accent[500], borderColor: accent[600] }
-                  : { backgroundColor: colors.bg.surface, borderColor: colors.border.DEFAULT },
+                  ? { borderColor: accent.DEFAULT, backgroundColor: accent[50] ?? '#FFF7ED' }
+                  : { borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.surface },
               ]}
             >
-              <IconComponent size={15} color={selected ? colors.text.inverse : colors.text.body} />
-              <AppText variant="label" numberOfLines={1} color={selected ? colors.text.inverse : colors.text.body}>
-                {pt.label}
+              <IconComponent size={16} color={selected ? accent.DEFAULT : colors.text.muted} />
+              <AppText
+                variant="caption"
+                numberOfLines={1}
+                color={selected ? accent[900] ?? colors.text.DEFAULT : colors.text.body}
+                style={{ fontFamily: selected ? typography.families.bold : typography.families.medium, flexShrink: 1 }}
+              >
+                {label}
               </AppText>
             </AppPressable>
           );
         })}
-      </ScrollView>
-
-      <AppText variant="label" style={styles.inputLabel}>
-        Précautions de transport
-      </AppText>
-      <View style={styles.optionsCard}>
-        <View style={styles.optionRow}>
-          <View style={styles.optionLeft}>
-            <Lock size={15} color={accent[700]} />
-            <View>
-              <AppText variant="bodyStrong">Emballage scellé / fermé</AppText>
-              <AppText variant="caption" color={colors.text.muted}>
-                Le coursier prend une photo du scellé au ramassage
-              </AppText>
-            </View>
-          </View>
-          <Switch
-            value={state.isSealed}
-            onValueChange={handlers.setIsSealed}
-            trackColor={{ false: colors.border.DEFAULT, true: accent[500] }}
-          />
-        </View>
-
-        <View style={styles.optionDivider} />
-
-        <View style={styles.optionRow}>
-          <View style={styles.optionLeft}>
-            <AlertTriangle size={15} color="#D97706" />
-            <View>
-              <AppText variant="bodyStrong">Contenu fragile</AppText>
-              <AppText variant="caption" color={colors.text.muted}>
-                Nécessite une manipulation délicate sur la moto
-              </AppText>
-            </View>
-          </View>
-          <Switch
-            value={state.isFragile}
-            onValueChange={handlers.setIsFragile}
-            trackColor={{ false: colors.border.DEFAULT, true: accent[500] }}
-          />
-        </View>
-
-        <View style={styles.optionDivider} />
-
-        <View style={styles.optionRow}>
-          <View style={styles.optionLeft}>
-            <UserCheck size={15} color="#2563EB" />
-            <View>
-              <AppText variant="bodyStrong">Remise en main propre</AppText>
-              <AppText variant="caption" color={colors.text.muted}>
-                Ne pas confier à un voisin ou gardien
-              </AppText>
-            </View>
-          </View>
-          <Switch
-            value={state.isHandDelivery}
-            onValueChange={handlers.setIsHandDelivery}
-            trackColor={{ false: colors.border.DEFAULT, true: accent[500] }}
-          />
-        </View>
       </View>
 
-      <AppText variant="label" style={styles.inputLabel}>
-        Consignes pratiques pour le coursier
-      </AppText>
-      <TextInput
-        placeholder="Ex : Appeler 5 min avant, remettre au portail blanc..."
-        placeholderTextColor={colors.text.subtle}
-        value={state.packageDescription}
-        onChangeText={handlers.setPackageDescription}
-        style={styles.input}
-      />
+      <View style={styles.chipsRow}>
+        <AppPressable
+          haptic="selection"
+          onPress={() => {
+            Haptics.selection();
+            handlers.setIsSealed(!state.isSealed);
+          }}
+          style={[
+            styles.chip,
+            state.isSealed
+              ? { borderColor: '#059669', backgroundColor: '#ECFDF5' }
+              : { borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.surface },
+          ]}
+        >
+          <Check size={14} color={state.isSealed ? '#059669' : colors.text.muted} />
+          <AppText variant="caption" color={state.isSealed ? '#065F46' : colors.text.body} style={{ fontFamily: typography.families.semibold }}>
+            Colis scellé
+          </AppText>
+        </AppPressable>
+
+        <AppPressable
+          haptic="selection"
+          onPress={() => {
+            Haptics.selection();
+            handlers.setIsFragile(!state.isFragile);
+          }}
+          style={[
+            styles.chip,
+            state.isFragile
+              ? { borderColor: '#D97706', backgroundColor: '#FFFBEB' }
+              : { borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.surface },
+          ]}
+        >
+          <AlertTriangle size={14} color={state.isFragile ? '#D97706' : colors.text.muted} />
+          <AppText variant="caption" color={state.isFragile ? '#92400E' : colors.text.body} style={{ fontFamily: typography.families.semibold }}>
+            Fragile
+          </AppText>
+        </AppPressable>
+      </View>
+
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>
+          Précision utile (optionnel)
+        </AppText>
+        <TextInput
+          placeholder="Ex : Enveloppe A4, sac repas..."
+          placeholderTextColor={colors.text.subtle}
+          value={state.packageDescription}
+          onChangeText={handlers.setPackageDescription}
+          style={styles.input}
+        />
+        <AppText variant="caption" color={colors.text.subtle} style={{ fontSize: 11, marginTop: 4 }}>
+          Par sécurité, ne mentionnez ni marque ni valeur du contenu.
+        </AppText>
+      </View>
     </View>
   );
 };

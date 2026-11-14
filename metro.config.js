@@ -14,6 +14,7 @@ const config = getDefaultConfig(projectRoot);
 
 // Support monorepo pnpm : inclure la racine du monorepo pour résoudre les packages partagés
 config.watchFolders = [monorepoRoot];
+config.resolver.unstable_enableSymlinks = true;
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(monorepoRoot, 'node_modules'),
@@ -40,6 +41,26 @@ config.resolver.extraNodeModules = {
   zlib: path.resolve(projectRoot, 'src/shims/zlib.js'),
 };
 
+// Force a single canonical module instance across monorepo workspace packages (prevents duplicate React hooks crashes on web)
+const SINGLETON_PACKAGES = [
+  'react',
+  'react-dom',
+  'react-native',
+  'react-native-web',
+  'react-native-svg',
+  'react-native-safe-area-context',
+  '@tanstack/react-query',
+  'zustand',
+  '@supabase/supabase-js',
+];
+const SINGLETON_PROJECT_ENTRY = path.join(projectRoot, 'package.json');
+
+function isSingletonModule(moduleName) {
+  return SINGLETON_PACKAGES.some(
+    (pkg) => moduleName === pkg || moduleName.startsWith(`${pkg}/`),
+  );
+}
+
 const originalResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === 'ws') {
@@ -60,11 +81,14 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       type: 'sourceFile',
     };
   }
+  const effectiveContext = isSingletonModule(moduleName)
+    ? { ...context, originModulePath: SINGLETON_PROJECT_ENTRY }
+    : context;
   try {
     if (originalResolveRequest) {
-      return originalResolveRequest(context, moduleName, platform);
+      return originalResolveRequest(effectiveContext, moduleName, platform);
     }
-    return context.resolveRequest(context, moduleName, platform);
+    return effectiveContext.resolveRequest(effectiveContext, moduleName, platform);
   } catch (err) {
     try {
       const resolved = require.resolve(moduleName, { paths: [projectRoot] });

@@ -158,7 +158,12 @@ export const StepCategoryPricing: React.FC<StepCategoryPricingProps> = ({
       </View>
 
       {/* ── Variantes ── */}
-      <StepVariantsSection basePrice={price} variants={variants} onVariantsChange={onVariantsChange} />
+      <StepVariantsSection
+        basePrice={price}
+        category={selectedCategory}
+        variants={variants}
+        onVariantsChange={onVariantsChange}
+      />
 
       {/* ── Prix, Gain net vendeur & Promo Flash (FOMO) ── */}
       <PricingPayoutPromoBox

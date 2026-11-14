@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { AppState, Platform } from 'react-native';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase } from '@daloa/api';
@@ -91,10 +91,16 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  // Sur web, ne jamais bloquer le premier rendu en attente des 6 polices Google Fonts (fontfaceobserver peut prendre plusieurs secondes).
+  if (Platform.OS !== 'web' && !fontsLoaded && !fontError) return null;
+
+  const webInitialMetrics = initialWindowMetrics ?? {
+    frame: { x: 0, y: 0, width: 390, height: 844 },
+    insets: { top: 0, left: 0, right: 0, bottom: 0 },
+  };
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={Platform.OS === 'web' ? webInitialMetrics : initialWindowMetrics}>
       <ThemeProvider app="market">
         <QueryClientProvider client={queryClient}>
           <PhaseProvider>

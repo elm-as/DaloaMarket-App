@@ -13,9 +13,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { Haptics } from '@daloa/utils';
+import { Haptics, getBoostDestination } from '@daloa/utils';
 import { PromoBanner } from '@daloa/types';
 import { promoBannersService } from '@daloa/api';
+import { useAuth } from '../../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(SCREEN_WIDTH - spacing[3] * 2, 420);
@@ -64,6 +65,12 @@ const DEFAULT_BANNERS: PromoBanner[] = [
 export const HomeBannerCarousel: React.FC = () => {
   const router = useRouter();
   const accent = useAccent();
+  const { isAuthenticated, profile } = useAuth();
+  const boostDestination = getBoostDestination(isAuthenticated, profile, {
+    login: '/auth/login',
+    myListings: '/seller/my-listings',
+    packs: '/pro/packs',
+  });
   const [banners, setBanners] = useState<PromoBanner[]>(DEFAULT_BANNERS);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -73,7 +80,10 @@ export const HomeBannerCarousel: React.FC = () => {
     try {
       const active = await promoBannersService.getActiveBanners();
       const filtered = (active || []).filter((b: PromoBanner) => b.link_type !== 'referral');
-      if (filtered.length > 0) {
+      if (filtered.length === 1) {
+        const companion = DEFAULT_BANNERS.find((d) => d.link_type !== filtered[0].link_type) ?? DEFAULT_BANNERS[1];
+        setBanners([filtered[0], companion]);
+      } else if (filtered.length > 1) {
         setBanners(filtered);
       }
     } catch {
@@ -126,6 +136,10 @@ export const HomeBannerCarousel: React.FC = () => {
         if (banner.link_target) Linking.openURL(banner.link_target).catch(() => {});
         return;
       default:
+        if (banner.link_target === '/pro/packs') {
+          router.push(boostDestination as any);
+          return;
+        }
         if (banner.link_target) router.push(banner.link_target as any);
         return;
     }
@@ -226,15 +240,24 @@ export const HomeBannerCarousel: React.FC = () => {
       {banners.length > 1 && (
         <View style={styles.dotsRow}>
           {banners.map((b, i) => (
-            <View
+            <AppPressable
               key={`dot-${b.id}-${i}`}
-              style={[
-                styles.dot,
-                i === activeIndex
-                  ? { backgroundColor: accent.DEFAULT, width: 18 }
-                  : { backgroundColor: colors.border.DEFAULT, width: 6 },
-              ]}
-            />
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+              onPress={() => {
+                setActiveIndex(i);
+                scrollRef.current?.scrollTo({ x: i * (BANNER_WIDTH + spacing[2]), animated: true });
+              }}
+              accessibilityLabel={`Afficher la bannière ${b.title}`}
+            >
+              <View
+                style={[
+                  styles.dot,
+                  i === activeIndex
+                    ? { backgroundColor: accent.DEFAULT, width: 18 }
+                    : { backgroundColor: colors.border.DEFAULT, width: 6 },
+                ]}
+              />
+            </AppPressable>
           ))}
         </View>
       )}

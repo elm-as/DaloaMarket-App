@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TextInput } from 'react-native';
 import { MapPin, ChevronDown } from 'lucide-react-native';
-import { colors, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { colors, AppText, AppPressable } from '@daloa/ui';
 import {
   expressFormStyles as styles,
   type ExpressFormState,
@@ -25,82 +25,98 @@ interface StepRouteProps {
   >;
 }
 
-export const ExpressStepRoute: React.FC<StepRouteProps> = ({ state, handlers }) => {
-  const accent = useAccent();
+export const ExpressStepRoute: React.FC<StepRouteProps> = ({ state, handlers }) => (
+  <View style={styles.card}>
+    <View style={styles.cardHeader}>
+      <MapPin size={16} color="#EA580C" />
+      <AppText variant="bodyStrong">1. Trajet & contacts</AppText>
+    </View>
 
-  return (
-    <View style={styles.stepContainer}>
-      <AppText variant="h2" style={styles.stepHeaderTitle}>
-        Où et à qui livrer ?
-      </AppText>
-      <AppText variant="caption" color={colors.text.muted} style={styles.stepHeaderSubtitle}>
-        Renseignez les quartiers et les numéros de contact.
-      </AppText>
+    <View style={styles.subBlock}>
+      <View style={styles.subTitleRow}>
+        <View style={[styles.dot, { backgroundColor: '#EA580C' }]} />
+        <AppText variant="label" color={colors.text.DEFAULT}>Départ (Ramassage)</AppText>
+      </View>
 
-      <View style={styles.sectionCard}>
-        <View style={styles.sectionCardHeader}>
-          <MapPin size={16} color={accent.DEFAULT} />
-          <AppText variant="bodyStrong">Point de départ (Ramassage)</AppText>
-        </View>
-
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>Quartier de départ</AppText>
         <AppPressable onPress={handlers.onOpenPickupDistrictPicker} style={styles.districtSelector}>
           <AppText variant="bodyStrong">{state.pickupDistrict}</AppText>
           <ChevronDown size={16} color={colors.text.subtle} />
         </AppPressable>
+      </View>
 
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>Repère exact (optionnel)</AppText>
         <TextInput
-          placeholder="Repère précis (ex : Face grande mosquée, lavage...)"
+          placeholder="Ex : Face pharmacie, carrefour..."
           placeholderTextColor={colors.text.subtle}
           value={state.pickupAddress}
           onChangeText={handlers.setPickupAddress}
           style={styles.input}
         />
+      </View>
+
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>Téléphone expéditeur *</AppText>
         <TextInput
-          placeholder="Téléphone de l'expéditeur"
+          placeholder="Ex : 07 00 00 00 00"
           placeholderTextColor={colors.text.subtle}
           value={state.senderPhone}
           onChangeText={handlers.setSenderPhone}
           keyboardType="phone-pad"
-          style={styles.input}
+          style={[styles.input, { fontVariant: ['tabular-nums'] }]}
         />
       </View>
+    </View>
 
-      <View style={styles.sectionCard}>
-        <View style={styles.sectionCardHeader}>
-          <MapPin size={16} color={colors.status.successDark} />
-          <AppText variant="bodyStrong">Point d'arrivée (Destinataire)</AppText>
-        </View>
+    <View style={styles.subBlock}>
+      <View style={styles.subTitleRow}>
+        <View style={[styles.dot, { backgroundColor: '#059669' }]} />
+        <AppText variant="label" color={colors.text.DEFAULT}>Arrivée (Destinataire)</AppText>
+      </View>
 
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>Quartier d&apos;arrivée</AppText>
         <AppPressable onPress={handlers.onOpenDropoffDistrictPicker} style={styles.districtSelector}>
           <AppText variant="bodyStrong">{state.dropoffDistrict}</AppText>
           <ChevronDown size={16} color={colors.text.subtle} />
         </AppPressable>
+      </View>
 
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>Repère exact (optionnel)</AppText>
         <TextInput
-          placeholder="Repère précis (ex : Carrefour Tazibouo, cour verte...)"
+          placeholder="Ex : Portail bleu, école..."
           placeholderTextColor={colors.text.subtle}
           value={state.dropoffAddress}
           onChangeText={handlers.setDropoffAddress}
           style={styles.input}
         />
-        <View style={styles.rowInputs}>
-          <TextInput
-            placeholder="Nom destinataire"
-            placeholderTextColor={colors.text.subtle}
-            value={state.recipientName}
-            onChangeText={handlers.setRecipientName}
-            style={[styles.input, styles.halfInput]}
-          />
-          <TextInput
-            placeholder="Téléphone destinataire"
-            placeholderTextColor={colors.text.subtle}
-            value={state.recipientPhone}
-            onChangeText={handlers.setRecipientPhone}
-            keyboardType="phone-pad"
-            style={[styles.input, styles.halfInput]}
-          />
-        </View>
+      </View>
+
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>Téléphone destinataire *</AppText>
+        <TextInput
+          placeholder="Ex : 05 00 00 00 00"
+          placeholderTextColor={colors.text.subtle}
+          value={state.recipientPhone}
+          onChangeText={handlers.setRecipientPhone}
+          keyboardType="phone-pad"
+          style={[styles.input, { fontVariant: ['tabular-nums'] }]}
+        />
+      </View>
+
+      <View>
+        <AppText variant="caption" style={styles.fieldLabel}>Nom du destinataire (optionnel)</AppText>
+        <TextInput
+          placeholder="Ex : Koffi Aya"
+          placeholderTextColor={colors.text.subtle}
+          value={state.recipientName}
+          onChangeText={handlers.setRecipientName}
+          style={styles.input}
+        />
       </View>
     </View>
-  );
-};
+  </View>
+);

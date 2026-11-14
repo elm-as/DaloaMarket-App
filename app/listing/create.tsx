@@ -91,6 +91,9 @@ export default function ListingCreateScreen() {
         existing.map((v) => ({
           id: v.id ? String(v.id) : undefined,
           title: String(v.label || ''),
+          color: v.color ? String(v.color) : null,
+          color_code: v.color_code ? String(v.color_code) : null,
+          size: v.size ? String(v.size) : null,
           price: v.price == null || v.price === '' ? null : Number(v.price),
           stock: Math.max(0, Number(v.stock) || 0),
         }))
@@ -249,6 +252,9 @@ export default function ListingCreateScreen() {
         variants: variants.map((v) => ({
           id: v.id,
           label: v.title,
+          color: v.color || null,
+          color_code: v.color_code || null,
+          size: v.size || null,
           price: v.price || null,
           stock: v.stock || 1,
           active: true,

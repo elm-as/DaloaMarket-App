@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight } from 'lucide-react-native';
 import {
   colors,
   radii,
@@ -11,14 +11,17 @@ import {
   AppPressable,
   Button,
   showAlert,
+  typography,
 } from '@daloa/ui';
-import { Haptics } from '@daloa/utils';
+import { Haptics, formatFCFA } from '@daloa/utils';
 import { ExpressDeliveryResult } from '@daloa/types';
 import { expressDeliveryService } from '@daloa/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { ExpressSuccessView } from '../../src/components/express/ExpressSuccessView';
-import { ExpressFormFields, PACKAGE_TYPES } from '../../src/components/express/ExpressFormFields';
-import { ExpressWizardStepper } from '../../src/components/express/ExpressWizardStepper';
+import { PACKAGE_TYPES } from '../../src/components/express/expressForm.types';
+import { ExpressStepRoute } from '../../src/components/express/ExpressStepRoute';
+import { ExpressStepPackage } from '../../src/components/express/ExpressStepPackage';
+import { ExpressStepPayment } from '../../src/components/express/ExpressStepPayment';
 import { DistrictPickerModal } from '../../src/components/express/DistrictPickerModal';
 
 export default function ExpressDeliveryScreen() {
@@ -26,81 +29,43 @@ export default function ExpressDeliveryScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
-  // Étape courante du Wizard
-  const [currentStep, setCurrentStep] = useState<number>(1);
-
-  // Étape 1 : Colis & Confidentialité anti-vol
   const [packageType, setPackageType] = useState('parcel');
   const [packageDescription, setPackageDescription] = useState('');
   const [isSealed, setIsSealed] = useState(true);
   const [isFragile, setIsFragile] = useState(false);
-  const [isHandDelivery, setIsHandDelivery] = useState(true);
 
-  // Étape 2 : Trajet & Contacts
-  const [pickupDistrict, setPickupDistrict] = useState(user?.district || 'Commerce');
+  const [pickupDistrict, setPickupDistrict] = useState<string>(user?.district || 'Commerce');
   const [pickupAddress, setPickupAddress] = useState('');
-  const [senderName, setSenderName] = useState(user?.full_name || '');
-  const [senderPhone, setSenderPhone] = useState(user?.phone || '');
+  const [senderPhone, setSenderPhone] = useState<string>(user?.phone || '');
 
   const [dropoffDistrict, setDropoffDistrict] = useState('Lobia');
   const [dropoffAddress, setDropoffAddress] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
 
-  // Étape 3 : Règlement
   const [payerRole, setPayerRole] = useState<'sender' | 'recipient'>('sender');
-
-  // Sélecteur quartier modal
   const [districtPickerTarget, setDistrictPickerTarget] = useState<'pickup' | 'dropoff' | null>(null);
-
-  // État soumission & résultat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdRun, setCreatedRun] = useState<ExpressDeliveryResult | null>(null);
 
-  // Devis kilométrique officiel
-  const quote = useMemo(() => {
-    return expressDeliveryService.estimateExpressDelivery({
-      pickupDistrict,
-      dropoffDistrict,
-    });
-  }, [pickupDistrict, dropoffDistrict]);
-
-  const packageTypeLabel = useMemo(() => {
-    return PACKAGE_TYPES.find((pt) => pt.id === packageType)?.label || 'Colis standard';
-  }, [packageType]);
-
-  const handleNextStep = () => {
-    if (currentStep === 1) {
-      setCurrentStep(2);
-      Haptics.selection();
-      return;
+  useEffect(() => {
+    if (user?.district) {
+      setPickupDistrict((prev: string) => (prev === 'Commerce' ? user.district || prev : prev));
     }
-
-    if (currentStep === 2) {
-      if (!senderPhone.trim()) {
-        showAlert('Téléphone manquant', "Veuillez renseigner le téléphone de l'expéditeur.");
-        return;
-      }
-
-      if (!recipientPhone.trim()) {
-        showAlert('Destinataire manquant', 'Veuillez renseigner le numéro du destinataire.');
-        return;
-      }
-
-      setCurrentStep(3);
-      Haptics.selection();
-      return;
+    if (user?.phone) {
+      setSenderPhone((prev: string) => (prev ? prev : user.phone || ''));
     }
-  };
+  }, [user?.district, user?.phone]);
 
-  const handlePrevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1);
-      Haptics.lightImpact();
-    } else {
-      router.back();
-    }
-  };
+  const quote = useMemo(
+    () => expressDeliveryService.estimateExpressDelivery({ pickupDistrict, dropoffDistrict }),
+    [pickupDistrict, dropoffDistrict],
+  );
+
+  const packageTypeLabel = useMemo(
+    () => PACKAGE_TYPES.find((pt) => pt.id === packageType)?.label || 'Colis standard',
+    [packageType],
+  );
 
   const handleSubmit = async () => {
     if (!user) {
@@ -108,16 +73,22 @@ export default function ExpressDeliveryScreen() {
       router.push('/login' as any);
       return;
     }
+    if (!senderPhone.trim()) {
+      showAlert('Téléphone manquant', "Veuillez renseigner le téléphone de l'expéditeur.");
+      return;
+    }
+    if (!recipientPhone.trim()) {
+      showAlert('Destinataire manquant', 'Veuillez renseigner le téléphone du destinataire.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       Haptics.mediumImpact();
 
-      // Description discrète combinant les précautions sans valeur marchande
       const discreteDescription = [
         isSealed ? '[Scellé]' : null,
         isFragile ? '[Fragile]' : null,
-        isHandDelivery ? '[En main propre]' : null,
         packageDescription.trim() || null,
       ]
         .filter(Boolean)
@@ -130,11 +101,12 @@ export default function ExpressDeliveryScreen() {
         dropoffAddress: dropoffAddress.trim() || 'Centre',
         packageType,
         packageDescription: discreteDescription,
-        senderName: senderName.trim() || user.full_name || 'Expéditeur',
+        senderName: user.full_name || 'Expéditeur',
         senderPhone: senderPhone.trim(),
         recipientName: recipientName.trim() || 'Destinataire',
         recipientPhone: recipientPhone.trim(),
         payerRole,
+        paymentMethod: payerRole === 'recipient' ? 'cod' : 'cash',
       });
 
       if (!res.success) {
@@ -164,7 +136,7 @@ export default function ExpressDeliveryScreen() {
           deliveryOtp={createdRun.deliveryOtp!}
           recipientName={recipientName || 'Destinataire'}
           recipientPhone={recipientPhone}
-          senderName={senderName || user?.full_name || 'Expéditeur'}
+          senderName={user?.full_name || 'Expéditeur'}
           packageDescription={packageDescription}
           packageTypeLabel={packageTypeLabel}
           payerRole={payerRole}
@@ -177,39 +149,48 @@ export default function ExpressDeliveryScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <AppPressable
           haptic="light"
-          onPress={handlePrevStep}
+          onPress={() => router.back()}
           style={styles.backBtn}
           accessibilityLabel="Retour"
         >
           <ArrowLeft size={20} color={colors.text.body} />
         </AppPressable>
         <View style={styles.headerTitleBox}>
-          <AppText variant="title">Coursier Express</AppText>
+          <AppText variant="title">Coursier Express Daloa</AppText>
           <AppText variant="caption" color={colors.text.muted}>
-            Étape {currentStep} sur 3 · Livraison directe à Daloa
+            Livraison directe entre quartiers
           </AppText>
         </View>
       </View>
 
-      {/* Stepper bar */}
-      <ExpressWizardStepper currentStep={currentStep} />
+      <View style={styles.liveQuoteBar}>
+        <View style={styles.liveRouteRow}>
+          <AppText variant="caption" color="#F8FAFC" numberOfLines={1} style={styles.routeLabel}>
+            {pickupDistrict}
+          </AppText>
+          <ArrowRight size={13} color="#FB923C" />
+          <AppText variant="caption" color="#F8FAFC" numberOfLines={1} style={styles.routeLabel}>
+            {dropoffDistrict}
+          </AppText>
+          <AppText variant="caption" color="#94A3B8" style={styles.tabular}>
+            · ~{quote.distanceKm} km
+          </AppText>
+        </View>
+        <AppText variant="bodyStrong" color="#FB923C" style={styles.tabular}>
+          {formatFCFA(quote.deliveryFee)}
+        </AppText>
+      </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ padding: spacing[4], paddingBottom: insets.bottom + spacing[8] }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: spacing[3], gap: spacing[3], paddingBottom: spacing[6] }}
       >
-        <ExpressFormFields
-          currentStep={currentStep}
+        <ExpressStepRoute
           state={{
-            packageType,
-            packageDescription,
-            isSealed,
-            isFragile,
-            isHandDelivery,
             pickupDistrict,
             pickupAddress,
             senderPhone,
@@ -217,17 +198,8 @@ export default function ExpressDeliveryScreen() {
             dropoffAddress,
             recipientName,
             recipientPhone,
-            payerRole,
-            distanceKm: quote.distanceKm,
-            deliveryFee: quote.deliveryFee,
-            driverNetGain: quote.driverNetGain,
           }}
           handlers={{
-            setPackageType,
-            setPackageDescription,
-            setIsSealed,
-            setIsFragile,
-            setIsHandDelivery,
             onOpenPickupDistrictPicker: () => setDistrictPickerTarget('pickup'),
             setPickupAddress,
             setSenderPhone,
@@ -235,33 +207,27 @@ export default function ExpressDeliveryScreen() {
             setDropoffAddress,
             setRecipientName,
             setRecipientPhone,
-            setPayerRole,
           }}
         />
 
-        {/* Boutons de navigation du Wizard */}
-        <View style={styles.navRow}>
-          {currentStep > 1 && (
-            <Button
-              variant="outline"
-              size="lg"
-              title="Précédent"
-              onPress={handlePrevStep}
-              style={styles.prevBtn}
-            />
-          )}
-          <Button
-            variant="market"
-            size="lg"
-            title={currentStep === 3 ? 'Confirmer la course express' : 'Continuer'}
-            onPress={currentStep === 3 ? handleSubmit : handleNextStep}
-            loading={isSubmitting}
-            style={styles.nextBtn}
-          />
-        </View>
+        <ExpressStepPackage
+          state={{ packageType, packageDescription, isSealed, isFragile }}
+          handlers={{ setPackageType, setPackageDescription, setIsSealed, setIsFragile }}
+        />
+
+        <ExpressStepPayment payerRole={payerRole} onSelectPayer={setPayerRole} />
       </ScrollView>
 
-      {/* Modal choix quartier */}
+      <View style={[styles.footerCta, { paddingBottom: Math.max(insets.bottom, spacing[3]) }]}>
+        <Button
+          variant="market"
+          size="lg"
+          title={`Commander un coursier · ${formatFCFA(quote.deliveryFee)}`}
+          onPress={handleSubmit}
+          loading={isSubmitting}
+        />
+      </View>
+
       <DistrictPickerModal
         visible={districtPickerTarget !== null}
         selectedDistrict={districtPickerTarget === 'pickup' ? pickupDistrict : dropoffDistrict}
@@ -277,40 +243,37 @@ export default function ExpressDeliveryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg.DEFAULT,
-  },
+  container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing[2],
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
+    backgroundColor: colors.bg.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
-  backBtn: {
-    padding: spacing[2],
-    borderRadius: radii.full,
-  },
-  headerTitleBox: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  navRow: {
+  backBtn: { padding: spacing[2], borderRadius: radii.full },
+  headerTitleBox: { flex: 1 },
+  liveQuoteBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing[2],
-    marginTop: spacing[4],
+    backgroundColor: '#0F172A',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2] + 2,
   },
-  prevBtn: {
-    flex: 1,
-  },
-  nextBtn: {
-    flex: 2,
+  liveRouteRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  routeLabel: { fontFamily: typography.families.bold, flexShrink: 1 },
+  tabular: { fontVariant: ['tabular-nums'] },
+  scroll: { flex: 1 },
+  footerCta: {
+    backgroundColor: colors.bg.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[2] + 2,
   },
 });
-

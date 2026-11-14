@@ -53,6 +53,7 @@ export default function ListingDetailScreen() {
   const [selectedVariant, setSelectedVariant] = useState<ListingVariant | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [showVariantPicker, setShowVariantPicker] = useState(false);
+  const [pickerIntent, setPickerIntent] = useState<'cart' | 'buyNow'>('cart');
   const [showOwnerSheet, setShowOwnerSheet] = useState(false);
   const [showCartBanner, setShowCartBanner] = useState(false);
 
@@ -262,9 +263,14 @@ export default function ListingDetailScreen() {
     }
   };
 
+  const openVariantPicker = (intent: 'cart' | 'buyNow') => {
+    setPickerIntent(intent);
+    setShowVariantPicker(true);
+  };
+
   const handleAddToCart = () => {
     if (hasVariants) {
-      setShowVariantPicker(true);
+      openVariantPicker('cart');
       return;
     }
     Haptics.lightImpact();
@@ -284,9 +290,34 @@ export default function ListingDetailScreen() {
   };
 
   const handleVariantsQuantitiesConfirm = (selections: { variant: ListingVariant; quantity: number }[]) => {
+    const intent = pickerIntent;
     setShowVariantPicker(false);
+    setPickerIntent('cart');
+
+    if (intent === 'buyNow') {
+      if (selections.length === 0) return;
+      Haptics.success();
+      if (selections.length === 1) {
+        const chosen = selections[0];
+        setSelectedVariant(chosen.variant);
+        router.push({
+          pathname: '/checkout' as any,
+          params: {
+            listingId: listing.id,
+            variantId: chosen.variant.id,
+            quantity: String(chosen.quantity),
+          },
+        });
+        return;
+      }
+      setListingVariants(listing, selections);
+      router.push({ pathname: '/checkout' as any, params: { cart: '1' } });
+      return;
+    }
+
     Haptics.success();
     setListingVariants(listing, selections);
+    setSelectedVariant(selections.length === 1 ? selections[0].variant : null);
     setShowCartBanner(true);
     userBehaviorService.trackInteraction(
       {
@@ -326,8 +357,37 @@ export default function ListingDetailScreen() {
       router.push('/auth/login' as any);
       return;
     }
-    if (hasVariants && totalListingCartQty === 0 && !selectedVariant) {
-      setShowVariantPicker(true);
+    if (hasVariants) {
+      if (listingCartItems.length === 1 && listingCartItems[0].variant?.id) {
+        Haptics.success();
+        router.push({
+          pathname: '/checkout' as any,
+          params: {
+            listingId: listing.id,
+            variantId: listingCartItems[0].variant.id,
+            quantity: String(listingCartItems[0].quantity),
+          },
+        });
+        return;
+      }
+      if (listingCartItems.length > 1) {
+        Haptics.success();
+        router.push({ pathname: '/checkout' as any, params: { cart: '1' } });
+        return;
+      }
+      if (selectedVariant?.id) {
+        Haptics.success();
+        router.push({
+          pathname: '/checkout' as any,
+          params: {
+            listingId: listing.id,
+            variantId: selectedVariant.id,
+            quantity: '1',
+          },
+        });
+        return;
+      }
+      openVariantPicker('buyNow');
       return;
     }
     Haptics.success();
@@ -335,7 +395,6 @@ export default function ListingDetailScreen() {
       pathname: '/checkout' as any,
       params: {
         listingId: listing.id,
-        variantId: selectedVariant?.id || '',
         quantity: totalListingCartQty > 0 ? String(totalListingCartQty) : '1',
       },
     });
@@ -604,12 +663,16 @@ export default function ListingDetailScreen() {
       {hasVariants && (
         <VariantPickerSheet
           visible={showVariantPicker}
-          onClose={() => setShowVariantPicker(false)}
+          onClose={() => {
+            setShowVariantPicker(false);
+            setPickerIntent('cart');
+          }}
           onConfirmQuantities={handleVariantsQuantitiesConfirm}
           variants={variants}
           listingTitle={listing.title}
           listingPhoto={photos[0]}
           basePrice={listing.price}
+          intent={pickerIntent}
           initialQuantities={initialVariantQuantities}
         />
       )}
@@ -627,7 +690,7 @@ export default function ListingDetailScreen() {
         cartItemId={cartItemId}
         hasVariants={hasVariants}
         onAddToCart={handleAddToCart}
-        onOpenOptions={() => setShowVariantPicker(true)}
+        onOpenOptions={() => openVariantPicker('cart')}
         onUpdateQty={updateQuantity}
         onRemoveFromCart={removeFromCart}
         onBuyNow={handleBuyNow}

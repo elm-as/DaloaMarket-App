@@ -42,7 +42,7 @@ export default function CheckoutScreen() {
     cart?: string;
   }>();
   const quantity = Math.max(1, parseInt(qty || qtyParam || '1', 10));
-  const isCartMode = cart === '1';
+  const isCartMode = cart === '1' || cart === 'true';
 
   const { user, profile, isAuthenticated } = useAuth();
   const { items: cartItems, clearCart } = useCart();
@@ -86,6 +86,33 @@ export default function CheckoutScreen() {
         <AppText variant="body" color={colors.text.muted}>
           Chargement de la commande...
         </AppText>
+      </View>
+    );
+  }
+
+  if (!isCartMode && (listing?.variants?.length ?? 0) > 0 && !state.variant) {
+    return (
+      <View style={styles.loadingBox}>
+        <AppText variant="bodyStrong" color={colors.text.body} center>
+          Choisissez d’abord une option
+        </AppText>
+        <AppText variant="caption" color={colors.text.muted} center>
+          Cet article propose plusieurs tailles, pointures ou couleurs.
+        </AppText>
+        <AppPressable
+          onPress={() => router.replace(`/listing/${listing!.id}` as any)}
+          style={{
+            marginTop: spacing[3],
+            paddingHorizontal: spacing[4],
+            paddingVertical: spacing[3],
+            borderRadius: radii.xl,
+            backgroundColor: accent.DEFAULT,
+          }}
+        >
+          <AppText variant="label" color={colors.text.inverse}>
+            Choisir une option
+          </AppText>
+        </AppPressable>
       </View>
     );
   }

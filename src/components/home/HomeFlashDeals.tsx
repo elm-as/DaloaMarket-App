@@ -7,12 +7,20 @@ import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } 
 import { formatFCFA, resolveListingPhoto } from '@daloa/utils';
 import { ListingFull } from '@daloa/types';
 import { listingFlashDealsService } from '@daloa/api';
+import { getBoostDestination } from '@daloa/utils';
 import { usePhase } from '../../context/PhaseContext';
+import { useAuth } from '../../context/AuthContext';
 
 export const HomeFlashDeals: React.FC = () => {
   const router = useRouter();
   const accent = useAccent();
   const { enableBoost } = usePhase();
+  const { isAuthenticated, profile } = useAuth();
+  const boostDestination = getBoostDestination(isAuthenticated, profile, {
+    login: '/auth/login',
+    myListings: '/seller/my-listings',
+    packs: '/pro/packs',
+  });
   const [deals, setDeals] = useState<ListingFull[]>([]);
 
   const fetchDeals = useCallback(async () => {
@@ -56,7 +64,7 @@ export const HomeFlashDeals: React.FC = () => {
         {enableBoost ? (
           <AppPressable
             haptic="light"
-            onPress={() => router.push('/pro/packs' as any)}
+            onPress={() => router.push(boostDestination as any)}
             style={styles.boostPill}
             accessibilityRole="button"
             accessibilityLabel="Mettre en avant une annonce"

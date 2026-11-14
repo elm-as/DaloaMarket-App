@@ -1,47 +1,33 @@
 import React from 'react';
 import { View } from 'react-native';
-import { ArrowUpRight, ArrowDownLeft, CheckCircle2, Circle } from 'lucide-react-native';
-import { colors, AppText, AppPressable, useAccent } from '@daloa/ui';
-import { ExpressQuoteCard } from './ExpressQuoteCard';
-import {
-  expressFormStyles as styles,
-  type ExpressFormState,
-  type ExpressFormHandlers,
-} from './expressForm.types';
+import { CheckCircle2, Circle, ShieldCheck } from 'lucide-react-native';
+import { colors, typography, AppText, AppPressable, useAccent } from '@daloa/ui';
+import { expressFormStyles as styles } from './expressForm.types';
 
 interface StepPaymentProps {
-  state: Pick<
-    ExpressFormState,
-    'payerRole' | 'distanceKm' | 'deliveryFee' | 'driverNetGain' | 'pickupDistrict' | 'dropoffDistrict'
-  >;
-  onSelectPayer: ExpressFormHandlers['setPayerRole'];
+  payerRole: 'sender' | 'recipient';
+  onSelectPayer: (role: 'sender' | 'recipient') => void;
 }
 
-export const ExpressStepPayment: React.FC<StepPaymentProps> = ({ state, onSelectPayer }) => {
+const PAYER_OPTIONS: Array<{
+  role: 'sender' | 'recipient';
+  title: string;
+  subtitle: string;
+}> = [
+  { role: 'sender', title: 'Je paie au départ', subtitle: 'Au ramassage' },
+  { role: 'recipient', title: 'Destinataire paie', subtitle: 'À la remise' },
+];
+
+export const ExpressStepPayment: React.FC<StepPaymentProps> = ({ payerRole, onSelectPayer }) => {
   const accent = useAccent();
 
-  const payerOptions: Array<{
-    role: 'sender' | 'recipient';
-    title: string;
-    subtitle: string;
-    Icon: typeof ArrowUpRight;
-  }> = [
-    { role: 'sender', title: 'Expéditeur', subtitle: 'Payé au ramassage', Icon: ArrowUpRight },
-    { role: 'recipient', title: 'Destinataire', subtitle: 'Payé à la réception', Icon: ArrowDownLeft },
-  ];
-
   return (
-    <View style={styles.stepContainer}>
-      <AppText variant="h2" style={styles.stepHeaderTitle}>
-        Règlement & Devis officiel
-      </AppText>
-      <AppText variant="caption" color={colors.text.muted} style={styles.stepHeaderSubtitle}>
-        Choisissez qui paie la livraison au coursier.
-      </AppText>
+    <View style={styles.card}>
+      <AppText variant="bodyStrong">3. Qui paie la livraison ?</AppText>
 
       <View style={styles.payerRow}>
-        {payerOptions.map(({ role, title, subtitle, Icon }) => {
-          const active = state.payerRole === role;
+        {PAYER_OPTIONS.map(({ role, title, subtitle }) => {
+          const active = payerRole === role;
           return (
             <AppPressable
               key={role}
@@ -50,39 +36,34 @@ export const ExpressStepPayment: React.FC<StepPaymentProps> = ({ state, onSelect
               style={[
                 styles.payerOption,
                 active
-                  ? { borderColor: accent.DEFAULT, backgroundColor: accent[50], borderWidth: 1.5 }
+                  ? { borderColor: accent.DEFAULT, backgroundColor: accent[50] ?? '#FFF7ED', borderWidth: 1.5 }
                   : { borderColor: colors.border.DEFAULT, backgroundColor: colors.bg.surface, borderWidth: 1 },
               ]}
             >
               <View style={styles.payerHeader}>
-                <View
-                  style={[
-                    styles.payerIconCircle,
-                    { backgroundColor: active ? accent[100] : colors.bg.subtle },
-                  ]}
-                >
-                  <Icon size={14} color={active ? accent[800] : colors.text.muted} />
-                </View>
+                <AppText variant="caption" color={colors.text.DEFAULT} style={{ fontFamily: typography.families.bold }}>
+                  {title}
+                </AppText>
                 {active ? (
                   <CheckCircle2 size={16} color={accent.DEFAULT} />
                 ) : (
                   <Circle size={16} color={colors.text.subtle} />
                 )}
               </View>
-              <AppText variant="bodyStrong" color={colors.text.DEFAULT}>{title}</AppText>
-              <AppText variant="caption" color={colors.text.muted}>{subtitle}</AppText>
+              <AppText variant="caption" color={colors.text.muted} style={{ fontSize: 11 }}>
+                {subtitle}
+              </AppText>
             </AppPressable>
           );
         })}
       </View>
 
-      <ExpressQuoteCard
-        distanceKm={state.distanceKm}
-        deliveryFee={state.deliveryFee}
-        driverNetGain={state.driverNetGain}
-        pickupDistrict={state.pickupDistrict}
-        dropoffDistrict={state.dropoffDistrict}
-      />
+      <View style={styles.securityNoteRow}>
+        <ShieldCheck size={14} color={colors.status.successDark} />
+        <AppText variant="caption" color={colors.text.muted} style={{ flex: 1, fontSize: 11 }}>
+          Double code secret OTP généré (ramassage et réception).
+        </AppText>
+      </View>
     </View>
   );
 };

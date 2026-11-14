@@ -13,3 +13,4 @@ export * from './ids';
 export * from './search';
 export * from './share/shareHelper';
 export * from './reliability';
+export * from './boostNavigation';
