@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   StyleSheet,
   ScrollView,
   ViewStyle,
+  KeyboardAvoidingView,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../tokens';
@@ -26,14 +29,45 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   contentStyle,
 }) => {
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardOffset(0);
+      return;
+    }
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      if (Platform.OS === 'android') {
+        setKeyboardOffset(e.endCoordinates.height);
+      }
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardOffset(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible]);
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {/* Fond sombre cliquable pour fermer sans intercepter les clics intérieurs */}
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -42,7 +76,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           accessibilityLabel="Fermer la boîte modale"
         />
 
-        <View style={[styles.sheet, contentStyle]}>
+        <View
+          style={[
+            styles.sheet,
+            keyboardOffset > 0 && { marginBottom: keyboardOffset, paddingBottom: spacing[3] },
+            contentStyle,
+          ]}
+        >
           <View style={styles.handleContainer}>
             <View style={styles.handle} />
           </View>
@@ -62,7 +102,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           )}
 
           <ScrollView
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
@@ -70,7 +110,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             {children}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -87,12 +127,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radii['3xl'],
     borderTopWidth: 1,
     borderColor: '#E5E7EB',
-    maxHeight: '85%',
-    paddingBottom: spacing[6],
+    maxHeight: '92%',
+    paddingBottom: spacing[5],
   },
   handleContainer: {
     alignItems: 'center',
-    paddingVertical: spacing[3],
+    paddingVertical: spacing[2],
   },
   handle: {
     width: 40,
@@ -111,7 +151,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#111827',
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.base,
     fontFamily: typography.families.bold,
   },
   closeBtn: {
@@ -119,6 +159,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: spacing[5],
-    paddingTop: spacing[4],
+    paddingTop: spacing[3],
   },
 });

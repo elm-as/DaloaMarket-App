@@ -3282,6 +3282,14 @@ export type Database = {
         Returns: undefined
       }
       admin_pending_counts: { Args: never; Returns: Json }
+      release_delivery_assignment: {
+        Args: { p_assignment_id: string; p_reason?: string }
+        Returns: Json
+      }
+      release_stale_accepted_assignments: {
+        Args: { p_timeout_minutes?: number }
+        Returns: Json
+      }
       admin_trigger_driver_payout: {
         Args: { p_assignment_id: string }
         Returns: Json

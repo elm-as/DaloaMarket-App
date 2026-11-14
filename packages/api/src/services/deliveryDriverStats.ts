@@ -33,7 +33,7 @@ export async function fetchDriverDailyStats(driverId: string): Promise<DriverDai
       .from('delivery_assignments')
       .select('delivery_price')
       .eq('delivery_person_id', driverId)
-      .in('status', ['assigned', 'picked_up', 'in_transit']),
+      .in('status', ['accepted', 'picked_up', 'in_transit']),
     supabase
       .from('payouts')
       .select('amount, status')

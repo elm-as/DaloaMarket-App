@@ -27,8 +27,22 @@ import { fetchDeliverersDirectory, fetchDriverDailyStats } from './deliveryDrive
 export { PLATFORM_COMMISSION_RATE };
 export type { AvailableRunBriefItem, AvailableRunsBrief };
 
-const RUN_DETAIL_SELECT =
-  'id, order_id, seller_id, delivery_person_id, status, is_private, is_express, is_grouped, delivery_group_id, group_total_stops, group_completed_stops, grouped_stops, pickup_confirmed_by_seller, pickup_confirmed_at, delivered_at, pickup_photo_url, delivery_photo_url, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, delivery_price, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, created_at, orders:order_id(id, order_type, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, payment_method, is_grouped, delivery_group_id, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))';
+let lastStaleSweepAt = 0;
+const STALE_SWEEP_INTERVAL_MS = 60_000;
+const PICKUP_TIMEOUT_MINUTES = 210; // Libère automatiquement après 3h30 sans retrait chez le vendeur
+
+async function sweepStaleAcceptedRunsIfNeeded(): Promise<void> {
+  const now = Date.now();
+  if (now - lastStaleSweepAt < STALE_SWEEP_INTERVAL_MS) return;
+  lastStaleSweepAt = now;
+  await deliveryVerificationService.releaseStaleAcceptedRuns(PICKUP_TIMEOUT_MINUTES);
+}
+
+// Exclut explicitement `pickup_otp` et `delivery_otp` côté livreur.
+export const SAFE_DELIVERY_ASSIGNMENT_COLUMNS =
+  'id, order_id, seller_id, delivery_person_id, status, is_private, is_express, is_grouped, delivery_group_id, group_total_stops, group_completed_stops, grouped_stops, pickup_confirmed_by_seller, pickup_confirmed_at, delivered_at, pickup_photo_url, delivery_photo_url, pickup_location, dropoff_location, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, delivery_price, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, pickup_otp_attempts, delivery_otp_attempts, current_driver_lat, current_driver_lng, location_updated_at, disputed_at, dispute_reason, accepted_at, created_at, updated_at';
+
+const RUN_DETAIL_SELECT = `${SAFE_DELIVERY_ASSIGNMENT_COLUMNS}, orders:order_id(id, order_type, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, payment_method, is_grouped, delivery_group_id, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, listings:listing_id(id, title, photos, price, district), order_items(id, quantity, unit_price, product_amount, listings:listing_id(title, photos)), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))`;
 
 export const deliveryService = {
   /**
@@ -62,8 +76,9 @@ export const deliveryService = {
    * Note de sécurité : `pickup_otp` et `delivery_otp` ne sont jamais sélectionnés côté livreur.
    */
   async getAvailableRuns(_driverCoords?: Coordinates | null): Promise<AvailableDeliveryRun[]> {
-    const { data, error } = await supabase
-      .from('delivery_assignments')
+    await sweepStaleAcceptedRunsIfNeeded();
+
+    const { data, error } = await (supabase.from('delivery_assignments') as any)
       .select(RUN_DETAIL_SELECT)
       .eq('status', 'awaiting_pickup')
       .is('delivery_person_id', null)
@@ -93,6 +108,8 @@ export const deliveryService = {
    * Version légère de `getAvailableRuns` pour les pastilles et la cloche de l'en-tête.
    */
   async getAvailableRunsBrief(limit = 5): Promise<AvailableRunsBrief> {
+    await sweepStaleAcceptedRunsIfNeeded();
+
     const { data, count, error } = await supabase
       .from('delivery_assignments')
       .select('id, pickup_location, dropoff_location, delivery_price, created_at', {
@@ -138,9 +155,18 @@ export const deliveryService = {
   },
 
   /**
+   * Libère une course acceptée avant le ramassage chez le vendeur et la remet en ligne.
+   */
+  async releaseRun(assignmentId: string, reason?: string): Promise<void> {
+    return deliveryVerificationService.releaseRun(assignmentId, reason);
+  },
+
+  /**
    * Récupère la course actuellement active pour un livreur (`pickup_otp`/`delivery_otp` exclus).
    */
   async getActiveRun(driverId: string): Promise<ActiveDeliveryRunDetails | null> {
+    await sweepStaleAcceptedRunsIfNeeded();
+
     const { data: rawResult, error } = await (supabase.from('delivery_assignments') as any)
       .select(RUN_DETAIL_SELECT)
       .eq('delivery_person_id', driverId)

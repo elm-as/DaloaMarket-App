@@ -128,12 +128,20 @@ function buildBaseRunFields(
   const packageDesc = order.package_description || item.package_description || null;
   const packageType = order.package_type || item.package_type || null;
 
+  const rawPickup = typeof item.pickup_location === 'string' ? item.pickup_location.trim() : '';
+  const pickupLocation =
+    !rawPickup || rawPickup.toLowerCase().includes('boutique du vendeur')
+      ? `${seller.shop_name || 'Vendeur'} (${seller.district || listing.district || 'Daloa'})`
+      : rawPickup;
+  const itemsCount = Array.isArray(order.order_items) ? order.order_items.length : 0;
+  const baseTitle = listing.title || order.order_items?.[0]?.listings?.title || 'Colis DaloaMarket';
+  const multiTitle =
+    itemsCount > 1 ? `${baseTitle} (+${itemsCount - 1} autre${itemsCount > 2 ? 's' : ''})` : baseTitle;
+
   return {
     assignmentId: item.id,
     orderId: item.order_id,
-    pickupLocation:
-      item.pickup_location ||
-      `${seller.shop_name || 'Vendeur'} (${seller.district || listing.district || 'Daloa'})`,
+    pickupLocation,
     dropoffLocation:
       item.dropoff_location || item.dropoff_address || dropoff.address || 'Adresse client',
     pickupDistrict: seller.district || listing.district || 'Daloa Centre',
@@ -149,8 +157,8 @@ function buildBaseRunFields(
     sellerPhone: isExpress ? senderPhone : seller.phone || null,
     buyerName: isExpress ? recipientName : buyer.full_name || buyerFallbackName,
     buyerPhone: isExpress ? recipientPhone : buyer.phone || null,
-    productTitle: isExpress ? packageDesc || '⚡ Course Express Daloa' : listing.title,
-    productPhoto: listing.photos?.[0] || null,
+    productTitle: isExpress ? packageDesc || '⚡ Course Express Daloa' : multiTitle,
+    productPhoto: listing.photos?.[0] || order.order_items?.[0]?.listings?.photos?.[0] || null,
     createdAt: item.created_at,
     isExpress,
     packageDescription: packageDesc,
@@ -211,7 +219,6 @@ export function mapActiveDeliveryRun(item: any): ActiveDeliveryRunDetails {
   const base = buildBaseRunFields(item, coords, 'Client');
   return {
     ...base,
-    pickupLocation: item.pickup_location,
     status: item.status as DeliveryRunStatus,
     pickupConfirmedBySeller: item.pickup_confirmed_by_seller,
     pickupConfirmedAt: item.pickup_confirmed_at,

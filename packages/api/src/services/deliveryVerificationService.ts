@@ -1,12 +1,13 @@
 import { supabase } from '../supabase';
 import { rpcOutcome } from '../lib/rpc';
 import { Coordinates } from '@daloa/types';
+import { DALOA_CENTER } from '@daloa/config';
 
 export interface VerifyPickupParams {
   assignmentId: string;
   enteredOtp: string;
   photoUrl: string;
-  driverCoords: Coordinates;
+  driverCoords?: Coordinates | null;
   /** @deprecated N'est plus utilisé : le contrôle de proximité GPS a été retiré. */
   targetCoords?: Coordinates | null;
 }
@@ -15,7 +16,7 @@ export interface VerifyDeliveryParams {
   assignmentId: string;
   enteredOtp: string;
   photoUrl: string;
-  driverCoords: Coordinates;
+  driverCoords?: Coordinates | null;
   /** @deprecated N'est plus utilisé : le contrôle de proximité GPS a été retiré. */
   targetCoords?: Coordinates | null;
 }
@@ -40,14 +41,15 @@ export const deliveryVerificationService = {
     // boutique étaient approximatives. L'OTP vendeur est la preuve de présence.
     // Les coordonnées restent transmises à la RPC, qui les archive.
 
+    const coords = params.driverCoords ?? DALOA_CENTER;
     // Tentative via fonction RPC Postgres atomique
     try {
       const { data: rpcRaw, error: rpcError } = await supabase.rpc('verify_pickup', {
         p_assignment_id: params.assignmentId,
         p_otp: trimmedOtp,
         p_photo_url: params.photoUrl,
-        p_gps_lat: params.driverCoords.lat,
-        p_gps_lng: params.driverCoords.lng,
+        p_gps_lat: coords.lat,
+        p_gps_lng: coords.lng,
       });
 
       const rpcData = rpcOutcome<{ attempts?: number; max_attempts?: number; distance?: number }>(rpcRaw);
@@ -106,14 +108,15 @@ export const deliveryVerificationService = {
     // Blocage GPS client retiré, comme pour le ramassage : c'est l'OTP acheteur
     // qui atteste la remise. La distance est archivée côté serveur pour l'audit.
 
+    const coords = params.driverCoords ?? DALOA_CENTER;
     // Tentative via fonction RPC Postgres atomique
     {
       const { data: rpcRaw, error: rpcError } = await supabase.rpc('verify_delivery', {
         p_assignment_id: params.assignmentId,
         p_otp: trimmedOtp,
         p_photo_url: params.photoUrl,
-        p_gps_lat: params.driverCoords.lat,
-        p_gps_lng: params.driverCoords.lng,
+        p_gps_lat: coords.lat,
+        p_gps_lng: coords.lng,
       });
 
       const rpcData = rpcOutcome<{ attempts?: number; max_attempts?: number; distance?: number }>(rpcRaw);
@@ -179,6 +182,37 @@ export const deliveryVerificationService = {
     const res = rpcOutcome(data);
     if (res && !res.success) {
       throw new Error(res.reason || 'Signalement du litige refusé par le serveur.');
+    }
+  },
+
+  /**
+   * Libère une course acceptée avant le ramassage chez le vendeur et la remet en ligne.
+   */
+  async releaseRun(assignmentId: string, reason = 'driver_released'): Promise<void> {
+    const { data, error } = await supabase.rpc('release_delivery_assignment', {
+      p_assignment_id: assignmentId,
+      p_reason: reason,
+    });
+
+    if (error) throw error;
+    const res = rpcOutcome(data);
+    if (res && !res.success) {
+      throw new Error(res.message || res.reason || 'Impossible de libérer cette course.');
+    }
+  },
+
+  /**
+   * Remet automatiquement en ligne les courses acceptées depuis plus de 3h30 (210 min) sans retrait.
+   */
+  async releaseStaleAcceptedRuns(timeoutMinutes = 210): Promise<number> {
+    try {
+      const { data, error } = await supabase.rpc('release_stale_accepted_assignments', {
+        p_timeout_minutes: timeoutMinutes,
+      });
+      if (error || !data) return 0;
+      return Number((data as any)?.released_count) || 0;
+    } catch {
+      return 0;
     }
   },
 };

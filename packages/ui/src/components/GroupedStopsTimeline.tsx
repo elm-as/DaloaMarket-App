@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Store, CheckCircle2, Clock, MapPin } from 'lucide-react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Store, CheckCircle2, MapPin } from 'lucide-react-native';
 import { colors, radii, spacing } from '../tokens';
 import { typography } from '../tokens/typography';
 import { useAccent } from '../theme/ThemeProvider';
@@ -13,6 +13,8 @@ export interface GroupedStopsTimelineProps {
   dropoffDistrict?: string | null;
   totalStops?: number;
   completedStops?: number;
+  onConfirmStop?: (stop: GroupedPickupStop) => void;
+  confirmingStopIndex?: number | null;
 }
 
 export const GroupedStopsTimeline: React.FC<GroupedStopsTimelineProps> = ({
@@ -21,13 +23,14 @@ export const GroupedStopsTimeline: React.FC<GroupedStopsTimelineProps> = ({
   dropoffDistrict,
   totalStops = stops.length,
   completedStops = stops.filter((s) => s.status === 'picked_up').length,
+  onConfirmStop,
+  confirmingStopIndex,
 }) => {
   const accent = useAccent();
   const allStopsCompleted = completedStops >= totalStops;
 
   return (
     <View style={styles.card}>
-      {/* En-tête de la tournée */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <View style={[styles.headerIconCircle, { backgroundColor: accent[50] }]}>
@@ -57,15 +60,15 @@ export const GroupedStopsTimeline: React.FC<GroupedStopsTimelineProps> = ({
         </View>
       </View>
 
-      {/* Liste des stops de collecte */}
       <View style={styles.timelineList}>
         {stops.map((stop, index) => {
           const isDone = stop.status === 'picked_up';
           const isCurrent = !isDone && index === completedStops;
+          const stopNum = stop.stopIndex || index + 1;
+          const isConfirming = confirmingStopIndex === stopNum;
 
           return (
-            <View key={`${stop.sellerId}-${stop.stopIndex}`} style={styles.stopRow}>
-              {/* Connecteur vertical et indicateur */}
+            <View key={`${stop.sellerId}-${stopNum}`} style={styles.stopRow}>
               <View style={styles.indicatorCol}>
                 <View
                   style={[
@@ -85,25 +88,19 @@ export const GroupedStopsTimeline: React.FC<GroupedStopsTimelineProps> = ({
                       color={isCurrent ? accent.DEFAULT : colors.text.subtle}
                       style={[styles.stopNumberText, styles.tabularNum]}
                     >
-                      {stop.stopIndex || index + 1}
+                      {stopNum}
                     </AppText>
                   )}
                 </View>
                 <View style={styles.connectingLine} />
               </View>
 
-              {/* Détails du stop */}
               <View style={styles.stopDetails}>
                 <View style={styles.stopTitleRow}>
                   <AppText variant="bodyStrong" numberOfLines={1}>
                     {stop.shopName}
                   </AppText>
-                  <View
-                    style={[
-                      styles.statusPill,
-                      isDone ? styles.pillDone : styles.pillPending,
-                    ]}
-                  >
+                  <View style={[styles.statusPill, isDone ? styles.pillDone : styles.pillPending]}>
                     <AppText
                       variant="overline"
                       color={isDone ? colors.status.successDark : colors.text.muted}
@@ -116,12 +113,28 @@ export const GroupedStopsTimeline: React.FC<GroupedStopsTimelineProps> = ({
                 <AppText variant="caption" color={colors.text.muted} numberOfLines={1}>
                   {stop.address || stop.district || 'Daloa'}
                 </AppText>
+
+                {!isDone && onConfirmStop && (
+                  <TouchableOpacity
+                    onPress={() => onConfirmStop({ ...stop, stopIndex: stopNum })}
+                    disabled={isConfirming}
+                    activeOpacity={0.8}
+                    style={[styles.confirmStopBtn, { backgroundColor: accent.DEFAULT }]}
+                  >
+                    {isConfirming ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <AppText variant="caption" color="#FFFFFF" style={{ fontFamily: typography.families.bold }}>
+                        Valider le retrait chez {stop.shopName}
+                      </AppText>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           );
         })}
 
-        {/* Étape finale : Destination acheteur */}
         <View style={styles.stopRow}>
           <View style={styles.indicatorCol}>
             <View
@@ -267,6 +280,14 @@ const styles = StyleSheet.create({
   },
   pillPending: {
     backgroundColor: colors.bg.subtle,
+  },
+  confirmStopBtn: {
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabularNum: {
     fontVariant: ['tabular-nums'],
