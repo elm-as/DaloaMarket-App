@@ -110,4 +110,16 @@ if (FileStore) {
   ];
 }
 
+// Empêche HmrServer/jsc-safe-url de planter lorsque HMR Web envoie /?platform=web sans /index.bundle
+const defaultRewriteRequestUrl = config.server?.rewriteRequestUrl;
+config.server = {
+  ...config.server,
+  rewriteRequestUrl: (requestUrl) => {
+    const rewritten = defaultRewriteRequestUrl ? defaultRewriteRequestUrl(requestUrl) : requestUrl;
+    return rewritten
+      .replace(/^(https?:\/\/[^/?#]+)\/\?/, '$1/index.bundle?')
+      .replace(/^\/\?/, '/index.bundle?');
+  },
+};
+
 module.exports = config;
