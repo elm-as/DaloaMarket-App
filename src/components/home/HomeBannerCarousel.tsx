@@ -20,8 +20,8 @@ import { useAuth } from '../../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_WIDTH = Math.min(SCREEN_WIDTH - spacing[3] * 2, 420);
-const BANNER_HEIGHT = 158;
-const AUTO_PLAY_MS = 4500;
+const BANNER_HEIGHT = 188;
+const AUTO_PLAY_MS = 4200;
 
 const DEFAULT_BANNERS: PromoBanner[] = [
   {
@@ -73,7 +73,9 @@ export const HomeBannerCarousel: React.FC = () => {
   });
   const [banners, setBanners] = useState<PromoBanner[]>(DEFAULT_BANNERS);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  const activeIndexRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const cooldownUntilRef = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
 
   const fetchBanners = useCallback(async () => {
@@ -96,24 +98,25 @@ export const HomeBannerCarousel: React.FC = () => {
   }, [fetchBanners]);
 
   useEffect(() => {
-    if (banners.length <= 1 || isDragging) return;
+    if (banners.length <= 1) return;
     const timer = setInterval(() => {
-      setActiveIndex((prev) => {
-        const next = (prev + 1) % banners.length;
-        scrollRef.current?.scrollTo({
-          x: next * (BANNER_WIDTH + spacing[2]),
-          animated: true,
-        });
-        return next;
+      if (isDraggingRef.current || Date.now() < cooldownUntilRef.current) return;
+      const next = (activeIndexRef.current + 1) % banners.length;
+      activeIndexRef.current = next;
+      setActiveIndex(next);
+      scrollRef.current?.scrollTo({
+        x: next * (BANNER_WIDTH + spacing[2]),
+        animated: true,
       });
     }, AUTO_PLAY_MS);
     return () => clearInterval(timer);
-  }, [banners.length, isDragging]);
+  }, [banners.length]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / (BANNER_WIDTH + spacing[2]));
-    if (index !== activeIndex && index >= 0 && index < banners.length) {
+    if (index !== activeIndexRef.current && index >= 0 && index < banners.length) {
+      activeIndexRef.current = index;
       setActiveIndex(index);
     }
   };
@@ -156,8 +159,15 @@ export const HomeBannerCarousel: React.FC = () => {
         snapToAlignment="center"
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
-        onScrollBeginDrag={() => setIsDragging(true)}
-        onScrollEndDrag={() => setIsDragging(false)}
+        onScrollBeginDrag={() => {
+          isDraggingRef.current = true;
+          cooldownUntilRef.current = Date.now() + 6000;
+        }}
+        onScrollEndDrag={() => { isDraggingRef.current = false; }}
+        onMomentumScrollEnd={(e) => {
+          isDraggingRef.current = false;
+          handleScroll(e);
+        }}
         scrollEventThrottle={16}
         contentContainerStyle={styles.scrollList}
       >
@@ -244,6 +254,8 @@ export const HomeBannerCarousel: React.FC = () => {
               key={`dot-${b.id}-${i}`}
               hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
               onPress={() => {
+                cooldownUntilRef.current = Date.now() + 6000;
+                activeIndexRef.current = i;
                 setActiveIndex(i);
                 scrollRef.current?.scrollTo({ x: i * (BANNER_WIDTH + spacing[2]), animated: true });
               }}

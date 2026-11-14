@@ -1,42 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePhase } from '../../src/context/PhaseContext';
-import { listingsService, supabase } from '@daloa/api';
-import { colors, spacing, Button, KeyboardScreen, ConfirmDialog, showAlert } from '@daloa/ui';
-import { ArrowRight, Check, CreditCard, MapPin } from 'lucide-react-native';
-import { Haptics, isLocationInDaloa, formatFCFA } from '@daloa/utils';
-import { PRICING_CONFIG } from '@daloa/config';
+import { colors, spacing, Button, KeyboardScreen, showAlert } from '@daloa/ui';
+import { ArrowRight, Check } from 'lucide-react-native';
+import { Haptics } from '@daloa/utils';
 import { safeBack } from '../../src/utils/navigation';
-import { AuthGuardView } from '../../src/components/common/AuthGuardView';
-import { RequirementGuardView } from '../../src/components/common/RequirementGuardView';
-import { WizardHero } from '../../src/components/create-wizard/WizardHero';
+import { renderListingCreateGuard } from '../../src/components/create-wizard/ListingCreateGuards';
+import { ListingCreateDialogs } from '../../src/components/create-wizard/ListingCreateDialogs';
+import { ListingWizardHeader } from '../../src/components/create-wizard/ListingWizardHeader';
 import { StepMediaTitle, type PickedPhoto } from '../../src/components/create-wizard/StepMediaTitle';
 import { StepCategoryPricing } from '../../src/components/create-wizard/StepCategoryPricing';
-import { StepVariantsSection, DraftVariant } from '../../src/components/create-wizard/StepVariantsSection';
+import type { DraftVariant } from '../../src/components/create-wizard/StepVariantsSection';
 import { StepLocationDelivery } from '../../src/components/create-wizard/StepLocationDelivery';
-import { StepSummaryPreview } from '../../src/components/create-wizard/StepSummaryPreview';
+import {
+  loadEditableListing,
+  submitMobileListing,
+  validateListingPricing,
+} from '../../src/components/create-wizard/listingCreateSubmit';
+import { clearListingDraft, loadListingDraft, saveListingDraft } from '../../src/services/listingDraftStorage';
 
-const STEP_TITLES = ['Photos & Titre', 'Catégorie & Prix', 'Quartier & Livraison', 'Aperçu & Publication'];
-
-/**
- * Création et modification d'annonce.
- *
- * Le bouton « Modifier l'annonce » (fiche, menu propriétaire, Mes annonces)
- * ouvrait déjà `/listing/create?id=…`, mais l'écran ignorait l'`id` : il
- * affichait un formulaire vide et, une fois validé, créait une DEUXIÈME
- * annonce. Avec `id`, l'annonce est chargée (propriétaire uniquement),
- * pré-remplie, puis mise à jour — comme `ListingCreatePage` côté web.
- */
 export default function ListingCreateScreen() {
   const router = useRouter();
   const { user, profile, isAuthenticated } = useAuth();
   const { sellerFeeOverride } = usePhase();
   const { id: editId } = useLocalSearchParams<{ id?: string }>();
   const isEditing = Boolean(editId);
-  const [isLoadingListing, setIsLoadingListing] = useState(isEditing);
 
+  const [isLoadingListing, setIsLoadingListing] = useState(isEditing);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,245 +42,182 @@ export default function ListingCreateScreen() {
   const [originalPrice, setOriginalPrice] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState(profile?.district || 'Centre-ville');
   const [stock, setStock] = useState(1);
+
+  const [isDraftReady, setIsDraftReady] = useState(isEditing);
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdListingId, setCreatedListingId] = useState<string | null>(null);
   const [errorDialog, setErrorDialog] = useState<string | null>(null);
 
-  // Édition : chargement et pré-remplissage de l'annonce existante.
+  useEffect(() => {
+    if (isEditing || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { draft, photos: cachedPhotos } = await loadListingDraft();
+      if (cancelled) return;
+      if (draft) {
+        setTitle(draft.title || '');
+        setDescription(draft.description || '');
+        setSelectedCategory(draft.selectedCategory || 'fashion');
+        setSelectedCondition(draft.selectedCondition || 'like_new');
+        setPrice(draft.price || '');
+        setOriginalPrice(draft.originalPrice || '');
+        setSelectedDistrict(draft.selectedDistrict || profile?.district || 'Centre-ville');
+        setStock(Math.max(1, draft.stock || 1));
+        setVariants(Array.isArray(draft.variants) ? draft.variants : []);
+        setCurrentStep(Math.min(3, Math.max(1, draft.currentStep || 1)));
+        if (cachedPhotos.length > 0) setPhotos(cachedPhotos);
+        setIsDraftRestored(true);
+      }
+      setIsDraftReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditing, user?.id, profile?.district]);
+
+  useEffect(() => {
+    if (isEditing || !isDraftReady || !user?.id) return;
+    const timer = setTimeout(() => {
+      saveListingDraft(
+        {
+          currentStep,
+          title,
+          description,
+          selectedCategory,
+          selectedCondition,
+          price,
+          originalPrice,
+          selectedDistrict,
+          stock,
+          variants,
+        },
+        photos,
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [
+    isEditing, isDraftReady, user?.id, currentStep, title, description,
+    selectedCategory, selectedCondition, price, originalPrice, selectedDistrict,
+    stock, variants, photos,
+  ]);
+
   useEffect(() => {
     if (!editId || !user?.id) return;
     let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('id', editId)
-        .maybeSingle();
+    loadEditableListing(editId, user.id, profile?.district || 'Centre-ville').then((loaded) => {
       if (cancelled) return;
-
-      if (error || !data || data.user_id !== user.id || data.status === 'deleted') {
+      if (!loaded) {
         setIsLoadingListing(false);
         showAlert('Annonce introuvable', 'Cette annonce n’existe plus ou ne vous appartient pas.');
         safeBack(router, '/seller/my-listings');
         return;
       }
-
-      setTitle(data.title || '');
-      setDescription(data.description || '');
-      setSelectedCategory(data.category || 'fashion');
-      setSelectedCondition(data.condition || 'like_new');
-      setPrice(data.price != null ? String(data.price) : '');
-      setOriginalPrice(data.original_price != null ? String(data.original_price) : '');
-      setSelectedDistrict(data.district || profile?.district || 'Centre-ville');
-      setStock(Math.max(1, data.stock || 1));
-      setPhotos(
-        (data.photos || [])
-          .filter((u: unknown): u is string => typeof u === 'string' && u.startsWith('http'))
-          .map((uri: string) => ({ uri }))
-      );
-      const existing = Array.isArray(data.variants) ? (data.variants as any[]) : [];
-      setVariants(
-        existing.map((v) => ({
-          id: v.id ? String(v.id) : undefined,
-          title: String(v.label || ''),
-          color: v.color ? String(v.color) : null,
-          color_code: v.color_code ? String(v.color_code) : null,
-          size: v.size ? String(v.size) : null,
-          price: v.price == null || v.price === '' ? null : Number(v.price),
-          stock: Math.max(0, Number(v.stock) || 0),
-        }))
-      );
+      setTitle(loaded.title);
+      setDescription(loaded.description);
+      setSelectedCategory(loaded.category);
+      setSelectedCondition(loaded.condition);
+      setPrice(loaded.price);
+      setOriginalPrice(loaded.originalPrice);
+      setSelectedDistrict(loaded.district);
+      setStock(loaded.stock);
+      setPhotos(loaded.photos);
+      setVariants(loaded.variants);
       setIsLoadingListing(false);
-    })();
+    });
     return () => {
       cancelled = true;
     };
   }, [editId, user?.id]);
 
-  if (!isAuthenticated || !user) {
-    return (
-      <AuthGuardView
-        title="Connexion requise"
-        description="Vous devez être connecté à votre compte pour publier une annonce sur DaloaMarket."
-        fallbackRoute="/(tabs)"
-      />
-    );
-  }
+  const guardScreen = renderListingCreateGuard({
+    isAuthenticated,
+    hasUser: Boolean(user),
+    profile: profile as Record<string, any> | null,
+    onNavigatePayout: () => router.push('/settings/payout' as any),
+    onNavigateShop: () => router.push('/settings/shop' as any),
+  });
+  if (guardScreen) return guardScreen;
 
-  const hasPayoutInfo = Boolean((profile as any)?.payout_network && (profile as any)?.payout_number);
-  const hasShopLocation = Boolean(profile?.district && (profile as any)?.shop_latitude != null && (profile as any)?.shop_longitude != null);
-  const isSuperOrAdmin = (profile as any)?.role === 'admin' || (profile as any)?.role === 'superadmin';
-  const isShopInDaloa =
-    hasShopLocation &&
-    (isSuperOrAdmin ||
-      isLocationInDaloa(Number((profile as any)?.shop_latitude), Number((profile as any)?.shop_longitude)));
-
-  if (!hasPayoutInfo) {
-    return (
-      <RequirementGuardView
-        icon={<CreditCard size={32} color={colors.status.warningDark} />}
-        title="Coordonnées de retrait requises"
-        description="Pour vendre sur DaloaMarket, vous devez d'abord configurer le compte Mobile Money (Wave, Orange, MTN...) sur lequel vous recevrez vos gains de vente."
-        actionLabel="Configurer mes coordonnées"
-        onAction={() => router.push('/settings/payout' as any)}
-      />
-    );
-  }
-
-  if (!hasShopLocation || !isShopInDaloa) {
-    return (
-      <RequirementGuardView
-        icon={<MapPin size={32} color={hasShopLocation ? colors.status.errorDark : colors.status.infoDark} />}
-        title={hasShopLocation ? 'Vente réservée à Daloa' : 'Localisation de boutique requise'}
-        description={
-          hasShopLocation
-            ? "Nous ne sommes encore présents qu'à Daloa pour le moment. Seuls les vendeurs situés à Daloa sont autorisés à vendre sur DaloaMarket."
-            : 'Afin que vos acheteurs et les livreurs de Daloa puissent localiser vos articles et calculer la livraison, veuillez positionner votre boutique sur la carte.'
-        }
-        actionLabel={hasShopLocation ? 'Mettre à jour ma position à Daloa' : 'Définir la position de ma boutique'}
-        onAction={() => router.push('/settings/shop' as any)}
-      />
-    );
-  }
-
-  /**
-   * Même règle que le web (`ListingCreatePage`) : prix de base et prix de chaque
-   * option au-dessus du minimum, et stock d'au moins 1 par option. Seul le prix de
-   * base était vérifié ici, et uniquement au passage à l'étape suivante — une
-   * variante à 50 F passait sans contrôle.
-   */
-  const validatePricing = (): string | null => {
-    const min = PRICING_CONFIG.marketplace.minListingPrice;
-    const num = parseFloat(price);
-    if (isNaN(num) || num < min) {
-      return `Le prix minimum d’une annonce est de ${min} FCFA.`;
-    }
-    if (variants.some((v) => v.price != null && v.price < min)) {
-      return `Chaque option doit être vendue au moins ${min} FCFA.`;
-    }
-    if (variants.some((v) => (v.stock ?? 0) < 1)) {
-      return 'Chaque option doit avoir un stock d’au moins 1.';
-    }
-    return null;
+  const handleResetDraft = async () => {
+    await clearListingDraft();
+    setPhotos([]);
+    setTitle('');
+    setDescription('');
+    setSelectedCategory('fashion');
+    setSelectedCondition('like_new');
+    setVariants([]);
+    setPrice('');
+    setOriginalPrice('');
+    setSelectedDistrict(profile?.district || 'Centre-ville');
+    setStock(1);
+    setCurrentStep(1);
+    setIsDraftRestored(false);
   };
 
   const handleNext = () => {
     Haptics.selection();
-    // Au moins une vraie photo, comme sur le web : l'app publiait sinon une
-    // photo de banque d'images à la place de l'article.
     if (currentStep === 1 && photos.length === 0) {
       showAlert('Photo requise', 'Ajoutez au moins une photo de votre article.');
       return;
     }
     if (currentStep === 1 && (!title.trim() || title.trim().length < 3)) {
-      showAlert('Titre requis', 'Veuillez saisir un titre d’au moins 3 caractères.');
+      showAlert('Titre requis', 'Saisissez un titre d’au moins 3 caractères.');
       return;
     }
     if (currentStep === 2) {
-      const invalid = validatePricing();
+      const invalid = validateListingPricing(price, variants);
       if (invalid) {
         showAlert('Prix invalide', invalid);
         return;
       }
     }
-    setCurrentStep((p) => Math.min(4, p + 1));
-  };
-
-  const handlePrev = () => {
-    Haptics.selection();
-    if (currentStep === 1) safeBack(router, '/(tabs)');
-    else setCurrentStep((p) => Math.max(1, p - 1));
+    setCurrentStep((p) => Math.min(3, p + 1));
   };
 
   const handlePublish = async () => {
-    if (!isAuthenticated || !user) {
-      showAlert('Connexion requise', 'Veuillez vous connecter pour publier une annonce.', [
-        { text: 'Se connecter', onPress: () => router.push('/auth/login' as any) },
-      ]);
-      return;
-    }
-
-    // Revalidation au moment de publier : l'utilisateur peut revenir en arrière
-    // et modifier un prix après avoir franchi l'étape 2.
-    const invalidPricing = validatePricing();
+    if (!user) return;
+    const invalidPricing = validateListingPricing(price, variants);
     if (invalidPricing) {
       showAlert('Prix invalide', invalidPricing);
+      setCurrentStep(2);
       return;
     }
     if (photos.length === 0) {
       showAlert('Photo requise', 'Ajoutez au moins une photo de votre article.');
+      setCurrentStep(1);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const uploadedPhotos: string[] = [];
-      for (const p of photos) {
-        const url = p.uri.startsWith('http')
-          ? p.uri
-          : await listingsService.uploadImage(p, user.id);
-
-        // Garde-fou : une URI locale (`file://`, `content://`) enregistree en base
-        // est illisible partout ailleurs — le web refuse meme de la charger
-        // (« Not allowed to load local resource »). Mieux vaut echouer ici.
-        if (!url.startsWith('http')) {
-          throw new Error(
-            "Une photo n'a pas pu être téléversée. Vérifiez votre connexion puis réessayez."
-          );
-        }
-        uploadedPhotos.push(url);
-      }
-
-      const input = {
-        title: title.trim(),
-        description: description.trim(),
-        price: parseFloat(price),
-        original_price: originalPrice ? parseFloat(originalPrice) : null,
+      const saved = await submitMobileListing({
+        editId,
+        userId: user.id,
+        photos,
+        title,
+        description,
+        price,
+        originalPrice,
         category: selectedCategory,
-        condition: selectedCondition as any,
+        condition: selectedCondition,
         district: selectedDistrict,
         stock,
-        photos: uploadedPhotos,
-        variants: variants.map((v) => ({
-          id: v.id,
-          label: v.title,
-          color: v.color || null,
-          color_code: v.color_code || null,
-          size: v.size || null,
-          price: v.price || null,
-          stock: v.stock || 1,
-          active: true,
-        })),
-      };
-
-      const saved = editId
-        ? await listingsService.updateListing(editId, input)
-        : await listingsService.createListing(user.id, input);
-
+        variants,
+      });
+      await clearListingDraft();
+      setIsDraftRestored(false);
       Haptics.success();
       setCreatedListingId(saved.id);
       setShowSuccessDialog(true);
     } catch (err: any) {
-      let msg =
-        err?.message ||
-        (isEditing ? 'Échec de l’enregistrement des modifications.' : 'Échec de la publication de votre annonce.');
-      if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
-        msg = 'Une annonce similaire existe déjà avec ces caractéristiques.';
-      } else if (msg.includes('Failed to fetch') || msg.includes('Network') || msg.includes('timeout')) {
-        msg = 'Connexion internet faible ou interrompue. Veuillez vérifier votre réseau puis réessayer.';
+      let msg = err?.message || (isEditing ? 'Échec de mise à jour.' : 'Échec de publication.');
+      if (msg.includes('Failed to fetch') || msg.includes('Network') || msg.includes('timeout')) {
+        msg = 'Connexion instable. Vérifiez votre réseau puis réessayez.';
       }
       setErrorDialog(msg);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleGoToCreatedListing = () => {
-    setShowSuccessDialog(false);
-    if (createdListingId) {
-      router.replace(`/listing/${createdListingId}` as any);
-    } else {
-      router.replace('/(tabs)' as any);
     }
   };
 
@@ -303,18 +232,16 @@ export default function ListingCreateScreen() {
   return (
     <KeyboardScreen>
       <View style={styles.container}>
-        <WizardHero
+        <ListingWizardHeader
           currentStep={currentStep}
-          totalSteps={4}
-          stepTitles={STEP_TITLES}
-          onBack={handlePrev}
+          isEditing={isEditing}
+          isDraftRestored={isDraftRestored}
+          onBack={() => (currentStep === 1 ? safeBack(router, '/(tabs)') : setCurrentStep((p) => Math.max(1, p - 1)))}
+          onSelectStep={(step) => setCurrentStep(step)}
+          onResetDraft={handleResetDraft}
         />
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.scrollContent}
-        >
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
           {currentStep === 1 && (
             <StepMediaTitle
               photos={photos}
@@ -349,21 +276,10 @@ export default function ListingCreateScreen() {
               setStock={setStock}
             />
           )}
-          {currentStep === 4 && (
-            <StepSummaryPreview
-              photos={photos.map((p) => p.uri)}
-              title={title}
-              price={price}
-              originalPrice={originalPrice}
-              district={selectedDistrict}
-              stock={stock}
-            />
-          )}
         </ScrollView>
 
-        {/* Barre de navigation */}
         <View style={styles.bottomBar}>
-          {currentStep < 4 ? (
+          {currentStep < 3 ? (
             <Button
               title="Continuer"
               variant="market"
@@ -373,7 +289,7 @@ export default function ListingCreateScreen() {
             />
           ) : (
             <Button
-              title={isEditing ? 'Enregistrer les modifications' : 'Publier à Daloa'}
+              title={isEditing ? 'Enregistrer' : 'Publier à Daloa'}
               variant="success"
               onPress={handlePublish}
               loading={isSubmitting}
@@ -383,40 +299,22 @@ export default function ListingCreateScreen() {
           )}
         </View>
 
-        {/* Dialogue de succès stylisé (Joie & Appartenance) */}
-        <ConfirmDialog
-          visible={showSuccessDialog}
-          type="info"
-          title={isEditing ? 'Annonce modifiée !' : '🎉 Ton annonce est en ligne !'}
-          message={
-            isEditing
-              ? 'Vos modifications sont visibles immédiatement.'
-              : 'Partage le lien de ton article en statut WhatsApp dès maintenant pour multiplier tes vues à Daloa !'
-          }
-          confirmText="Voir l'annonce"
-          cancelText={isEditing ? 'Fermer' : '📲 Partager WhatsApp'}
-          onConfirm={handleGoToCreatedListing}
-          onCancel={() => {
+        <ListingCreateDialogs
+          isEditing={isEditing}
+          showSuccessDialog={showSuccessDialog}
+          createdListingId={createdListingId}
+          title={title}
+          price={price}
+          errorDialog={errorDialog}
+          onViewListing={() => {
             setShowSuccessDialog(false);
-            if (!isEditing && createdListingId) {
-              const shareText = `🔥 Regarde ce que je viens de mettre en vente sur DaloaMarket : *${title.trim()}* à *${formatFCFA(parseFloat(price) || 0)}* !\n👉 https://daloamarket.com/listing/${createdListingId}`;
-              Linking.openURL(`https://wa.me/?text=${encodeURIComponent(shareText)}`).catch(() => {});
-              router.replace(`/listing/${createdListingId}` as any);
-            } else {
-              router.replace('/(tabs)' as any);
-            }
+            router.replace((createdListingId ? `/listing/${createdListingId}` : '/(tabs)') as any);
           }}
-        />
-
-        {/* Dialogue d'erreur stylisé */}
-        <ConfirmDialog
-          visible={Boolean(errorDialog)}
-          type="danger"
-          title={isEditing ? 'Erreur d’enregistrement' : 'Erreur de publication'}
-          message={errorDialog || ''}
-          confirmText="Compris"
-          onConfirm={() => setErrorDialog(null)}
-          onCancel={() => setErrorDialog(null)}
+          onDismissSuccess={() => {
+            setShowSuccessDialog(false);
+            router.replace((createdListingId ? `/listing/${createdListingId}` : '/(tabs)') as any);
+          }}
+          onDismissError={() => setErrorDialog(null)}
         />
       </View>
     </KeyboardScreen>
@@ -424,17 +322,11 @@ export default function ListingCreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg.surface,
-  },
-  scrollContent: {
-    paddingBottom: 260,
-  },
+  container: { flex: 1, backgroundColor: colors.bg.surface },
+  scrollContent: { paddingBottom: 140 },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[3],
     borderTopWidth: 1,
@@ -442,11 +334,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.surface,
     gap: spacing[3],
   },
-  flex1: {
-    flex: 1,
-  },
-  centered: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  flex1: { flex: 1 },
+  centered: { alignItems: 'center', justifyContent: 'center' },
 });
