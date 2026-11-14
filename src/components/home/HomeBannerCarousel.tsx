@@ -3,10 +3,11 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
   Linking,
+  Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,65 +18,35 @@ import { Haptics, getBoostDestination } from '@daloa/utils';
 import { PromoBanner } from '@daloa/types';
 import { promoBannersService } from '@daloa/api';
 import { useAuth } from '../../context/AuthContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_WIDTH = Math.min(SCREEN_WIDTH - spacing[3] * 2, 420);
-const BANNER_HEIGHT = 188;
-const AUTO_PLAY_MS = 4200;
-
-const DEFAULT_BANNERS: PromoBanner[] = [
-  {
-    id: 'default-express',
-    title: 'Coursier Express Daloa',
-    subtitle: 'Colis, plis & repas livrés en 30 min entre quartiers dès 500 F',
-    image_url:
-      'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=900&q=80',
-    badge_text: 'EXPRESS · DÈS 500 F',
-    badge_color: '#EA580C',
-    sponsor_name: 'DaloaDelivery',
-    link_type: 'express',
-    link_target: null,
-    is_active: true,
-    priority: 10,
-    views_count: 0,
-    clicks_count: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'default-boost',
-    title: 'Vendez 3x plus vite à Daloa',
-    subtitle: 'Placez vos articles en tête d’accueil ou passez Vendeur Pro vérifié',
-    image_url:
-      'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=80',
-    badge_text: 'VISIBILITÉ N°1',
-    badge_color: '#D97706',
-    sponsor_name: 'DaloaMarket Pro',
-    link_type: 'none',
-    link_target: '/pro/packs',
-    is_active: true,
-    priority: 5,
-    views_count: 0,
-    clicks_count: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
+import {
+  animateWebScrollLeft,
+  AUTO_PLAY_MS,
+  BANNER_HEIGHT,
+  DEFAULT_MOBILE_BANNERS,
+} from './homeBannerConfig';
 
 export const HomeBannerCarousel: React.FC = () => {
   const router = useRouter();
   const accent = useAccent();
+  const { width: windowWidth } = useWindowDimensions();
+  const bannerWidth = Math.max(260, Math.min(windowWidth - spacing[3] * 2, 420));
+  const slideInterval = bannerWidth + spacing[2];
+
   const { isAuthenticated, profile } = useAuth();
   const boostDestination = getBoostDestination(isAuthenticated, profile, {
     login: '/auth/login',
     myListings: '/seller/my-listings',
     packs: '/pro/packs',
   });
-  const [banners, setBanners] = useState<PromoBanner[]>(DEFAULT_BANNERS);
+
+  const [banners, setBanners] = useState<PromoBanner[]>(DEFAULT_MOBILE_BANNERS);
   const [activeIndex, setActiveIndex] = useState(0);
   const activeIndexRef = useRef(0);
   const isDraggingRef = useRef(false);
+  const isProgrammaticRef = useRef(false);
   const cooldownUntilRef = useRef(0);
+  const cancelWebGlideRef = useRef<(() => void) | null>(null);
+  const nativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const fetchBanners = useCallback(async () => {
@@ -83,7 +54,7 @@ export const HomeBannerCarousel: React.FC = () => {
       const active = await promoBannersService.getActiveBanners();
       const filtered = (active || []).filter((b: PromoBanner) => b.link_type !== 'referral');
       if (filtered.length === 1) {
-        const companion = DEFAULT_BANNERS.find((d) => d.link_type !== filtered[0].link_type) ?? DEFAULT_BANNERS[1];
+        const companion = DEFAULT_MOBILE_BANNERS.find((d) => d.link_type !== filtered[0].link_type) ?? DEFAULT_MOBILE_BANNERS[1];
         setBanners([filtered[0], companion]);
       } else if (filtered.length > 1) {
         setBanners(filtered);
@@ -95,26 +66,59 @@ export const HomeBannerCarousel: React.FC = () => {
 
   useEffect(() => {
     fetchBanners();
+    return () => {
+      cancelWebGlideRef.current?.();
+      if (nativeTimerRef.current) clearTimeout(nativeTimerRef.current);
+    };
   }, [fetchBanners]);
+
+  const scrollToSlide = useCallback((targetIdx: number, isManual: boolean) => {
+    if (banners.length <= 1) return;
+    if (isManual) cooldownUntilRef.current = Date.now() + 5500;
+
+    cancelWebGlideRef.current?.();
+    cancelWebGlideRef.current = null;
+    if (nativeTimerRef.current) clearTimeout(nativeTimerRef.current);
+
+    activeIndexRef.current = targetIdx;
+    setActiveIndex(targetIdx);
+    isProgrammaticRef.current = true;
+    const targetX = targetIdx * slideInterval;
+
+    if (Platform.OS === 'web') {
+      const cancel = animateWebScrollLeft({
+        scrollView: scrollRef.current,
+        targetX,
+        durationMs: isManual ? 650 : 1000,
+        onSettled: () => {
+          isProgrammaticRef.current = false;
+        },
+      });
+      if (cancel) {
+        cancelWebGlideRef.current = cancel;
+        return;
+      }
+    }
+
+    scrollRef.current?.scrollTo({ x: targetX, animated: true });
+    nativeTimerRef.current = setTimeout(() => {
+      isProgrammaticRef.current = false;
+    }, 650);
+  }, [banners.length, slideInterval]);
 
   useEffect(() => {
     if (banners.length <= 1) return;
     const timer = setInterval(() => {
-      if (isDraggingRef.current || Date.now() < cooldownUntilRef.current) return;
-      const next = (activeIndexRef.current + 1) % banners.length;
-      activeIndexRef.current = next;
-      setActiveIndex(next);
-      scrollRef.current?.scrollTo({
-        x: next * (BANNER_WIDTH + spacing[2]),
-        animated: true,
-      });
+      if (isDraggingRef.current || isProgrammaticRef.current || Date.now() < cooldownUntilRef.current) return;
+      scrollToSlide((activeIndexRef.current + 1) % banners.length, false);
     }, AUTO_PLAY_MS);
     return () => clearInterval(timer);
-  }, [banners.length]);
+  }, [banners.length, scrollToSlide]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isProgrammaticRef.current) return;
     const offsetX = event.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / (BANNER_WIDTH + spacing[2]));
+    const index = Math.round(offsetX / slideInterval);
     if (index !== activeIndexRef.current && index >= 0 && index < banners.length) {
       activeIndexRef.current = index;
       setActiveIndex(index);
@@ -155,17 +159,20 @@ export const HomeBannerCarousel: React.FC = () => {
         horizontal
         pagingEnabled={false}
         decelerationRate="fast"
-        snapToInterval={BANNER_WIDTH + spacing[2]}
+        snapToInterval={slideInterval}
         snapToAlignment="center"
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
         onScrollBeginDrag={() => {
+          cancelWebGlideRef.current?.();
+          isProgrammaticRef.current = false;
           isDraggingRef.current = true;
-          cooldownUntilRef.current = Date.now() + 6000;
+          cooldownUntilRef.current = Date.now() + 5500;
         }}
         onScrollEndDrag={() => { isDraggingRef.current = false; }}
         onMomentumScrollEnd={(e) => {
           isDraggingRef.current = false;
+          isProgrammaticRef.current = false;
           handleScroll(e);
         }}
         scrollEventThrottle={16}
@@ -176,7 +183,7 @@ export const HomeBannerCarousel: React.FC = () => {
             key={b.id}
             haptic="medium"
             onPress={() => handleBannerPress(b)}
-            style={styles.bannerCard}
+            style={[styles.bannerCard, { width: bannerWidth }]}
             accessibilityRole="button"
             accessibilityLabel={`${b.title}. ${b.subtitle || ''}`}
           >
@@ -253,12 +260,7 @@ export const HomeBannerCarousel: React.FC = () => {
             <AppPressable
               key={`dot-${b.id}-${i}`}
               hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-              onPress={() => {
-                cooldownUntilRef.current = Date.now() + 6000;
-                activeIndexRef.current = i;
-                setActiveIndex(i);
-                scrollRef.current?.scrollTo({ x: i * (BANNER_WIDTH + spacing[2]), animated: true });
-              }}
+              onPress={() => scrollToSlide(i, true)}
               accessibilityLabel={`Afficher la bannière ${b.title}`}
             >
               <View
@@ -281,7 +283,6 @@ const styles = StyleSheet.create({
   container: { marginTop: spacing[2], marginBottom: spacing[1] },
   scrollList: { paddingHorizontal: spacing[3], gap: spacing[2] },
   bannerCard: {
-    width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
     borderRadius: radii['2xl'],
     overflow: 'hidden',
