@@ -145,12 +145,24 @@ export const paymentService = {
   },
 
   /**
-   * Vérifie le statut d'un paiement auprès de l'API DaloaPay
+   * Déclenche le traitement des virements en attente côté serveur de paiement.
    */
   async triggerPayoutProcessing(): Promise<void> {
     try {
-      fetch(`${ENV_CONFIG.PAYMENT_API_URL}/process-payouts`).catch(() => {});
-    } catch {}
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) return;
+
+      const res = await fetch(`${ENV_CONFIG.PAYMENT_API_URL}/process-payouts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) {
+        console.warn('[paymentService] triggerPayoutProcessing HTTP', res.status);
+      }
+    } catch (err) {
+      console.warn('[paymentService] triggerPayoutProcessing error:', err);
+    }
   },
 
   async checkPaymentStatus(orderId: string): Promise<{ status: string; isPaid: boolean }> {

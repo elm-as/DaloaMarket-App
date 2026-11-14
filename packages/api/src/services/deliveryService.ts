@@ -6,10 +6,8 @@ import {
   DriverDailyStats,
   DeliveryPersonRow,
   Coordinates,
-  DeliveryRunStatus,
 } from '@daloa/types';
-import { haversineDistance, isLocationInDaloa, serializeGeoPoint } from '@daloa/utils';
-import { DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
+import { serializeGeoPoint } from '@daloa/utils';
 import {
   deliveryVerificationService,
   VerifyPickupParams,
@@ -17,49 +15,24 @@ import {
   VerificationResult,
 } from './deliveryVerificationService';
 import { deliveryStorageService } from './deliveryStorageService';
+import {
+  AvailableRunBriefItem,
+  AvailableRunsBrief,
+  PLATFORM_COMMISSION_RATE,
+  mapActiveDeliveryRun,
+  mapAvailableDeliveryRun,
+} from './deliveryRunMapper';
+import { fetchDeliverersDirectory, fetchDriverDailyStats } from './deliveryDriverStats';
 
-/**
- * Part des frais de livraison retenue par la plateforme.
- *
- * `delivery_assignments` n'a pas de colonne `driver_fee` : la commission est
- * derivee ici du prix de la course, et le livreur conserve les 90 % restants
- * — le taux annonce aux coursiers a l'inscription.
- */
-export const PLATFORM_COMMISSION_RATE = 0.1;
+export { PLATFORM_COMMISSION_RATE };
+export type { AvailableRunBriefItem, AvailableRunsBrief };
 
-/** Aperçu d'une course à prendre, pour les pastilles et la cloche de l'en-tête. */
-export interface AvailableRunBriefItem {
-  assignmentId: string;
-  pickupLocation: string;
-  dropoffLocation: string;
-  deliveryPrice: number;
-  createdAt: string;
-}
-
-export interface AvailableRunsBrief {
-  count: number;
-  runs: AvailableRunBriefItem[];
-}
-
-const commissionOn = (deliveryPrice: number): number =>
-  Math.round(deliveryPrice * PLATFORM_COMMISSION_RATE);
-
-/**
- * `orders` n'a pas de colonne `delivery_district` : `ordersService` concatene le
- * quartier dans `delivery_address` sous la forme « Adresse (Quartier) ». On le
- * re-extrait ici, plutot que de demander a PostgREST une colonne inexistante.
- */
-const parseDropoffAddress = (address?: string | null): { address: string; district: string } => {
-  const raw = (address || '').trim();
-  const match = raw.match(/^(.*?)\s*\(([^()]+)\)$/);
-  return match
-    ? { address: match[1].trim(), district: match[2].trim() }
-    : { address: raw, district: '' };
-};
+const RUN_DETAIL_SELECT =
+  'id, order_id, seller_id, delivery_person_id, status, is_private, is_express, is_grouped, delivery_group_id, group_total_stops, group_completed_stops, grouped_stops, pickup_confirmed_by_seller, pickup_confirmed_at, delivered_at, pickup_photo_url, delivery_photo_url, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, delivery_price, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, created_at, orders:order_id(id, order_type, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, payment_method, is_grouped, delivery_group_id, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))';
 
 export const deliveryService = {
   /**
-   * Bascule la disponibilité du livreur (En Ligne / Hors Ligne)
+   * Bascule la disponibilité du livreur (En Ligne / Hors Ligne).
    */
   async setDriverAvailability(driverId: string, isAvailable: boolean): Promise<void> {
     const { error } = await supabase
@@ -71,23 +44,27 @@ export const deliveryService = {
   },
 
   /**
-   * Met à jour la position GPS du livreur
+   * Met à jour la position GPS du livreur en signalant tout échec réseau sans bloquer la boucle GPS.
    */
   async updateDriverLocation(driverId: string, coords: Coordinates): Promise<void> {
-    await supabase
+    const { error } = await supabase
       .from('delivery_persons')
       .update({ current_location: serializeGeoPoint(coords) })
       .eq('id', driverId);
+
+    if (error) {
+      console.warn('[deliveryService.updateDriverLocation] Echec mise a jour GPS:', error.message);
+    }
   },
 
   /**
    * Récupère les courses disponibles en attente d'attribution.
-   * Note de sécurité : pickup_otp et delivery_otp ne sont jamais sélectionnés côté livreur.
+   * Note de sécurité : `pickup_otp` et `delivery_otp` ne sont jamais sélectionnés côté livreur.
    */
-  async getAvailableRuns(driverCoords?: Coordinates | null): Promise<AvailableDeliveryRun[]> {
+  async getAvailableRuns(_driverCoords?: Coordinates | null): Promise<AvailableDeliveryRun[]> {
     const { data, error } = await supabase
       .from('delivery_assignments')
-      .select('id, order_id, seller_id, delivery_person_id, status, is_private, is_express, is_grouped, delivery_group_id, group_total_stops, group_completed_stops, grouped_stops, pickup_confirmed_by_seller, pickup_confirmed_at, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, delivery_price, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, created_at, orders:order_id(id, order_type, delivery_address, delivery_lat, delivery_lng, total_amount, quantity, payment_method, is_grouped, delivery_group_id, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
+      .select(RUN_DETAIL_SELECT)
       .eq('status', 'awaiting_pickup')
       .is('delivery_person_id', null)
       .order('delivery_price', { ascending: false })
@@ -95,7 +72,7 @@ export const deliveryService = {
 
     if (error) throw error;
 
-    // Dédoublonnage des tournées groupées (F06) : une seule carte par delivery_group_id
+    // Dédoublonnage des tournées groupées : une seule carte par `delivery_group_id`.
     const seenGroups = new Set<string>();
     const deduplicated = (data || []).filter((item: any) => {
       const gid = item.delivery_group_id || item.orders?.delivery_group_id;
@@ -105,115 +82,15 @@ export const deliveryService = {
       return true;
     });
 
-    // Téléphones via get_contact_phones : avant l'acceptation, seul celui d'un
-    // vendeur en ligne est visible ; celui de l'acheteur l'est une fois la course prise.
-    await attachContactPhones(deduplicated.flatMap((item: any) => [item.orders?.seller, item.orders?.buyer]));
+    await attachContactPhones(
+      deduplicated.flatMap((item: any) => [item.orders?.seller, item.orders?.buyer])
+    );
 
-    return deduplicated.map((item: any) => {
-      const order = item.orders || {};
-      const listing = order.listings || {};
-      const seller = order.seller || {};
-      const buyer = order.buyer || {};
-
-      const dropoff = parseDropoffAddress(order.delivery_address);
-
-      const isSellerGpsValid =
-        seller.shop_latitude != null &&
-        seller.shop_longitude != null &&
-        isLocationInDaloa(seller.shop_latitude, seller.shop_longitude);
-
-      const sellerDistrictFallback =
-        (seller.district && (DALOA_DISTRICT_COORDINATES as any)[seller.district]) ||
-        (listing.district && (DALOA_DISTRICT_COORDINATES as any)[listing.district]);
-
-      const pickupCoords: Coordinates = {
-        lat: isSellerGpsValid
-          ? seller.shop_latitude
-          : (sellerDistrictFallback?.latitude ?? DALOA_CENTER.lat),
-        lng: isSellerGpsValid
-          ? seller.shop_longitude
-          : (sellerDistrictFallback?.longitude ?? DALOA_CENTER.lng),
-      };
-
-      const isOrderGpsValid =
-        order.delivery_lat != null &&
-        order.delivery_lng != null &&
-        isLocationInDaloa(order.delivery_lat, order.delivery_lng);
-
-      const buyerDistrictFallback =
-        dropoff.district && (DALOA_DISTRICT_COORDINATES as any)[dropoff.district];
-
-      const dropoffCoords: Coordinates = {
-        lat: isOrderGpsValid
-          ? order.delivery_lat
-          : (buyerDistrictFallback?.latitude ?? DALOA_CENTER.lat),
-        lng: isOrderGpsValid
-          ? order.delivery_lng
-          : (buyerDistrictFallback?.longitude ?? DALOA_CENTER.lng),
-      };
-
-      const distanceKm = haversineDistance(pickupCoords, dropoffCoords);
-      const deliveryPrice = Number(item.delivery_price) || 500;
-      const driverFee = commissionOn(deliveryPrice);
-      const driverNetGain = deliveryPrice - driverFee;
-
-      const isExpress = Boolean(item.is_express || order.order_type === 'express');
-      const senderName = order.sender_name || item.sender_name || seller.shop_name || seller.full_name || 'Expéditeur';
-      const senderPhone = order.sender_phone || item.sender_phone || seller.phone || null;
-      const recipientName = order.recipient_name || item.recipient_name || buyer.full_name || 'Destinataire';
-      const recipientPhone = order.recipient_phone || item.recipient_phone || buyer.phone || null;
-      const packageDesc = order.package_description || item.package_description || null;
-      const packageType = order.package_type || item.package_type || null;
-
-      return {
-        assignmentId: item.id,
-        orderId: item.order_id,
-        pickupLocation: item.pickup_location || `${seller.shop_name || 'Vendeur'} (${seller.district || listing.district || 'Daloa'})`,
-        dropoffLocation: item.dropoff_location || item.dropoff_address || dropoff.address || 'Adresse client',
-        pickupDistrict: seller.district || listing.district || 'Daloa Centre',
-        dropoffDistrict: dropoff.district || 'Daloa',
-        pickupCoordinates: pickupCoords,
-        dropoffCoordinates: dropoffCoords,
-        distanceKm: Math.round(distanceKm * 10) / 10,
-        deliveryPrice,
-        driverFee,
-        driverNetGain,
-        isPrivate: item.is_private ?? false,
-        sellerName: isExpress ? senderName : (seller.shop_name || seller.full_name || 'Vendeur'),
-        sellerPhone: isExpress ? senderPhone : (seller.phone || null),
-        buyerName: isExpress ? recipientName : (buyer.full_name || 'Client DaloaMarket'),
-        buyerPhone: isExpress ? recipientPhone : (buyer.phone || null),
-        productTitle: isExpress ? (packageDesc || '⚡ Course Express Daloa') : listing.title,
-        productPhoto: listing.photos?.[0] || null,
-        createdAt: item.created_at,
-        isExpress,
-        packageDescription: packageDesc,
-        packageType,
-        senderName: isExpress ? senderName : undefined,
-        senderPhone: isExpress ? senderPhone : undefined,
-        recipientName: isExpress ? recipientName : undefined,
-        recipientPhone: isExpress ? recipientPhone : undefined,
-        payerRole: item.payer_role || order.payer_role || 'sender',
-        isCod: Boolean(order.payment_method && ['cod', 'cash', 'cash_at_shop'].includes(order.payment_method)),
-        buyerCodReliabilityScore: (buyer as any).cod_reliability_score != null ? Number((buyer as any).cod_reliability_score) : null,
-        buyerCodDeliveredCount: (buyer as any).cod_delivered_count != null ? Number((buyer as any).cod_delivered_count) : null,
-        buyerCodRefusedCount: (buyer as any).cod_refused_count != null ? Number((buyer as any).cod_refused_count) : null,
-        isGrouped: Boolean(item.is_grouped || order.is_grouped),
-        deliveryGroupId: item.delivery_group_id || order.delivery_group_id || null,
-        groupTotalStops: Number(item.group_total_stops) || 1,
-        groupCompletedStops: Number(item.group_completed_stops) || 0,
-        groupedStops: Array.isArray(item.grouped_stops) ? item.grouped_stops : undefined,
-      };
-    });
+    return deduplicated.map(mapAvailableDeliveryRun);
   },
 
   /**
-   * Version légère de `getAvailableRuns` pour les pastilles et la cloche : le
-   * décompte exact des courses à prendre + les quelques plus récentes.
-   *
-   * Volontairement sans jointure ni calcul de distance — c'est ce qui permet de
-   * l'appeler depuis la barre du haut sans dupliquer la requête complète de
-   * l'écran « Courses disponibles ».
+   * Version légère de `getAvailableRuns` pour les pastilles et la cloche de l'en-tête.
    */
   async getAvailableRunsBrief(limit = 5): Promise<AvailableRunsBrief> {
     const { data, count, error } = await supabase
@@ -241,7 +118,7 @@ export const deliveryService = {
   },
 
   /**
-   * Accepte une course disponible (via RPC sécurisée accept_delivery_assignment pour passer les RLS)
+   * Accepte une course disponible via la RPC sécurisée `accept_delivery_assignment`.
    */
   async acceptRun(assignmentId: string, driverId: string): Promise<void> {
     const { data, error } = await supabase.rpc('accept_delivery_assignment', {
@@ -249,27 +126,23 @@ export const deliveryService = {
       p_delivery_person_id: driverId,
     });
 
-    // Le repli qui existait ici a été retiré volontairement.
-    // Il rejouait l'acceptation par un UPDATE direct filtré sur
-    // `.is('delivery_person_id', null)` : aucune policy RLS UPDATE ne couvre une
-    // ligne sans livreur assigné, donc PostgREST renvoyait 0 ligne modifiée *sans
-    // erreur*. La promesse résolvait, l'app naviguait vers l'écran de course, et
-    // la course restait en réalité disponible pour tout le monde.
-    // `accept_delivery_assignment` est désormais le seul chemin.
+    // Pas de fallback UPDATE direct : aucune policy RLS ne permet à un livreur
+    // de modifier une ligne sans `delivery_person_id`, PostgREST renvoyait 0 ligne sans erreur.
     if (error) throw error;
 
     if (data && typeof data === 'object' && 'success' in (data as any) && !(data as any).success) {
-      throw new Error((data as any).reason || 'Cette course a déjà été acceptée par un autre livreur.');
+      throw new Error(
+        (data as any).reason || 'Cette course a déjà été acceptée par un autre livreur.'
+      );
     }
   },
 
   /**
-   * Récupère la course actuellement active pour un livreur.
-   * Note de sécurité : pickup_otp et delivery_otp sont exclus de la requête SQL envoyée au livreur.
+   * Récupère la course actuellement active pour un livreur (`pickup_otp`/`delivery_otp` exclus).
    */
   async getActiveRun(driverId: string): Promise<ActiveDeliveryRunDetails | null> {
     const { data: rawResult, error } = await (supabase.from('delivery_assignments') as any)
-      .select('id, order_id, seller_id, delivery_person_id, status, is_private, is_express, is_grouped, delivery_group_id, group_total_stops, group_completed_stops, grouped_stops, pickup_confirmed_by_seller, pickup_confirmed_at, delivered_at, pickup_photo_url, delivery_photo_url, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, delivery_price, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, created_at, orders:order_id(id, order_type, delivery_address, delivery_lat, delivery_lng, total_amount, payment_method, is_grouped, delivery_group_id, package_description, package_type, sender_name, sender_phone, recipient_name, recipient_phone, payer_role, listings:listing_id(id, title, photos, price, district), seller:seller_id(id, full_name, shop_name, district, shop_latitude, shop_longitude), buyer:buyer_id(id, full_name, cod_reliability_score, cod_delivered_count, cod_refused_count))')
+      .select(RUN_DETAIL_SELECT)
       .eq('delivery_person_id', driverId)
       .in('status', ['accepted', 'picked_up', 'in_transit'])
       .order('delivery_price', { ascending: false })
@@ -277,251 +150,46 @@ export const deliveryService = {
       .limit(1)
       .maybeSingle();
 
-    const data = rawResult as any;
-    if (error || !data) return null;
+    if (error) {
+      console.warn('[deliveryService.getActiveRun] Erreur lecture course active:', error.message);
+      return null;
+    }
+    if (!rawResult) return null;
 
-    await attachContactPhones([(data as any).orders?.seller, (data as any).orders?.buyer]);
-
-    const order: any = data.orders || {};
-    const listing: any = order.listings || {};
-    const seller: any = order.seller || {};
-    const buyer: any = order.buyer || {};
-
-    const pickupCoords: Coordinates = {
-      lat: seller.shop_latitude ?? 6.8773,
-      lng: seller.shop_longitude ?? -6.4502,
-    };
-    const dropoffCoords: Coordinates = {
-      lat: order.delivery_lat ?? 6.8773,
-      lng: order.delivery_lng ?? -6.4502,
-    };
-    const distanceKm = haversineDistance(pickupCoords, dropoffCoords);
-    const deliveryPrice = Number(data.delivery_price) || 500;
-    const driverFee = commissionOn(deliveryPrice);
-    const dropoff = parseDropoffAddress(order.delivery_address);
-
-    const rawData = data as any;
-    const rawOrder = order as any;
-    const isExpress = Boolean(rawData.is_express || rawOrder.order_type === 'express');
-    const senderName = rawOrder.sender_name || rawData.sender_name || seller.shop_name || seller.full_name || 'Expéditeur';
-    const senderPhone = rawOrder.sender_phone || rawData.sender_phone || (seller as { phone?: string | null }).phone || null;
-    const recipientName = rawOrder.recipient_name || rawData.recipient_name || buyer.full_name || 'Destinataire';
-    const recipientPhone = rawOrder.recipient_phone || rawData.recipient_phone || (buyer as { phone?: string | null }).phone || null;
-    const packageDesc = rawOrder.package_description || rawData.package_description || null;
-    const packageType = rawOrder.package_type || rawData.package_type || null;
-
-    return {
-      assignmentId: data.id,
-      orderId: data.order_id,
-      status: data.status as DeliveryRunStatus,
-      pickupConfirmedBySeller: data.pickup_confirmed_by_seller,
-      pickupConfirmedAt: data.pickup_confirmed_at,
-      deliveredAt: data.delivered_at,
-      pickupPhotoUrl: data.pickup_photo_url,
-      deliveryPhotoUrl: data.delivery_photo_url,
-      pickupLocation: data.pickup_location,
-      dropoffLocation:
-        (typeof data.dropoff_location === 'string' && data.dropoff_location) ||
-        (typeof data.dropoff_address === 'string' && data.dropoff_address) ||
-        dropoff.address || 'Adresse client',
-      pickupDistrict: seller.district || listing.district || 'Daloa Centre',
-      dropoffDistrict: dropoff.district || 'Daloa',
-      pickupCoordinates: pickupCoords,
-      dropoffCoordinates: dropoffCoords,
-      distanceKm: Math.round(distanceKm * 10) / 10,
-      deliveryPrice,
-      driverFee,
-      driverNetGain: deliveryPrice - driverFee,
-      isPrivate: data.is_private ?? false,
-      sellerName: isExpress ? senderName : (seller.shop_name || seller.full_name || 'Vendeur'),
-      sellerPhone: isExpress ? senderPhone : ((seller as { phone?: string | null }).phone || null),
-      buyerName: isExpress ? recipientName : (buyer.full_name || 'Client'),
-      buyerPhone: isExpress ? recipientPhone : ((buyer as { phone?: string | null }).phone || null),
-      productTitle: isExpress ? (packageDesc || '⚡ Course Express Daloa') : listing.title,
-      productPhoto: listing.photos?.[0] || null,
-      createdAt: data.created_at,
-      isExpress,
-      packageDescription: packageDesc,
-      packageType,
-      senderName: isExpress ? senderName : undefined,
-      senderPhone: isExpress ? senderPhone : undefined,
-      recipientName: isExpress ? recipientName : undefined,
-      recipientPhone: isExpress ? recipientPhone : undefined,
-      payerRole: rawData.payer_role || rawOrder.payer_role || 'sender',
-      isCod: Boolean(order.payment_method && ['cod', 'cash', 'cash_at_shop'].includes(order.payment_method)),
-      buyerCodReliabilityScore: (buyer as any).cod_reliability_score != null ? Number((buyer as any).cod_reliability_score) : null,
-      buyerCodDeliveredCount: (buyer as any).cod_delivered_count != null ? Number((buyer as any).cod_delivered_count) : null,
-      buyerCodRefusedCount: (buyer as any).cod_refused_count != null ? Number((buyer as any).cod_refused_count) : null,
-      isGrouped: Boolean(rawData.is_grouped || rawOrder.is_grouped),
-      deliveryGroupId: rawData.delivery_group_id || rawOrder.delivery_group_id || null,
-      groupTotalStops: Number(rawData.group_total_stops) || 1,
-      groupCompletedStops: Number(rawData.group_completed_stops) || 0,
-      groupedStops: Array.isArray(rawData.grouped_stops) ? rawData.grouped_stops : undefined,
-    };
+    await attachContactPhones([rawResult.orders?.seller, rawResult.orders?.buyer]);
+    return mapActiveDeliveryRun(rawResult);
   },
 
   /**
-   * Valide le ramassage chez le vendeur avec vérification OTP + Photo + GPS (≤ 100m)
+   * Valide le ramassage chez le vendeur avec vérification OTP + Photo + GPS (<= 100 m).
    */
   async verifyPickupWithOtpAndGps(params: VerifyPickupParams): Promise<VerificationResult> {
     return deliveryVerificationService.verifyPickup(params);
   },
 
   /**
-   * Valide le code OTP Vendeur
-   */
-  async verifyPickupOtp(
-    assignmentId: string,
-    enteredOtp: string,
-    photoUrl: string,
-    driverCoords?: Coordinates,
-    targetCoords?: Coordinates | null
-  ): Promise<VerificationResult> {
-    return deliveryVerificationService.verifyPickup({
-      assignmentId,
-      enteredOtp,
-      photoUrl,
-      driverCoords: driverCoords || { lat: 6.8773, lng: -6.4502 },
-      targetCoords,
-    });
-  },
-
-  /**
-   * Valide la livraison chez l'acheteur avec vérification OTP + Photo + GPS (≤ 100m)
+   * Valide la livraison chez l'acheteur avec vérification OTP + Photo + GPS (<= 100 m).
    */
   async verifyDeliveryWithOtpAndGps(params: VerifyDeliveryParams): Promise<VerificationResult> {
     return deliveryVerificationService.verifyDelivery(params);
   },
 
   /**
-   * Valide le code OTP Client Acheteur
-   */
-  async verifyDeliveryOtp(
-    assignmentId: string,
-    enteredOtp: string,
-    photoUrl: string,
-    driverCoords?: Coordinates,
-    targetCoords?: Coordinates | null
-  ): Promise<VerificationResult> {
-    return deliveryVerificationService.verifyDelivery({
-      assignmentId,
-      enteredOtp,
-      photoUrl,
-      driverCoords: driverCoords || { lat: 6.8773, lng: -6.4502 },
-      targetCoords,
-    });
-  },
-
-  /**
-   * Récupère les statistiques quotidiennes et le solde réel du livreur
+   * Récupère les statistiques quotidiennes et le solde réel disponible du livreur.
    */
   async getDriverDailyStats(driverId: string): Promise<DriverDailyStats> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data: driver } = await supabase
-      .from('delivery_persons')
-      .select('id, user_id, rating, is_available')
-      .eq('id', driverId)
-      .maybeSingle();
-
-    const driverUserId = driver?.user_id || driverId;
-
-    const [deliveredRes, activeRes, payoutsRes] = await Promise.all([
-      // 1. Toutes les courses livrées par ce coursier
-      supabase
-        .from('delivery_assignments')
-        .select('delivery_price, delivered_at')
-        .eq('delivery_person_id', driverId)
-        .eq('status', 'delivered'),
-      // 2. Courses actuellement en cours d'acheminement
-      supabase
-        .from('delivery_assignments')
-        .select('delivery_price')
-        .eq('delivery_person_id', driverId)
-        .in('status', ['assigned', 'picked_up', 'in_transit']),
-      // 3. Versements liés aux livraisons uniquement
-      supabase
-        .from('payouts')
-        .select('amount, status')
-        .eq('user_id', driverUserId)
-        .eq('type', 'delivery'),
-    ]);
-
-    const allDelivered = deliveredRes.data || [];
-    const activeRuns = activeRes.data || [];
-    const payouts = payoutsRes.data || [];
-
-    let earningsToday = 0;
-    let completedRunsToday = 0;
-    let totalLifetimeEarnings = 0;
-
-    allDelivered.forEach((r) => {
-      const price = Number(r.delivery_price) || 0;
-      const net = price - commissionOn(price);
-      totalLifetimeEarnings += net;
-
-      if (r.delivered_at && new Date(r.delivered_at) >= today) {
-        earningsToday += net;
-        completedRunsToday += 1;
-      }
-    });
-
-    const pendingEscrowAmount = activeRuns.reduce((sum, r) => {
-      const price = Number(r.delivery_price) || 0;
-      return sum + (price - commissionOn(price));
-    }, 0);
-
-    const pendingPayoutAmount = payouts
-      .filter((p) => p.status === 'pending' || p.status === 'processing')
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-    const paidOutAmount = payouts
-      .filter((p) => p.status === 'paid' || p.status === 'completed')
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-    const totalAvailableBalance = Math.max(0, totalLifetimeEarnings - paidOutAmount - pendingPayoutAmount);
-
-    return {
-      completedRunsToday,
-      earningsToday,
-      pendingEscrowAmount,
-      totalAvailableBalance,
-      rating: driver?.rating != null ? Number(driver.rating) : null,
-      isOnline: Boolean(driver?.is_available),
-      totalLifetimeEarnings,
-      totalCompletedRuns: allDelivered.length,
-      pendingPayoutAmount,
-      paidOutAmount,
-    };
+    return fetchDriverDailyStats(driverId);
   },
 
   /**
-   * Récupère l'annuaire des livreurs partenaires de Daloa
+   * Récupère l'annuaire des livreurs partenaires de Daloa.
    */
   async getDeliverersDirectory(vehicleType?: string, zone?: string): Promise<DeliveryPersonRow[]> {
-    let query = supabase
-      .from('delivery_persons_directory')
-      .select('*')
-      .order('rating', { ascending: false });
-
-    if (vehicleType && vehicleType !== 'all') {
-      query = query.eq('vehicle_type', vehicleType);
-    }
-
-    if (zone && zone !== 'all') {
-      query = query.contains('coverage_zones', [zone]);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return ((data as unknown as DeliveryPersonRow[]) || []).filter(
-      (d) => Boolean(d.name && d.name.trim().length > 0 && d.phone && d.phone.trim().length > 0)
-    );
+    return fetchDeliverersDirectory(vehicleType, zone);
   },
 
   /**
-   * Téléverse un document KYC vers le bucket sécurisé
+   * Téléverse un document KYC vers le bucket sécurisé.
    */
   async uploadKycDocument(
     fileUri: string,
@@ -532,7 +200,7 @@ export const deliveryService = {
   },
 
   /**
-   * Soumet les documents KYC pour vérification CNI
+   * Soumet les documents KYC pour vérification CNI.
    */
   async submitKycVerification(
     driverId: string,
@@ -547,7 +215,7 @@ export const deliveryService = {
   },
 
   /**
-   * Téléverse une photo de preuve vers Supabase Storage sécurisé
+   * Téléverse une photo de preuve vers Supabase Storage sécurisé.
    */
   async uploadDeliveryProof(
     input: string | { fileUri: string; base64?: string | null },
@@ -557,7 +225,7 @@ export const deliveryService = {
   },
 
   /**
-   * Signale un incident de livraison
+   * Signale un incident de livraison.
    */
   async reportIncident(assignmentId: string, reason: string): Promise<void> {
     return deliveryVerificationService.reportIncident(assignmentId, reason);

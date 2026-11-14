@@ -8,12 +8,13 @@ import { haversineDistance } from '@daloa/utils';
 import {
   DALOA_CENTER,
   DALOA_DISTRICT_COORDINATES,
+  PRICING_CONFIG,
   calculateDeliveryFee,
   reconcileRoadDistanceKm,
 } from '@daloa/config';
 
-/** Part de commission retenue par la plateforme (10%) */
-const PLATFORM_COMMISSION_RATE = 0.1;
+/** Part de commission retenue par la plateforme (source unique @daloa/config). */
+const PLATFORM_COMMISSION_RATE = PRICING_CONFIG.delivery.driverCommissionRate;
 
 export const expressDeliveryService = {
   /**

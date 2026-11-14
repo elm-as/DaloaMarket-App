@@ -95,60 +95,50 @@ export function getTrendingListings<T extends FeedListingCandidate>(
   return out;
 }
 
+function findAlternateSellerIndex<T extends FeedListingCandidate>(
+  deferred: T[],
+  blockedSellerId: string | null
+): number {
+  return deferred.findIndex((candidate) => getListingSellerId(candidate) !== blockedSellerId);
+}
+
 /**
  * Anti-Monopole : Réorganise un flux chronologique ou scoré pour garantir
  * qu'aucun vendeur ne monopolise plus de `maxConsecutive` (défaut: 2) positions consécutives.
- * Préserve l'ordre relatif des annonces au maximum.
+ * Préserve l'ordre relatif des annonces de manière pure sans muter le tableau d'entrée.
  */
 export function interleaveSellerListings<T extends FeedListingCandidate>(
   listings: T[],
   maxConsecutive = 2
 ): T[] {
-  if (listings.length <= maxConsecutive) return listings;
+  if (listings.length <= maxConsecutive) return [...listings];
 
   const result: T[] = [];
-  const deferred: T[] = [];
+  let deferred: T[] = [];
   let currentSellerId: string | null = null;
   let consecutiveCount = 0;
 
   for (const item of listings) {
-    const sellerId = getListingSellerId(item);
-
-    // Vérifier si des éléments différés d'autres vendeurs peuvent être insérés
-    if (deferred.length > 0) {
-      for (let i = 0; i < deferred.length; i++) {
-        const dItem = deferred[i];
-        const dSellerId = getListingSellerId(dItem);
-        if (dSellerId !== currentSellerId) {
-          result.push(dItem);
-          deferred.splice(i, 1);
-          currentSellerId = dSellerId;
-          consecutiveCount = 1;
-          break;
-        }
-      }
-    }
-
-    if (sellerId && sellerId === currentSellerId) {
-      if (consecutiveCount >= maxConsecutive) {
-        // Trop d'annonces consécutives du même vendeur, on temporise
-        deferred.push(item);
-        continue;
-      }
-      consecutiveCount++;
-    } else {
-      currentSellerId = sellerId;
+    const altIdx = deferred.length > 0 ? findAlternateSellerIndex(deferred, currentSellerId) : -1;
+    if (altIdx >= 0) {
+      const picked = deferred[altIdx];
+      deferred = [...deferred.slice(0, altIdx), ...deferred.slice(altIdx + 1)];
+      result.push(picked);
+      currentSellerId = getListingSellerId(picked);
       consecutiveCount = 1;
     }
 
+    const sellerId = getListingSellerId(item);
+    const exceedsStreak = Boolean(sellerId && sellerId === currentSellerId && consecutiveCount >= maxConsecutive);
+    if (exceedsStreak) {
+      deferred = [...deferred, item];
+      continue;
+    }
+
+    consecutiveCount = sellerId === currentSellerId ? consecutiveCount + 1 : 1;
+    currentSellerId = sellerId;
     result.push(item);
   }
 
-  // Insérer les éléments restants différés
-  while (deferred.length > 0) {
-    const item = deferred.shift()!;
-    result.push(item);
-  }
-
-  return result;
+  return [...result, ...deferred];
 }

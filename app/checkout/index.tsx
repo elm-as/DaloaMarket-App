@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { colors, radii, spacing, AppText, AppPressable, useAccent, KeyboardScreen, GroupedDeliveryBanner } from '@daloa/ui';
+import {
+  colors,
+  radii,
+  spacing,
+  AppText,
+  AppPressable,
+  useAccent,
+  KeyboardScreen,
+  GroupedDeliveryBanner,
+} from '@daloa/ui';
 import { ArrowLeft, Lock } from 'lucide-react-native';
-import * as Location from 'expo-location';
-import { calculateOrderBreakdown, calculateDeliveryFee, calculateGroupedDeliveryQuote, PRICING_CONFIG, DALOA_CENTER, DALOA_DISTRICT_COORDINATES } from '@daloa/config';
-import { Haptics, isLocationInDaloa, withTimeout, GPS_TIMEOUT_MS } from '@daloa/utils';
-import { useListingDetail, analyticsService, useSystemSettings, supabase, quoteService } from '@daloa/api';
-import { useQuery } from '@tanstack/react-query';
+import { useListingDetail, useSystemSettings } from '@daloa/api';
 import { usePhase } from '../../src/context/PhaseContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCart } from '../../src/context/CartContext';
@@ -19,12 +24,10 @@ import { CheckoutWizardBar } from '../../src/components/checkout/CheckoutWizardB
 import { CheckoutStepReception } from '../../src/components/checkout/CheckoutStepReception';
 import { CheckoutStepLocation } from '../../src/components/checkout/CheckoutStepLocation';
 import { CheckoutStepPayment } from '../../src/components/checkout/CheckoutStepPayment';
-import { AppliedMobilePromo } from '../../src/components/checkout/PromoCodeBox';
-import { PaymentMode, MobileMoneyOperator } from '../../src/components/checkout/PaymentMethodSelector';
-import { useCheckoutOrder } from '../../src/components/checkout/useCheckoutOrder';
-import { resolveSellerPoint, resolveBuyerPoint, resolveBillableDistanceKm } from '@daloa/utils';
+import { useCheckoutState } from '../../src/components/checkout/useCheckoutState';
 
-const FALLBACK_PHOTO = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+const FALLBACK_PHOTO =
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 
 export default function CheckoutScreen() {
   const scrollRef = useRef<ScrollView>(null);
@@ -32,7 +35,11 @@ export default function CheckoutScreen() {
   const accent = useAccent();
   const insets = useSafeAreaInsets();
   const { listingId, variantId, qty, quantity: qtyParam, cart } = useLocalSearchParams<{
-    listingId?: string; variantId?: string; qty?: string; quantity?: string; cart?: string;
+    listingId?: string;
+    variantId?: string;
+    qty?: string;
+    quantity?: string;
+    cart?: string;
   }>();
   const quantity = Math.max(1, parseInt(qty || qtyParam || '1', 10));
   const isCartMode = cart === '1';
@@ -41,364 +48,26 @@ export default function CheckoutScreen() {
   const { items: cartItems, clearCart } = useCart();
   const { data: listing, isLoading } = useListingDetail(isCartMode ? undefined : listingId);
   const { data: settings } = useSystemSettings();
+  const phase = usePhase();
 
-  // Agrégats panier
-  const cartProductTotal = cartItems.reduce((s, ci) => s + (ci.variant?.price ?? ci.listing.price) * ci.quantity, 0);
-  const cartQtyTotal = cartItems.reduce((s, ci) => s + ci.quantity, 0);
-  const cartSellerCount = new Set(cartItems.map((ci) => ci.listing.user_id || ci.listing.seller?.id)).size;
-
-  const paymentConfig = settings?.paymentConfig;
-  const onlineDisabled = Boolean(paymentConfig?.disable_online_payments || paymentConfig?.force_cod_only);
-
-  const variant = listing?.variants?.find((v: any) => v.id === variantId);
-  const activePrice = variant?.price ?? listing?.price ?? 0;
-
-  // État du Wizard
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'pickup'>('delivery');
-  const [deliveryDistrict, setDeliveryDistrict] = useState<string>(profile?.district || 'Tazibouo');
-  const [deliveryCoords, setDeliveryCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [distanceKm, setDistanceKm] = useState<number>(2.5);
-  const [isDistrictPickerOpen, setIsDistrictPickerOpen] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
-  const [buyerPhone, setBuyerPhone] = useState<string>(profile?.phone || '');
-  const { isPhase0, phaseConfig, allowCodForAll, allowPickupForAll } = usePhase();
-  // Même règle que create_cod_order : hors phase 0, paiement à la livraison et
-  // retrait réservés aux vendeurs Pro. En panier multi-vendeurs, on reste
-  // prudent (la base vérifie chaque vendeur).
-  const isDigital = !isCartMode && listing?.category === 'digital';
-  const isSellerPro = Boolean(
-    !isCartMode && listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()
-  );
-  const isBuyerCodBlocked = Boolean(
-    profile?.cod_blocked_until && new Date(profile.cod_blocked_until).getTime() > Date.now()
-  );
-  const isCodAllowed = (allowCodForAll || isSellerPro) && !isBuyerCodBlocked;
-  const isPickupAllowed = allowPickupForAll || isSellerPro || isDigital;
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(() => {
-    if (onlineDisabled) {
-      return (deliveryMode === 'pickup' || isDigital) && isPickupAllowed ? 'cash_at_shop' : 'cod';
-    }
-    return (phaseConfig?.default_payment_method === 'cod' || isPhase0) && isCodAllowed ? 'cod' : 'online';
+  const state = useCheckoutState({
+    user,
+    profile,
+    isAuthenticated,
+    listingId,
+    variantId,
+    quantity,
+    isCartMode,
+    cartItems,
+    clearCart,
+    listing,
+    settings,
+    phase,
   });
-
-  // Résolution déterministe et unidirectionnelle du mode de paiement
-  // Évite tout rebond/ping-pong entre 'cod' et 'online' quand les paiements en ligne sont coupés
-  useEffect(() => {
-    if (isDigital) {
-      if (deliveryMode !== 'pickup') setDeliveryMode('pickup');
-      return;
-    }
-
-    if (!isPickupAllowed && deliveryMode === 'pickup') {
-      setDeliveryMode('delivery');
-    }
-
-    if (onlineDisabled) {
-      if (paymentMode === 'online') {
-        setPaymentMode(deliveryMode === 'pickup' && isPickupAllowed ? 'cash_at_shop' : 'cod');
-      }
-    } else {
-      if (!isCodAllowed && paymentMode === 'cod') {
-        setPaymentMode('online');
-      }
-      if (!isPickupAllowed && paymentMode === 'cash_at_shop') {
-        setPaymentMode('online');
-      }
-    }
-  }, [isCodAllowed, isPickupAllowed, deliveryMode, paymentMode, onlineDisabled]);
-  const [operator, setOperator] = useState<MobileMoneyOperator>('wave');
-  const [appliedPromo, setAppliedPromo] = useState<AppliedMobilePromo | null>(null);
-
-  // Position de la boutique relue en base à chaque ouverture du checkout.
-  // L'annonce en cache pouvait dater de plusieurs heures (ou venir d'une liste
-  // sans GPS boutique) : le vendeur retombait sur le centre de son quartier et
-  // le prix affiché ne correspondait plus à celui facturé par le serveur.
-  const baseListing: any = isCartMode ? cartItems[0]?.listing : listing;
-  const sellerId: string | undefined = baseListing?.user_id || baseListing?.seller?.id;
-  const { data: sellerPlace } = useQuery({
-    queryKey: ['seller-point', sellerId],
-    enabled: Boolean(sellerId),
-    staleTime: 0,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('users')
-        .select('shop_latitude, shop_longitude, district')
-        .eq('id', sellerId as string)
-        .maybeSingle();
-      return data ?? null;
-    },
-  });
-
-  // Coordonnées résolues du vendeur (en mode panier, prend le premier article du panier)
-  const sellerCoords = useMemo(() => {
-    if (!baseListing) return resolveSellerPoint(null);
-    return resolveSellerPoint(
-      sellerPlace
-        ? { latitude: baseListing.latitude, longitude: baseListing.longitude, district: baseListing.district, seller: sellerPlace }
-        : baseListing
-    );
-  }, [baseListing, sellerPlace]);
-
-  // Panier multi-vendeurs : une livraison par vendeur, chacune à sa distance
-  // réelle — exactement ce que facture le serveur (payments.js). L'ancien
-  // forfait de 500 F par vendeur sous-estimait tout vendeur éloigné.
-  const cartSellerIds = useMemo(
-    () => Array.from(new Set(cartItems.map((ci) => ci.listing.user_id || ci.listing.seller?.id).filter(Boolean))) as string[],
-    [cartItems]
-  );
-  const { data: cartSellerPlaces } = useQuery({
-    queryKey: ['seller-points', cartSellerIds],
-    enabled: isCartMode && cartSellerIds.length > 0,
-    staleTime: 0,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('users')
-        .select('id, shop_latitude, shop_longitude, district')
-        .in('id', cartSellerIds);
-      return (data ?? []) as { id: string; shop_latitude: number | null; shop_longitude: number | null; district: string | null }[];
-    },
-  });
-  const [cartDeliveryFees, setCartDeliveryFees] = useState<number[] | null>(null);
-
-  const [isLocatingGps, setIsLocatingGps] = useState(false);
-
-  const handleRequestGps = useCallback(async (isSilent = false) => {
-    try {
-      if (!isSilent) setIsLocatingGps(true);
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        if (!isSilent) setErrorMsg('Veuillez autoriser l’accès GPS pour que le coursier puisse vous livrer.');
-        return;
-      }
-      // Sans garde-temps, `getCurrentPositionAsync` ne rend jamais la main
-      // quand l'appareil n'obtient pas de fix : le bouton restait figé sur
-      // « Localisation… » indéfiniment.
-      const loc = await withTimeout(
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        GPS_TIMEOUT_MS,
-        () => Location.getLastKnownPositionAsync()
-      );
-      if (!loc?.coords && !isSilent) {
-        setErrorMsg('Position GPS introuvable. Vérifiez que la localisation de votre appareil est activée.');
-      }
-      if (loc?.coords) {
-        const { latitude, longitude } = loc.coords;
-        if (isLocationInDaloa(latitude, longitude)) {
-          setDeliveryCoords({ latitude, longitude });
-          setErrorMsg(null);
-          Haptics.success();
-        } else {
-          const fallback = (deliveryDistrict && DALOA_DISTRICT_COORDINATES[deliveryDistrict]) || DALOA_CENTER;
-          const fbLat = (fallback as any).latitude ?? (fallback as any).lat;
-          const fbLng = (fallback as any).longitude ?? (fallback as any).lng;
-          setDeliveryCoords({ latitude: fbLat, longitude: fbLng });
-          if (!isSilent) setErrorMsg(`Position calée sur ${deliveryDistrict || 'Daloa'} (GPS hors zone).`);
-          Haptics.selection();
-        }
-      }
-    } catch {
-      if (!isSilent) setErrorMsg('Position GPS introuvable. Vérifiez que la localisation de votre appareil est activée.');
-    } finally {
-      if (!isSilent) setIsLocatingGps(false);
-    }
-  }, [deliveryDistrict]);
-
-  useEffect(() => {
-    if (deliveryMode === 'delivery' && !deliveryCoords) {
-      handleRequestGps(true);
-    }
-  }, [deliveryMode, handleRequestGps]);
-
-  // Calcul dynamique de la distance via Mapbox dès que les positions vendeur ou acheteur changent
-  useEffect(() => {
-    // En panier, la distance vient du calcul par vendeur ci-dessous.
-    if (isCartMode) return;
-    let active = true;
-    const buyerPoint = resolveBuyerPoint(deliveryCoords, deliveryDistrict);
-
-    resolveBillableDistanceKm(sellerCoords, buyerPoint).then((calculatedDistance) => {
-      if (active && calculatedDistance > 0) {
-        setDistanceKm(calculatedDistance);
-      }
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [isCartMode, sellerCoords, deliveryCoords, deliveryDistrict]);
-
-  useEffect(() => {
-    if (!isCartMode || !cartSellerPlaces || cartSellerPlaces.length === 0) {
-      setCartDeliveryFees(null);
-      return;
-    }
-    let active = true;
-    const buyerPoint = resolveBuyerPoint(deliveryCoords, deliveryDistrict);
-    Promise.all(
-      cartSellerPlaces.map(async (place) => {
-        const km = await resolveBillableDistanceKm(resolveSellerPoint({ seller: place }), buyerPoint);
-        return { km, fee: calculateDeliveryFee(km) };
-      })
-    ).then((rows) => {
-      if (!active) return;
-      setCartDeliveryFees(rows.map((r) => r.fee));
-      // Distance affichée : la plus longue course du panier.
-      setDistanceKm(Math.max(...rows.map((r) => r.km)));
-    });
-    return () => {
-      active = false;
-    };
-  }, [isCartMode, cartSellerPlaces, deliveryCoords, deliveryDistrict]);
-
-  const rawCartFees = useMemo(() => {
-    return cartDeliveryFees ?? Array(Math.max(1, cartSellerCount)).fill(PRICING_CONFIG.delivery.baseFee);
-  }, [cartDeliveryFees, cartSellerCount]);
-
-  const groupedQuote = useMemo(() => {
-    if (!isCartMode || cartSellerCount <= 1 || deliveryMode === 'pickup') {
-      return null;
-    }
-    return calculateGroupedDeliveryQuote(rawCartFees);
-  }, [isCartMode, cartSellerCount, deliveryMode, rawCartFees]);
-
-  const groupedSavings = groupedQuote?.savings ?? 0;
-
-  const estimatedCartDelivery =
-    deliveryMode === 'pickup'
-      ? 0
-      : groupedQuote
-      ? groupedQuote.totalGroupedFee
-      : rawCartFees.reduce((sum, fee) => sum + fee, 0);
-
-  // Arrondi article par article. Zéro frais de réservation/protection pour les règlements en espèces (cash_at_shop & cod).
-  const isCashPayment = paymentMode === 'cash_at_shop' || paymentMode === 'cod' || deliveryMode === 'pickup';
-  const cartBuyerServiceFee = isCashPayment
-    ? 0
-    : cartItems.reduce(
-        (s, ci) => s + Math.round((ci.variant?.price ?? ci.listing.price) * ci.quantity * PRICING_CONFIG.marketplace.buyerServiceFeeRate),
-        0
-      );
-
-  const breakdown = isCartMode
-    ? {
-        productPrice: cartProductTotal, quantity: cartQtyTotal, productSubtotal: cartProductTotal,
-        deliveryFee: estimatedCartDelivery, buyerServiceFee: cartBuyerServiceFee,
-        groupedDeliveryDiscount: groupedSavings,
-        totalAmount: cartProductTotal + estimatedCartDelivery + cartBuyerServiceFee,
-        sellerCommission: 0, sellerNetPayout: cartProductTotal, driverFee: 0, driverNetPayout: estimatedCartDelivery,
-      }
-    : calculateOrderBreakdown({
-        productPrice: activePrice, quantity, distanceKm, deliveryMode,
-        paymentMethod: paymentMode,
-        isProSeller: Boolean(listing?.seller?.pro_until && new Date(listing.seller.pro_until) > new Date()),
-        // Même règle que la base : commission imposée par la phase si elle existe.
-        sellerFeeOverride: phaseConfig?.seller_fee_override ?? null,
-      });
-
-  // ── Devis serveur ──
-  // À l'étape Paiement, le prix affiché et facturé est celui du serveur (même
-  // calcul, même itinéraire, même position de boutique). Le calcul local
-  // au-dessus ne sert plus qu'à estimer pendant le choix de la position.
-  const quoteItems = useMemo(
-    () =>
-      isCartMode
-        ? cartItems.map((ci) => ({ listing_id: ci.listing.id, variant_id: ci.variant?.id || null, quantity: ci.quantity }))
-        : listingId
-        ? [{ listing_id: listingId, variant_id: variantId || null, quantity }]
-        : [],
-    [isCartMode, cartItems, listingId, variantId, quantity]
-  );
-  const {
-    data: serverQuote,
-    isFetching: isQuoteLoading,
-    isError: isQuoteError,
-    error: quoteError,
-    refetch: refetchQuote,
-  } = useQuery({
-    queryKey: [
-      'order-quote',
-      JSON.stringify(quoteItems),
-      deliveryMode,
-      paymentMode,
-      deliveryCoords?.latitude?.toFixed(5),
-      deliveryCoords?.longitude?.toFixed(5),
-      deliveryDistrict,
-      deliveryAddress.trim(),
-    ],
-    enabled: step === 3 && isAuthenticated && quoteItems.length > 0,
-    // Le devis vit 15 min côté serveur : on le redemande bien avant.
-    staleTime: 5 * 60 * 1000,
-    gcTime: 0,
-    retry: 1,
-    queryFn: () => {
-      const resolvedBuyerPoint = resolveBuyerPoint(deliveryCoords, deliveryDistrict);
-      return quoteService.getQuote({
-        items: quoteItems,
-        deliveryMode,
-        paymentMethod: paymentMode,
-        deliveryLat: resolvedBuyerPoint.latitude,
-        deliveryLng: resolvedBuyerPoint.longitude,
-        deliveryDistrict,
-        deliveryAddress: deliveryMode === 'delivery' ? deliveryAddress.trim() : 'Retrait direct en boutique',
-      });
-    },
-  });
-  // Refus métier (article indisponible, retrait refusé…) : bloquant. Panne
-  // technique du serveur de devis : on laisse commander par l'ancien chemin,
-  // où le serveur recalcule et refuse tout total supérieur à celui affiché.
-  const quoteIsTechnicalFailure = isQuoteError && !(quoteError as any)?.reason;
-  const priceStatus: 'loading' | 'error' | 'ready' =
-    serverQuote && !isQuoteLoading
-      ? 'ready'
-      : isQuoteError && !isQuoteLoading
-      ? quoteIsTechnicalFailure
-        ? 'ready'
-        : 'error'
-      : 'loading';
-
-  const currentDeliveryFee = serverQuote ? serverQuote.deliveryTotal : breakdown.deliveryFee;
-  const currentBuyerServiceFee = isCashPayment ? 0 : (serverQuote ? serverQuote.buyerFeeTotal : breakdown.buyerServiceFee);
-  const currentTotalAmount = isCashPayment
-    ? (isCartMode ? cartProductTotal : activePrice * quantity) + currentDeliveryFee
-    : (serverQuote ? serverQuote.totalAmount : breakdown.totalAmount);
-  const daloaCashDiscount = appliedPromo ? Math.min(appliedPromo.discountAmount, currentTotalAmount) : 0;
-  const effectiveTotalAmount = Math.max(0, currentTotalAmount - daloaCashDiscount);
-
-  const { isSubmitting, errorMsg, setErrorMsg, submitOrder } = useCheckoutOrder({
-    user, profile, listingId, variantId, variant, quantity, listing, activePrice, breakdown,
-    daloaCashDiscount,
-    distanceKm,
-    isCartMode, cartItems, clearCart, deliveryMode, deliveryDistrict, deliveryCoords,
-    deliveryAddress, buyerPhone, paymentMode, operator, onlineDisabled,
-    paymentConfigNotice: paymentConfig?.notice,
-    quote: priceStatus === 'ready' && serverQuote ? serverQuote : null,
-    onQuoteInvalid: () => {
-      refetchQuote();
-    },
-  });
-
-  // Erreur de devis (article indisponible, retrait refusé…) : affichée telle quelle.
-  useEffect(() => {
-    if (step === 3 && isQuoteError && quoteError && (quoteError as any).reason) {
-      setErrorMsg((quoteError as any).message || null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, isQuoteError, quoteError]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [step]);
-
-  useEffect(() => {
-    if (!listing?.id) return;
-    analyticsService.logEvent({
-      eventName: 'checkout_start',
-      userId: user?.id ?? null,
-      listingId: listing.id,
-      props: { category: listing.category, price: activePrice, quantity },
-    });
-  }, [listing?.id, user?.id]);
+  }, [state.step]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -414,7 +83,9 @@ export default function CheckoutScreen() {
     return (
       <View style={styles.loadingBox}>
         <ActivityIndicator size="large" color={accent.DEFAULT} />
-        <AppText variant="body" color={colors.text.muted}>Chargement de la commande...</AppText>
+        <AppText variant="body" color={colors.text.muted}>
+          Chargement de la commande...
+        </AppText>
       </View>
     );
   }
@@ -422,20 +93,16 @@ export default function CheckoutScreen() {
   if (isCartMode && cartItems.length === 0) {
     return (
       <View style={styles.loadingBox}>
-        <AppText variant="body" color={colors.text.muted}>Votre panier est vide.</AppText>
+        <AppText variant="body" color={colors.text.muted}>
+          Votre panier est vide.
+        </AppText>
       </View>
     );
   }
 
-  const handleSelectDistrict = (d: string) => {
-    setDeliveryDistrict(d);
-    if (d && DALOA_DISTRICT_COORDINATES[d]) {
-      setDeliveryCoords(DALOA_DISTRICT_COORDINATES[d]);
-    }
-    setIsDistrictPickerOpen(false);
-  };
-
-  const photoUrl = isCartMode ? cartItems[0]?.listing?.photos?.[0] || FALLBACK_PHOTO : listing?.photos?.[0] || FALLBACK_PHOTO;
+  const photoUrl = isCartMode
+    ? cartItems[0]?.listing?.photos?.[0] || FALLBACK_PHOTO
+    : listing?.photos?.[0] || FALLBACK_PHOTO;
 
   return (
     <KeyboardScreen>
@@ -446,7 +113,9 @@ export default function CheckoutScreen() {
         >
           <View style={styles.heroNav}>
             <AppPressable
-              onPress={() => (step === 3 ? setStep(2) : step === 2 ? setStep(1) : router.back())}
+              onPress={() =>
+                state.step === 3 ? state.setStep(2) : state.step === 2 ? state.setStep(1) : router.back()
+              }
               rippleBorderless
               style={styles.heroBackBtn}
               accessibilityLabel="Retour"
@@ -457,11 +126,15 @@ export default function CheckoutScreen() {
               <Lock size={16} color={colors.text.inverse} />
             </View>
           </View>
-          <AppText variant="overline" color={accent[100]}>TUNNEL SÉCURISÉ</AppText>
-          <AppText variant="h2" color={colors.text.inverse}>Commander</AppText>
+          <AppText variant="overline" color={accent[100]}>
+            TUNNEL SÉCURISÉ
+          </AppText>
+          <AppText variant="h2" color={colors.text.inverse}>
+            Commander
+          </AppText>
         </LinearGradient>
 
-        <CheckoutWizardBar currentStep={step} totalSteps={3} />
+        <CheckoutWizardBar currentStep={state.step} totalSteps={3} />
 
         <ScrollView
           ref={scrollRef}
@@ -469,121 +142,114 @@ export default function CheckoutScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {errorMsg && (
+          {state.errorMsg && (
             <View style={styles.errorBanner}>
-              <AppText variant="caption" color={colors.status.errorDark} center>{errorMsg}</AppText>
+              <AppText variant="caption" color={colors.status.errorDark} center>
+                {state.errorMsg}
+              </AppText>
             </View>
           )}
 
-          {step === 1 && (
+          {state.step === 1 && (
             <CheckoutStepReception
               photoUrl={photoUrl}
-              title={isCartMode ? `Votre panier · ${cartItems.length} article${cartItems.length > 1 ? 's' : ''}` : listing!.title}
-              variantLabel={isCartMode ? (cartSellerCount > 1 ? `${cartSellerCount} vendeurs` : null) : variant?.label}
-              activePrice={isCartMode ? cartProductTotal : activePrice}
+              title={
+                isCartMode
+                  ? `Votre panier · ${cartItems.length} article${cartItems.length > 1 ? 's' : ''}`
+                  : listing!.title
+              }
+              variantLabel={
+                isCartMode
+                  ? state.cartSellerCount > 1
+                    ? `${state.cartSellerCount} vendeurs`
+                    : null
+                  : state.variant?.label
+              }
+              activePrice={isCartMode ? state.cartProductTotal : state.activePrice}
               quantity={isCartMode ? 1 : quantity}
-              deliveryMode={deliveryMode}
+              deliveryMode={state.deliveryMode}
               onDeliveryModeChange={(m) => {
-                setDeliveryMode(m);
-                if (m === 'pickup' && paymentMode === 'cod') setPaymentMode('cash_at_shop');
-                else if (m === 'delivery' && paymentMode === 'cash_at_shop') setPaymentMode('online');
+                state.setDeliveryMode(m);
+                if (m === 'pickup' && state.paymentMode === 'cod') state.setPaymentMode('cash_at_shop');
+                else if (m === 'delivery' && state.paymentMode === 'cash_at_shop') state.setPaymentMode('online');
               }}
-              onNext={() => { setErrorMsg(null); setStep(2); }}
-              isPickupAllowed={isPickupAllowed}
-              isDigital={isDigital}
-            />
-          )}
-
-          {step === 2 && (
-            <CheckoutStepLocation
-              deliveryMode={deliveryMode}
-              deliveryDistrict={deliveryDistrict}
-              onOpenDistrictPicker={() => setIsDistrictPickerOpen(true)}
-              deliveryCoords={deliveryCoords}
-              onDeliveryCoordsChange={setDeliveryCoords}
-              sellerCoords={sellerCoords}
-              deliveryAddress={deliveryAddress}
-              onDeliveryAddressChange={setDeliveryAddress}
-              buyerPhone={buyerPhone}
-              onBuyerPhoneChange={setBuyerPhone}
-              shopName={listing ? (listing.seller?.shop_name || listing.seller?.full_name) : undefined}
-              sellerDistrict={listing?.seller?.district || listing?.district}
-              onLocateGps={() => handleRequestGps(false)}
-              isLocatingGps={isLocatingGps}
-              onBack={() => setStep(1)}
-              isDigital={isDigital}
               onNext={() => {
-                if (deliveryMode === 'delivery' && !isDigital) {
-                  if (!deliveryDistrict.trim()) {
-                    setErrorMsg('Veuillez sélectionner votre quartier à Daloa.');
-                    return;
-                  }
-                  if (!deliveryAddress.trim()) {
-                    setErrorMsg('Veuillez préciser votre repère ou adresse de livraison.');
-                    return;
-                  }
-                  if (!deliveryCoords?.latitude || !deliveryCoords?.longitude) {
-                    const fallbackPoint = resolveBuyerPoint(null, deliveryDistrict);
-                    setDeliveryCoords(fallbackPoint);
-                  }
-                }
-                if (!buyerPhone.trim() || buyerPhone.length < 8) {
-                  setErrorMsg('Veuillez renseigner un numéro de téléphone de contact valide.');
-                  return;
-                }
-                setErrorMsg(null);
-                setStep(3);
+                state.setErrorMsg(null);
+                state.setStep(2);
               }}
+              isPickupAllowed={state.isPickupAllowed}
+              isDigital={state.isDigital}
             />
           )}
 
-          {step === 3 && (
+          {state.step === 2 && (
+            <CheckoutStepLocation
+              deliveryMode={state.deliveryMode}
+              deliveryDistrict={state.deliveryDistrict}
+              onOpenDistrictPicker={() => state.setIsDistrictPickerOpen(true)}
+              deliveryCoords={state.deliveryCoords}
+              onDeliveryCoordsChange={state.setDeliveryCoords}
+              sellerCoords={state.pricing.sellerCoords}
+              deliveryAddress={state.deliveryAddress}
+              onDeliveryAddressChange={state.setDeliveryAddress}
+              buyerPhone={state.buyerPhone}
+              onBuyerPhoneChange={state.setBuyerPhone}
+              shopName={listing ? listing.seller?.shop_name || listing.seller?.full_name : undefined}
+              sellerDistrict={listing?.seller?.district || listing?.district}
+              onLocateGps={() => state.handleRequestGps(false)}
+              isLocatingGps={state.isLocatingGps}
+              onBack={() => state.setStep(1)}
+              isDigital={state.isDigital}
+              onNext={state.handleStep2Next}
+            />
+          )}
+
+          {state.step === 3 && (
             <>
-              {isCartMode && cartSellerCount > 1 && deliveryMode === 'delivery' && (
-                <GroupedDeliveryBanner sellerCount={cartSellerCount} savings={groupedSavings} />
+              {isCartMode && state.cartSellerCount > 1 && state.deliveryMode === 'delivery' && (
+                <GroupedDeliveryBanner sellerCount={state.cartSellerCount} savings={state.pricing.groupedSavings} />
               )}
               <CheckoutStepPayment
-                deliveryMode={deliveryMode}
-                paymentMode={paymentMode}
-                onPaymentModeChange={setPaymentMode}
-                operator={operator}
-                onOperatorChange={setOperator}
-                isCodAllowed={isCodAllowed}
-                isCodBlocked={isBuyerCodBlocked}
+                deliveryMode={state.deliveryMode}
+                paymentMode={state.paymentMode}
+                onPaymentModeChange={state.setPaymentMode}
+                operator={state.operator}
+                onOperatorChange={state.setOperator}
+                isCodAllowed={state.isCodAllowed}
+                isCodBlocked={state.isBuyerCodBlocked}
                 codBlockedNotice="Le paiement à la livraison est temporairement indisponible suite à des commandes non réceptionnées. Veuillez régler par Mobile Money sécurisé."
-                onlineDisabled={onlineDisabled}
-                onlineNotice={paymentConfig?.notice}
-                // En panier, pas d'annonce unique : le prix affiché valait 0 FCFA.
+                onlineDisabled={state.onlineDisabled}
+                onlineNotice={state.paymentConfig?.notice}
                 quantity={isCartMode ? 1 : quantity}
-                activePrice={isCartMode ? cartProductTotal : activePrice}
-                appliedPromo={appliedPromo}
-                onApplyPromo={setAppliedPromo}
-                promoDiscount={daloaCashDiscount}
-                groupedDeliveryDiscount={groupedSavings}
-                deliveryFee={currentDeliveryFee}
-              buyerServiceFee={currentBuyerServiceFee}
-              totalAmount={effectiveTotalAmount}
-              distanceKm={serverQuote ? serverQuote.distanceKm : distanceKm}
-              isSubmitting={isSubmitting}
-              priceStatus={priceStatus}
-              onRetryPrice={() => {
-                setErrorMsg(null);
-                refetchQuote();
-              }}
-              onBack={() => setStep(2)}
-              onSubmit={submitOrder}
-            />
-          </>
-        )}
+                activePrice={isCartMode ? state.cartProductTotal : state.activePrice}
+                appliedPromo={state.appliedPromo}
+                onApplyPromo={state.setAppliedPromo}
+                promoDiscount={state.pricing.daloaCashDiscount}
+                groupedDeliveryDiscount={state.pricing.groupedSavings}
+                deliveryFee={state.pricing.currentDeliveryFee}
+                buyerServiceFee={state.pricing.currentBuyerServiceFee}
+                totalAmount={state.pricing.effectiveTotalAmount}
+                distanceKm={state.pricing.serverQuote ? state.pricing.serverQuote.distanceKm : state.pricing.distanceKm}
+                isSubmitting={state.isSubmitting}
+                priceStatus={state.pricing.priceStatus}
+                onRetryPrice={() => {
+                  state.setErrorMsg(null);
+                  state.pricing.refetchQuote();
+                }}
+                onBack={() => state.setStep(2)}
+                onSubmit={state.submitOrder}
+              />
+            </>
+          )}
 
           <View style={{ height: insets.bottom + spacing[6] }} />
         </ScrollView>
 
         <DistrictPickerSheet
-          visible={isDistrictPickerOpen}
-          onClose={() => setIsDistrictPickerOpen(false)}
-          selectedDistrict={deliveryDistrict}
-          onSelectDistrict={handleSelectDistrict}
+          visible={state.isDistrictPickerOpen}
+          onClose={() => state.setIsDistrictPickerOpen(false)}
+          selectedDistrict={state.deliveryDistrict}
+          onSelectDistrict={state.handleSelectDistrict}
         />
       </View>
     </KeyboardScreen>
@@ -593,9 +259,34 @@ export default function CheckoutScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.DEFAULT },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[2] },
-  hero: { paddingHorizontal: spacing[4], paddingBottom: spacing[4], borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  hero: {
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[4],
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
   heroNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
-  heroBackBtn: { width: 36, height: 36, borderRadius: radii.lg, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  heroLockCircle: { width: 36, height: 36, borderRadius: radii.full, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }, scrollContent: { padding: spacing[4] },
-  errorBanner: { backgroundColor: colors.status.errorLight, padding: spacing[3], borderRadius: radii.lg, marginBottom: spacing[3] },
+  heroBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroLockCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: { padding: spacing[4] },
+  errorBanner: {
+    backgroundColor: colors.status.errorLight,
+    padding: spacing[3],
+    borderRadius: radii.lg,
+    marginBottom: spacing[3],
+  },
 });

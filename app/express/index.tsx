@@ -204,35 +204,39 @@ export default function ExpressDeliveryScreen() {
       >
         <ExpressFormFields
           currentStep={currentStep}
-          packageType={packageType}
-          setPackageType={setPackageType}
-          packageDescription={packageDescription}
-          setPackageDescription={setPackageDescription}
-          isSealed={isSealed}
-          setIsSealed={setIsSealed}
-          isFragile={isFragile}
-          setIsFragile={setIsFragile}
-          isHandDelivery={isHandDelivery}
-          setIsHandDelivery={setIsHandDelivery}
-          pickupDistrict={pickupDistrict}
-          onOpenPickupDistrictPicker={() => setDistrictPickerTarget('pickup')}
-          pickupAddress={pickupAddress}
-          setPickupAddress={setPickupAddress}
-          senderPhone={senderPhone}
-          setSenderPhone={setSenderPhone}
-          dropoffDistrict={dropoffDistrict}
-          onOpenDropoffDistrictPicker={() => setDistrictPickerTarget('dropoff')}
-          dropoffAddress={dropoffAddress}
-          setDropoffAddress={setDropoffAddress}
-          recipientName={recipientName}
-          setRecipientName={setRecipientName}
-          recipientPhone={recipientPhone}
-          setRecipientPhone={setRecipientPhone}
-          payerRole={payerRole}
-          setPayerRole={setPayerRole}
-          distanceKm={quote.distanceKm}
-          deliveryFee={quote.deliveryFee}
-          driverNetGain={quote.driverNetGain}
+          state={{
+            packageType,
+            packageDescription,
+            isSealed,
+            isFragile,
+            isHandDelivery,
+            pickupDistrict,
+            pickupAddress,
+            senderPhone,
+            dropoffDistrict,
+            dropoffAddress,
+            recipientName,
+            recipientPhone,
+            payerRole,
+            distanceKm: quote.distanceKm,
+            deliveryFee: quote.deliveryFee,
+            driverNetGain: quote.driverNetGain,
+          }}
+          handlers={{
+            setPackageType,
+            setPackageDescription,
+            setIsSealed,
+            setIsFragile,
+            setIsHandDelivery,
+            onOpenPickupDistrictPicker: () => setDistrictPickerTarget('pickup'),
+            setPickupAddress,
+            setSenderPhone,
+            onOpenDropoffDistrictPicker: () => setDistrictPickerTarget('dropoff'),
+            setDropoffAddress,
+            setRecipientName,
+            setRecipientPhone,
+            setPayerRole,
+          }}
         />
 
         {/* Boutons de navigation du Wizard */}
