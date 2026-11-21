@@ -2,25 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Tag, Rocket, MapPin } from 'lucide-react-native';
-import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
+import { MapPin } from 'lucide-react-native';
+import { colors, radii, spacing, AppText, AppPressable, typography } from '@daloa/ui';
 import { formatFCFA, resolveListingPhoto } from '@daloa/utils';
 import { ListingFull } from '@daloa/types';
 import { listingFlashDealsService } from '@daloa/api';
-import { getBoostDestination } from '@daloa/utils';
-import { usePhase } from '../../context/PhaseContext';
-import { useAuth } from '../../context/AuthContext';
 
+/**
+ * Carrousel horizontal des articles en promotion ou mis en avant sur l'accueil mobile.
+ */
 export const HomeFlashDeals: React.FC = () => {
   const router = useRouter();
-  const accent = useAccent();
-  const { enableBoost } = usePhase();
-  const { isAuthenticated, profile } = useAuth();
-  const boostDestination = getBoostDestination(isAuthenticated, profile, {
-    login: '/auth/login',
-    myListings: '/seller/my-listings',
-    packs: '/pro/packs',
-  });
   const [deals, setDeals] = useState<ListingFull[]>([]);
 
   const fetchDeals = useCallback(async () => {
@@ -46,37 +38,6 @@ export const HomeFlashDeals: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.bannerHeader}>
-        <View style={styles.headerLeft}>
-          <View style={styles.tagBadge}>
-            <Tag size={14} color={accent[600]} />
-          </View>
-          <View>
-            <AppText variant="subtitle" color={colors.text.DEFAULT} style={styles.headerTitle}>
-              Promotions & Articles en vedette
-            </AppText>
-            <AppText variant="caption" color={colors.text.muted} style={styles.headerSubtitle}>
-              Offres actives des commerçants de Daloa
-            </AppText>
-          </View>
-        </View>
-
-        {enableBoost ? (
-          <AppPressable
-            haptic="light"
-            onPress={() => router.push(boostDestination as any)}
-            style={styles.boostPill}
-            accessibilityRole="button"
-            accessibilityLabel="Mettre en avant une annonce"
-          >
-            <Rocket size={11} color={accent[600]} />
-            <AppText variant="caption" color={accent[600]} style={styles.boostPillText}>
-              Mettre en avant
-            </AppText>
-          </AppPressable>
-        ) : null}
-      </View>
-
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -156,45 +117,7 @@ export const HomeFlashDeals: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { marginVertical: spacing[2] },
-  bannerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: spacing[3],
-    marginBottom: spacing[2],
-    paddingHorizontal: spacing[3],
-    paddingVertical: 10,
-    borderRadius: radii.lg,
-    backgroundColor: colors.bg.surface,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  tagBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.md,
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1,
-    borderColor: '#FFEDD5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { fontFamily: typography.families.bold, fontSize: 13 },
-  headerSubtitle: { fontSize: 11, marginTop: 1 },
-  boostPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1,
-    borderColor: '#FED7AA',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radii.md,
-  },
-  boostPillText: { fontSize: 11, fontFamily: typography.families.bold },
+  container: { marginTop: spacing[2], marginBottom: spacing[1] },
   scrollContent: { paddingHorizontal: spacing[3], gap: 10, paddingBottom: 4 },
   dealCard: {
     width: 144,
