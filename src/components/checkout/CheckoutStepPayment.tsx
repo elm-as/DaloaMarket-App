@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { colors, radii, spacing, Button, AppText, useAccent, typography } from '@daloa/ui';
+import { PRICING_CONFIG } from '@daloa/config';
 import { ArrowLeft, ShieldCheck } from 'lucide-react-native';
 import { formatFCFA, Haptics } from '@daloa/utils';
 import {
@@ -76,6 +77,9 @@ export function CheckoutStepPayment({
       ? 'Paiement en ligne temporairement indisponible'
       : `Payer avec ${operator.toUpperCase()} · ${formatFCFA(totalAmount)}`;
 
+  const estimatedOnlineFee = Math.round(activePrice * quantity * PRICING_CONFIG.marketplace.buyerServiceFeeRate);
+  const isCashPayment = paymentMode === 'cod' || paymentMode === 'cash_at_shop' || deliveryMode === 'pickup';
+
   return (
     <View style={styles.container}>
       {/* 1. Sélecteur de méthode de règlement */}
@@ -85,6 +89,7 @@ export function CheckoutStepPayment({
         onPaymentModeChange={onPaymentModeChange}
         operator={operator}
         onOperatorChange={onOperatorChange}
+        estimatedOnlineFee={estimatedOnlineFee}
         isCodAllowed={isCodAllowed}
         isCodBlocked={isCodBlocked}
         codBlockedNotice={codBlockedNotice}
@@ -133,13 +138,18 @@ export function CheckoutStepPayment({
           </AppText>
         </View>
 
-        {buyerServiceFee > 0 && (
+        {deliveryMode !== 'pickup' && (
           <View style={styles.breakRow}>
             <AppText variant="caption" color={colors.text.muted} style={styles.breakLabel}>
-              Frais de service plateforme (2%)
+              Frais paiement en ligne ({Math.round(PRICING_CONFIG.marketplace.buyerServiceFeeRate * 100)} %)
             </AppText>
-            <AppText variant="body" style={[styles.boldNum, styles.breakAmount]} numberOfLines={1}>
-              {formatFCFA(buyerServiceFee)}
+            <AppText
+              variant="body"
+              color={isCashPayment ? colors.status.successDark : colors.text.DEFAULT}
+              style={[styles.boldNum, styles.breakAmount]}
+              numberOfLines={1}
+            >
+              {isCashPayment ? '0 FCFA' : formatFCFA(buyerServiceFee)}
             </AppText>
           </View>
         )}

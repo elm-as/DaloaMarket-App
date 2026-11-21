@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { colors, radii, spacing, AppText, AppPressable, useAccent, typography } from '@daloa/ui';
-import { CreditCard, Banknote, Store, ShieldCheck, Truck, Check } from 'lucide-react-native';
+import { PRICING_CONFIG } from '@daloa/config';
+import { formatFCFA } from '@daloa/utils';
+import { CreditCard, Banknote, Store, Truck, Check } from 'lucide-react-native';
 
 export type PaymentMode = 'online' | 'cod' | 'cash_at_shop';
 export type MobileMoneyOperator = 'wave' | 'orange' | 'mtn' | 'moov';
@@ -26,6 +28,7 @@ interface PaymentMethodSelectorProps {
   onPaymentModeChange: (mode: PaymentMode) => void;
   operator: MobileMoneyOperator;
   onOperatorChange: (op: MobileMoneyOperator) => void;
+  estimatedOnlineFee?: number;
   isCodAllowed?: boolean;
   isCodBlocked?: boolean;
   codBlockedNotice?: string;
@@ -33,12 +36,17 @@ interface PaymentMethodSelectorProps {
   onlineNotice?: string;
 }
 
+/**
+ * Sélecteur de mode de règlement mobile : affiche les frais en ligne à l'avance
+ * directement sur chaque carte pour éviter toute hausse inattendue.
+ */
 export function PaymentMethodSelector({
   deliveryMode,
   paymentMode,
   onPaymentModeChange,
   operator,
   onOperatorChange,
+  estimatedOnlineFee = 0,
   isCodAllowed = true,
   isCodBlocked = false,
   codBlockedNotice,
@@ -46,13 +54,17 @@ export function PaymentMethodSelector({
   onlineNotice,
 }: PaymentMethodSelectorProps) {
   const accent = useAccent();
+  const feePercent = Math.round(PRICING_CONFIG.marketplace.buyerServiceFeeRate * 100);
+  const onlineFeeText =
+    estimatedOnlineFee > 0
+      ? `Frais en ligne : +${formatFCFA(estimatedOnlineFee)} (${feePercent} %)`
+      : `Frais en ligne : ${feePercent} %`;
 
   return (
     <View style={styles.container}>
       <AppText variant="bodyStrong">Mode de règlement</AppText>
 
       <View style={styles.modesContainer}>
-        {/* 1. Option COD (Paiement à la livraison) */}
         {deliveryMode === 'delivery' && (
           isCodBlocked ? (
             <View style={[styles.modeCard, styles.disabledModeCard]}>
@@ -70,7 +82,7 @@ export function PaymentMethodSelector({
                     </View>
                   </View>
                   <AppText variant="caption" color={colors.status.errorDark} style={styles.descText}>
-                    {codBlockedNotice || 'Option temporairement suspendue suite à des commandes non réceptionnées. Veuillez régler par Mobile Money sécurisé.'}
+                    {codBlockedNotice || 'Option temporairement suspendue suite à des commandes non réceptionnées.'}
                   </AppText>
                 </View>
               </View>
@@ -86,14 +98,9 @@ export function PaymentMethodSelector({
                   <Banknote size={16} color={colors.status.successDark} />
                 </View>
                 <View style={styles.flex1}>
-                  <View style={styles.badgeRow}>
-                    <AppText variant="bodyStrong">Paiement à la livraison</AppText>
-                    <View style={styles.recBadge}>
-                      <AppText variant="overline" color={colors.status.successDark}>RECOMMANDÉ</AppText>
-                    </View>
-                  </View>
+                  <AppText variant="bodyStrong">Paiement à la livraison</AppText>
                   <AppText variant="caption" color={colors.text.muted} style={styles.descText}>
-                    Espèces ou Mobile Money remis au livreur après contrôle du colis
+                    Espèces ou Mobile Money au livreur · 0 FCFA de frais en ligne
                   </AppText>
                 </View>
                 <View style={[styles.radioCircle, paymentMode === 'cod' && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT }]}>
@@ -104,7 +111,6 @@ export function PaymentMethodSelector({
           ) : null
         )}
 
-        {/* 2. Option Espèces en magasin */}
         {deliveryMode === 'pickup' && (
           <AppPressable
             haptic="selection"
@@ -118,7 +124,7 @@ export function PaymentMethodSelector({
               <View style={styles.flex1}>
                 <AppText variant="bodyStrong">Espèces au magasin</AppText>
                 <AppText variant="caption" color={colors.text.muted} style={styles.descText}>
-                  Réglez directement chez le commerçant lors du retrait
+                  Réglez chez le commerçant · 0 FCFA de frais en ligne
                 </AppText>
               </View>
               <View style={[styles.radioCircle, paymentMode === 'cash_at_shop' && { borderColor: accent.DEFAULT, backgroundColor: accent.DEFAULT }]}>
@@ -128,7 +134,6 @@ export function PaymentMethodSelector({
           </AppPressable>
         )}
 
-        {/* 3. Option Mobile Money Sécurisé */}
         <AppPressable
           haptic={onlineDisabled ? 'none' : 'selection'}
           onPress={() => {
@@ -148,7 +153,7 @@ export function PaymentMethodSelector({
             <View style={styles.flex1}>
               <View style={styles.badgeRow}>
                 <AppText variant="bodyStrong" color={onlineDisabled ? colors.text.muted : colors.text.DEFAULT}>
-                  Paiement Mobile Money Sécurisé
+                  Mobile Money en ligne
                 </AppText>
                 {onlineDisabled && (
                   <View style={[styles.recBadge, { backgroundColor: '#FEE2E2' }]}>
@@ -158,8 +163,8 @@ export function PaymentMethodSelector({
               </View>
               <AppText variant="caption" color={onlineDisabled ? colors.status.errorDark : colors.text.muted} style={styles.descText}>
                 {onlineDisabled
-                  ? (onlineNotice || 'Paiement en ligne temporairement suspendu pour maintenance')
-                  : "Fonds protégés sous séquestre jusqu'à validation OTP"}
+                  ? (onlineNotice || 'Paiement en ligne temporairement suspendu')
+                  : `Wave, Orange, MTN, Moov · ${onlineFeeText}`}
               </AppText>
             </View>
             <View
@@ -173,7 +178,6 @@ export function PaymentMethodSelector({
             </View>
           </View>
 
-          {/* Grille des opérateurs (seulement si actif) */}
           {paymentMode === 'online' && !onlineDisabled && (
             <View style={styles.operatorsGrid}>
               {OPERATORS.map((op) => {
@@ -207,36 +211,27 @@ export function PaymentMethodSelector({
         </AppPressable>
       </View>
 
-      {/* Notice de réassurance */}
-      <View style={styles.noticeCard}>
-        {paymentMode === 'online' && (
+      {paymentMode === 'cod' && (
+        <View style={styles.noticeCard}>
           <View style={styles.noticeRow}>
-            <ShieldCheck size={16} color={colors.status.successDark} />
+            <Truck size={15} color={accent[700]} />
             <AppText variant="caption" color={colors.text.body} style={styles.flex1}>
-              <AppText variant="caption" style={styles.bold}>Protection Séquestre : </AppText>
-              Votre argent reste bloqué sur un compte sécurisé et vous est remboursé à 100% en cas de problème.
+              Réglez directement au livreur après vérification du colis.
             </AppText>
           </View>
-        )}
-        {paymentMode === 'cod' && (
+        </View>
+      )}
+
+      {paymentMode === 'cash_at_shop' && (
+        <View style={styles.noticeCard}>
           <View style={styles.noticeRow}>
-            <Truck size={16} color={accent[700]} />
+            <Store size={15} color="#B45309" />
             <AppText variant="caption" color={colors.text.body} style={styles.flex1}>
-              <AppText variant="caption" style={styles.bold}>Paiement après contrôle : </AppText>
-              Vous réglez en espèces ou Mobile Money directement au coursier après inspection de votre colis.
+              Testez l&apos;article à la boutique à Daloa et réglez sur place.
             </AppText>
           </View>
-        )}
-        {paymentMode === 'cash_at_shop' && (
-          <View style={styles.noticeRow}>
-            <Store size={16} color="#B45309" />
-            <AppText variant="caption" color={colors.text.body} style={styles.flex1}>
-              <AppText variant="caption" style={styles.bold}>Remise directe : </AppText>
-              Rendez-vous à la boutique du commerçant à Daloa pour tester l'article et régler sur place.
-            </AppText>
-          </View>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -261,5 +256,5 @@ const styles = StyleSheet.create({
   bold: { fontFamily: typography.families.bold },
   checkCircle: { width: 15, height: 15, borderRadius: radii.full, alignItems: 'center', justifyContent: 'center' },
   noticeCard: { backgroundColor: colors.bg.surface, borderRadius: radii.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.border.DEFAULT },
-  noticeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  noticeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });
